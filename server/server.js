@@ -5,7 +5,8 @@ const dotenv = require('dotenv');
 const morgan = require('morgan');
 const { ensureEnvFile, DEFAULT_MONGO_URI } = require('./config/ensureEnv');
 const authRoutes = require('./routes/authRoutes');
-const User = require('./models/User');
+const studentRoutes = require('./routes/studentRoutes');
+const { seed } = require('./config/seedData');
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
 if (ensureEnvFile()) {
@@ -20,6 +21,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/students', studentRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 
 const PORT = process.env.PORT || 5000;
@@ -34,15 +36,8 @@ async function startServer() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    // FORCE SEED EVERY TIME ON START
-    console.log('Syncing test users...');
-    await User.deleteMany({});
-    await User.create([
-      { fullName: 'Samy Elgedaily', email: 'samy.elgedaily@student.guc.edu.eg', password: 'SamySamy2006', role: 'Student', isActive: true },
-      { fullName: 'Dr. Advisor', email: 'advisor@guc.edu.eg', password: 'password123', role: 'Advisor', isActive: true },
-      { fullName: 'Admin User', email: 'admin@guc.edu.eg', password: 'password123', role: 'Administrator', isActive: true }
-    ]);
-    console.log('✅ All test users created and hashed!');
+    const { users, students } = await seed();
+    console.log(`✅ Seeded ${users} users and ${students} students`);
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {
