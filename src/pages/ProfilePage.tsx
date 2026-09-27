@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { CreditCard, GraduationCap, Loader2, Mail, UserRound } from 'lucide-react';
+import { CreditCard, GraduationCap, Loader2, Mail, ShieldCheck, UserRound } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 import StatusPill from '../components/ui/StatusPill';
 import AlertBanner from '../components/ui/AlertBanner';
 import { ApiError, apiFetch } from '../lib/api';
+import { formatDate } from '../lib/studentsService';
 import type { Role } from '../lib/types';
 
 interface ProfileAdvisor {
@@ -20,13 +21,14 @@ interface ProfileUser {
   fullName: string;
   email: string;
   role: Role;
+  isActive?: boolean;
+  createdAt?: string;
   studentId?: string;
   studentType?: 'Normal Student' | 'Advising Student';
   major?: string;
   currentSemester?: number;
   academicStanding?: string;
   workflowStatus?: string;
-  isActive?: boolean;
   assignedAdvisor?: ProfileAdvisor | null;
 }
 
@@ -85,7 +87,11 @@ const ProfilePage: React.FC = () => {
     <>
       <PageHeader
         title="My Profile"
-        description="Your account and academic information."
+        description={
+          isStudent
+            ? 'Your account and academic information.'
+            : 'Your account information and scheduling role.'
+        }
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
       />
 
@@ -103,14 +109,40 @@ const ProfilePage: React.FC = () => {
                 {profile.email}
               </p>
             </div>
-            {isStudent && profile.isActive !== undefined && (
+            {profile.isActive !== undefined && (
               <div className="ml-auto">
                 <StatusPill
                   state={profile.isActive ? 'active' : 'inactive'}
-                  workflowStatus={profile.workflowStatus}
+                  workflowStatus={isStudent ? profile.workflowStatus : null}
                 />
               </div>
             )}
+          </div>
+        </Card>
+
+        {/* FR 4.0: every account sees their own profile details. */}
+        <Card className="p-6">
+          <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
+            <ShieldCheck className="h-4 w-4 text-indigo-400" aria-hidden />
+            Account Information
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <DetailField label="Full Name" value={profile.fullName} />
+            <DetailField
+              label="GUC Email"
+              value={
+                <span className="flex items-center gap-1.5">
+                  <Mail className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                  <span className="truncate">{profile.email}</span>
+                </span>
+              }
+            />
+            <DetailField label="Role" value={profile.role} />
+            <DetailField
+              label="Account Status"
+              value={profile.isActive === undefined ? 'Unknown' : profile.isActive ? 'Active' : 'Inactive'}
+            />
+            <DetailField label="Member Since" value={profile.createdAt ? formatDate(profile.createdAt) : 'Unknown'} />
           </div>
         </Card>
 
