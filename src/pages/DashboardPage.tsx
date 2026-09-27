@@ -1,17 +1,65 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function DashboardPage() {
+const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const user = {
-    fullName: 'Samy Elgedaily',
-    role: 'Student',
-    email: 'samy.elgedaily@student.guc.edu.eg'
-  };
+  const [user, setUser] = useState<{ fullName: string; role: string; email: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          navigate('/');
+          return;
+        }
+
+        const response = await fetch('http://localhost:5000/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+
+        if (!response.ok) throw new Error('Session expired');
+
+        const data = await response.json();
+        setUser(data.user);
+      } catch (error) {
+        localStorage.removeItem('token');
+        navigate('/');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [navigate]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user');
     navigate('/');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  if (!user) return null;
+
+  // Logic for the professional greeting
+  const getGreetingName = () => {
+    const names = user.fullName.split(' ');
+    if (user.role === 'Advisor' || user.role === 'Administrator') {
+      // For Professors/Advisors: Show "Dr. [First Name]"
+      // We assume the name is stored as "Dr. Firstname Lastname"
+      return names.length >= 2 ? `${names[0]} ${names[1]}` : names[0];
+    }
+    // For Students: Just the first name
+    return names[0];
   };
 
   return (
@@ -32,9 +80,6 @@ function DashboardPage() {
             <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
               <span>👤</span> My Profile
             </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-              <span>🔔</span> Notifications
-            </button>
           </nav>
         </div>
         <div className="mt-auto p-6 border-t border-slate-800">
@@ -46,8 +91,8 @@ function DashboardPage() {
       <main className="flex-1 p-10 overflow-y-auto">
         <header className="flex justify-between items-center mb-12">
           <div>
-            <h2 className="text-4xl font-extrabold text-white tracking-tight">Welcome back, {user.fullName.split(' ')[0]}!</h2>
-            <p className="text-slate-400 mt-2 text-lg">Here is what's happening with your academic schedule today.</p>
+            <h2 className="text-4xl font-extrabold text-white tracking-tight">Welcome back, {getGreetingName()}!</h2>
+            <p className="text-slate-400 mt-2 text-lg">{user.role} | {user.email}</p>
           </div>
           <div className="flex items-center gap-4 bg-slate-900 p-2 pr-6 rounded-full border border-slate-800">
             <div className="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center font-bold text-white">
@@ -79,6 +124,6 @@ function DashboardPage() {
       </main>
     </div>
   );
-}
+};
 
 export default DashboardPage;
