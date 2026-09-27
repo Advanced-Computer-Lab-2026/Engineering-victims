@@ -31,8 +31,12 @@ async function seedDB() {
         email: 'samy.elgedaily@student.guc.edu.eg',
         password: 'SamySamy2006',
         role: 'Student',
-        studentId: 'S12345',
-        major: 'Computer Science',
+        studentId: '64-12345',
+        studentType: 'Normal Student',
+        major: 'CS',
+        currentSemester: 5,
+        academicStanding: 'Good Academic Standing',
+        scheduleStatus: 'Schedule Assigned',
         isActive: true,
       },
       {
@@ -53,6 +57,15 @@ async function seedDB() {
 
     for (const u of testUsers) {
       await User.create(u);
+    }
+
+    // Link the seeded student to the seeded advisor (assignedAdvisor ref)
+    const advisor = await User.findOne({ email: 'advisor@guc.edu.eg' });
+    if (advisor) {
+      await User.updateOne(
+        { email: 'samy.elgedaily@student.guc.edu.eg' },
+        { $set: { assignedAdvisor: advisor._id } },
+      );
     }
 
     console.log('✅ Successfully seeded users!');
