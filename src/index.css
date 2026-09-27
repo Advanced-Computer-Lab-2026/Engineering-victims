@@ -10,3 +10,17 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+@layer utilities {
+  /* Page background: the app's base slate tone fading into black. */
+  .app-gradient {
+    background-image: linear-gradient(
+      to bottom right,
+      theme('colors.slate.950') 0%,
+      theme('colors.slate.900') 45%,
+      #000000 100%
+    );
+    background-attachment: fixed;
+  }
+}
+
