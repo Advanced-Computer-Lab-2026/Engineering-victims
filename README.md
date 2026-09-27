@@ -175,6 +175,13 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Search, filter, export audit logs
 - Notifications for every workflow event
 
+### 👥 Student Directory (Coordinator / Administrator)
+- Every GUC student with their workflow status, blocking step and last update
+- Search by student ID, full name or GUC email
+- Filter by type, advisor, major, semester, standing, status, blocking step, account
+- Open one student's full details from the results
+- Administrator can activate or deactivate an account
+
 ### 📅 Integrations
 - Third-party calendar sync via OAuth (Google / Outlook)
 - Email notifications
@@ -185,30 +192,30 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 
 ```text
 university-schedule-management/
-├── client/                    # React + Vite frontend (TypeScript)
-│   ├── public/
-│   └── src/
-│       ├── api/               # Axios wrappers per resource
-│       ├── components/        # Reusable UI components
-│       ├── contexts/          # Auth, Notification contexts
-│       ├── hooks/             # Custom React hooks
-│       ├── pages/             # Route-level pages
-│       ├── styles/            # Tailwind + styled-components
-│       ├── types/             # Shared TS types
-│       └── main.tsx
-├── server/                    # Express + Node backend
-│   ├── config/                # DB, env, constants
-│   ├── controllers/           # Route handlers
-│   ├── middleware/            # Auth, RBAC, validation, errors
-│   ├── models/                # Mongoose schemas
-│   ├── routes/                # Express routers
-│   ├── services/              # Business logic
-│   ├── utils/                 # Helpers
+├── src/                        # React + Vite frontend (TypeScript)
+│   ├── components/
+│   │   ├── ui/                 # Card, Badge, Select, Button, Input, Alert, ...
+│   │   ├── AppLayout.tsx       # Sidebar + content shell
+│   │   ├── RouteGuards.tsx     # Auth and role guards
+│   │   └── Sidebar.tsx
+│   ├── hooks/                  # useSession (shared, cached)
+│   ├── lib/                    # api.ts (fetch wrapper), types, services
+│   ├── pages/                  # Route-level pages
+│   ├── index.css               # Inter @font-face, .app-gradient
+│   └── main.tsx                # Routes
+├── server/                     # Express + Node backend
+│   ├── config/                 # env bootstrap, seed data
+│   ├── controllers/            # Route handlers
+│   ├── middleware/             # Auth + role guards
+│   ├── models/                 # Mongoose schemas
+│   ├── routes/                 # Express routers
+│   ├── services/               # Query building, workflow status
 │   └── server.js
-├── seed/                      # MongoDB seed scripts
-├── postman/                   # Postman collection + env
-├── docs/                      # Diagrams, screenshots, docs
-├── tests/                     # Jest + Supertest
+├── seed/                       # MongoDB seed scripts
+├── scripts/                    # setup-env.mjs
+├── postman/                    # Postman collection + env
+├── docs/                       # Diagrams, screenshots, docs
+├── tests/                      # Jest + Supertest
 ├── .env.example
 ├── package.json
 └── README.md
@@ -257,7 +264,13 @@ Seeded logins (the database is re-seeded on every server start):
 | --- | --- | --- |
 | Student | `samy.elgedaily@student.guc.edu.eg` | `SamySamy2006` |
 | Advisor | `advisor@guc.edu.eg` | `password123` |
+| Coordinator | `coordinator@guc.edu.eg` | `password123` |
 | Administrator | `admin@guc.edu.eg` | `password123` |
+
+The seed also creates 12 students spanning both student types, every workflow
+status, both account states and both academic standings, so the students list,
+search, filters and the activate/deactivate action can all be exercised without
+adding data by hand.
 
 ### Troubleshooting
 
