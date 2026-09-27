@@ -1,132 +1,163 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { CreditCard, GraduationCap, Loader2, Mail, UserRound } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+import Card from '../components/ui/Card';
+import StatusPill from '../components/ui/StatusPill';
+import AlertBanner from '../components/ui/AlertBanner';
+import { ApiError, apiFetch } from '../lib/api';
+import type { Role } from '../lib/types';
+
+interface ProfileAdvisor {
+  fullName: string;
+  email: string;
+}
+
+/**
+ * The student fields come from the Student directory (req 6-10) rather than the
+ * login user, so they stay correct across the seed that runs on every boot.
+ */
+interface ProfileUser {
+  fullName: string;
+  email: string;
+  role: Role;
+  studentId?: string;
+  studentType?: 'Normal Student' | 'Advising Student';
+  major?: string;
+  currentSemester?: number;
+  academicStanding?: string;
+  workflowStatus?: string;
+  isActive?: boolean;
+  assignedAdvisor?: ProfileAdvisor | null;
+}
+
+const DetailField: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
+  <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4">
+    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
+    <p className="mt-1 text-sm font-medium text-white">{value}</p>
+  </div>
+);
 
 const ProfilePage: React.FC = () => {
-  const navigate = useNavigate();
-  const [user, setUser] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [profile, setProfile] = useState<ProfileUser | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/');
-          return;
-        }
+    let cancelled = false;
 
-        const response = await fetch('http://localhost:5000/api/user/profile', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
+    apiFetch<{ user: ProfileUser }>('/api/user/profile')
+      .then((response) => {
+        if (!cancelled) setProfile(response.user);
+      })
+      .catch((err: ApiError) => {
+        if (!cancelled) setError(err.message);
+      });
 
-        if (!response.ok) throw new Error('Failed to fetch profile');
-
-        const data = await response.json();
-        setUser(data.user);
-      } catch (error) {
-        console.error('Profile error:', error);
-        navigate('/');
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      cancelled = true;
     };
+  }, []);
 
-    fetchProfile();
-  }, [navigate]);
-
-  if (isLoading) {
+  if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      <>
+        <PageHeader
+          title="My Profile"
+          description="Your account and academic information."
+          onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
+        />
+        <AlertBanner tone="error">Could not load your profile: {error}</AlertBanner>
+      </>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center gap-2 text-sm text-slate-400">
+        <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+        Loading your profile...
       </div>
     );
   }
 
-  if (!user) return null;
+  const isStudent = profile.role === 'Student';
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-200 font-sans">
-      {/* Sidebar (Consistent with Dashboard) */}
-      <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shadow-xl">
-        <div className="p-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">U</div>
-            <h1 className="text-xl font-bold tracking-tight text-white">USMS Portal</h1>
-          </div>
-          <nav className="space-y-1">
-            <button onClick={() => navigate('/dashboard')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-              <span>🏠</span> Dashboard
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium transition-all shadow-lg shadow-indigo-500/20">
-              <span>👤</span> My Profile
-            </button>
-          </nav>
-        </div>
-        <div className="mt-auto p-6 border-t border-slate-800">
-          <button onClick={() => { localStorage.removeItem('token'); navigate('/'); }} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-900/20 hover:text-red-400 transition-all">
-            <span>🚪</span> Sign Out
-          </button>
-        </div>
-      </aside>
+    <>
+      <PageHeader
+        title="My Profile"
+        description="Your account and academic information."
+        onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
+      />
 
-      <main className="flex-1 p-10 overflow-y-auto">
-        <header className="mb-12">
-          <h2 className="text-4xl font-extrabold text-white tracking-tight">My Profile</h2>
-          <p className="text-slate-400 mt-2">Manage your academic information and account settings.</p>
-        </header>
-
-        <div className="max-w-4xl space-y-8">
-          {/* Profile Header Card */}
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl p-8 flex items-center gap-8 shadow-xl">
-            <div className="w-24 h-24 bg-indigo-600 rounded-full flex items-center justify-center text-3xl font-bold text-white shadow-lg shadow-indigo-500/20">
-              {user.fullName.charAt(0)}
+      <div className="max-w-4xl space-y-6">
+        <Card tone="raised" className="p-6" sheen>
+          <div className="flex flex-wrap items-center gap-5">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-2xl font-bold text-white shadow-lg shadow-indigo-950/50">
+              {profile.fullName.charAt(0)}
             </div>
-            <div>
-              <h3 className="text-2xl font-bold text-white">{user.fullName}</h3>
-              <p className="text-indigo-400 font-medium">{user.role}</p>
-              <p className="text-slate-400 text-sm">{user.email}</p>
+            <div className="min-w-0">
+              <h2 className="truncate text-xl font-bold text-white">{profile.fullName}</h2>
+              <p className="text-sm font-medium text-indigo-400">{profile.role}</p>
+              <p className="flex items-center gap-1.5 truncate text-sm text-slate-400">
+                <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {profile.email}
+              </p>
             </div>
-          </div>
-
-          {/* Information Grid — student-only fields (FR 4.0) */}
-          {user.role === 'Student' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-              <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold mb-1">Student ID</p>
-              <p className="text-white text-lg font-medium">{user.studentId || 'N/A'}</p>
-            </div>
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-              <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold mb-1">Student Type</p>
-              <p className="text-white text-lg font-medium">{user.studentType || 'N/A'}</p>
-            </div>
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-              <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold mb-1">Major</p>
-              <p className="text-white text-lg font-medium">{user.major || 'N/A'}</p>
-            </div>
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-              <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold mb-1">Current Semester</p>
-              <p className="text-white text-lg font-medium">{user.currentSemester ?? 'N/A'}</p>
-            </div>
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-              <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold mb-1">Academic Standing</p>
-              <p className="text-white text-lg font-medium">{user.academicStanding || 'Good Standing'}</p>
-            </div>
-            <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-              <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold mb-1">Schedule Status</p>
-              <p className="text-white text-lg font-medium">{user.scheduleStatus || 'N/A'}</p>
-            </div>
-            {user.assignedAdvisor && (
-              <div className="p-6 bg-slate-900 border border-slate-800 rounded-2xl shadow-sm">
-                <p className="text-slate-500 text-xs uppercase tracking-wider font-semibold mb-1">Assigned Advisor</p>
-                <p className="text-white text-lg font-medium">{user.assignedAdvisor.fullName}</p>
-                <p className="text-slate-400 text-sm">{user.assignedAdvisor.email}</p>
+            {isStudent && profile.isActive !== undefined && (
+              <div className="ml-auto">
+                <StatusPill
+                  state={profile.isActive ? 'active' : 'inactive'}
+                  workflowStatus={profile.workflowStatus}
+                />
               </div>
             )}
           </div>
-          )}
-        </div>
-      </main>
-    </div>
+        </Card>
+
+        {/* FR 4.0: only student profiles carry the academic fields. */}
+        {isStudent && (
+          <Card className="p-6">
+            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
+              <GraduationCap className="h-4 w-4 text-indigo-400" aria-hidden />
+              Academic Information
+            </h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <DetailField
+                label="Student ID"
+                value={
+                  <span className="flex items-center gap-1.5">
+                    <CreditCard className="h-4 w-4 text-slate-500" aria-hidden />
+                    {profile.studentId || 'Not set'}
+                  </span>
+                }
+              />
+              <DetailField label="Student Type" value={profile.studentType || 'Not set'} />
+              <DetailField label="Major" value={profile.major || 'Not set'} />
+              <DetailField label="Current Semester" value={profile.currentSemester ?? 'Not set'} />
+              <DetailField label="Academic Standing" value={profile.academicStanding || 'Not set'} />
+              <DetailField
+                label="Assigned Advisor"
+                value={
+                  profile.assignedAdvisor ? (
+                    <span className="flex flex-col">
+                      <span className="flex items-center gap-1.5">
+                        <UserRound className="h-4 w-4 text-slate-500" aria-hidden />
+                        {profile.assignedAdvisor.fullName}
+                      </span>
+                      <span className="truncate text-xs font-normal text-slate-500">
+                        {profile.assignedAdvisor.email}
+                      </span>
+                    </span>
+                  ) : (
+                    'None assigned'
+                  )
+                }
+              />
+            </div>
+          </Card>
+        )}
+      </div>
+    </>
   );
 };
 

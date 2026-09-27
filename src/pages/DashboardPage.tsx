@@ -1,121 +1,183 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Bell, CalendarDays, Contact, UserX, Users } from 'lucide-react';
+import { ApiError, apiFetch } from '../lib/api';
+import { useSession } from '../hooks/useSession';
+import PageHeader from '../components/PageHeader';
+import Card from '../components/ui/Card';
+
+interface StatsResponse {
+  total: number;
+  active: number;
+  inactive: number;
+  advising: number;
+  normal: number;
+  waitingOnStudent: number;
+}
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const [user, setUser] = useState<{ fullName: string; role: string; email: string } | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user } = useSession();
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const canManageStudents = user?.role === 'Coordinator' || user?.role === 'Administrator';
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        if (!token) {
-          navigate('/');
-          return;
-        }
+    if (!canManageStudents) return;
 
-        const response = await fetch('http://localhost:5000/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
+    let cancelled = false;
+    apiFetch<{ stats: StatsResponse }>('/api/students/stats')
+      .then((response) => {
+        if (!cancelled) setStats(response.stats);
+      })
+      .catch((err: ApiError) => {
+        if (!cancelled) setError(err.message);
+      });
 
-        if (!response.ok) throw new Error('Session expired');
-
-        const data = await response.json();
-        setUser(data.user);
-      } catch (error) {
-        localStorage.removeItem('token');
-        navigate('/');
-      } finally {
-        setIsLoading(false);
-      }
+    return () => {
+      cancelled = true;
     };
+  }, [canManageStudents]);
 
-    fetchUser();
-  }, [navigate]);
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    navigate('/');
-  };
-
-  const handleComingSoon = (feature: string) => {
-    alert(`🚀 ${feature} is coming soon in the next sprint!`);
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
-      </div>
-    );
-  }
-
-  if (!user) return null;
+  const firstName = user?.fullName?.split(' ')[0] ?? 'there';
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-200 font-sans">
-      <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shadow-xl">
-        <div className="p-8">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">U</div>
-            <h1 className="text-xl font-bold tracking-tight text-white">USMS Portal</h1>
-          </div>
-          <nav className="space-y-1">
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium transition-all shadow-lg shadow-indigo-500/20">
-              <span>🏠</span> Dashboard
-            </button>
-            <button onClick={() => handleComingSoon('Weekly Schedule')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-              <span>📅</span> My Schedule
-            </button>
-            <button onClick={() => navigate('/profile')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-              <span>👤</span> My Profile
-            </button>
-          </nav>
+    <>
+      <PageHeader
+        title={`Welcome back, ${firstName}`}
+        description={user ? `${user.role} | ${user.email}` : undefined}
+        onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
+      />
+
+      {error && (
+        <Card className="p-4 text-sm text-rose-300">
+          Could not load dashboard data: {error}
+        </Card>
+      )}
+
+      {canManageStudents && stats && (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            label="Total students"
+            value={stats.total}
+            detail={`${stats.active} active, ${stats.inactive} inactive`}
+            icon={<Users className="h-5 w-5" aria-hidden />}
+            tone="indigo"
+          />
+          <StatCard
+            label="Advising students"
+            value={stats.advising}
+            detail={`${stats.normal} normal students`}
+            icon={<Contact className="h-5 w-5" aria-hidden />}
+            tone="sky"
+          />
+          <StatCard
+            label="Waiting on student"
+            value={stats.waitingOnStudent}
+            detail="Review or slot-change pending"
+            icon={<Bell className="h-5 w-5" aria-hidden />}
+            tone="amber"
+          />
+          <StatCard
+            label="Inactive accounts"
+            value={stats.inactive}
+            detail="Cannot log in"
+            icon={<UserX className="h-5 w-5" aria-hidden />}
+            tone="rose"
+          />
         </div>
-        <div className="mt-auto p-6 border-t border-slate-800">
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-900/20 hover:text-red-400 transition-all">
-            <span>🚪</span> Sign Out
-          </button>
-        </div>
-      </aside>
-      <main className="flex-1 p-10 overflow-y-auto">
-        <header className="flex justify-between items-center mb-12">
-          <div>
-            <h2 className="text-4xl font-extrabold text-white tracking-tight">Welcome back, {user.fullName.split(' ')[0]}!</h2>
-            <p className="text-slate-400 mt-2 text-lg">{user.role} | {user.email}</p>
-          </div>
-          <div className="flex items-center gap-4 bg-slate-900 p-2 pr-6 rounded-full border border-slate-800">
-            <div className="w-10 h-10 bg-indigo-500 rounded-full flex items-center justify-center font-bold text-white">
-              {user.fullName.charAt(0)}
+      )}
+
+      <Card tone="raised" className="mt-6 p-6" sheen>
+        <h2 className="text-lg font-bold text-white">Getting started</h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Pick a destination from the sidebar. Your access depends on your role.
+        </p>
+        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+          {canManageStudents && (
+            <li>
+              <button
+                type="button"
+                onClick={() => navigate('/students')}
+                className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-indigo-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Users className="h-4 w-4 text-indigo-400" aria-hidden />
+                  Students
+                </span>
+                <span className="mt-1 block text-xs text-slate-400">
+                  Search, filter and review the scheduling workflow for every student.
+                </span>
+              </button>
+            </li>
+          )}
+          <li>
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-emerald-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Contact className="h-4 w-4 text-emerald-400" aria-hidden />
+                My Profile
+              </span>
+              <span className="mt-1 block text-xs text-slate-400">
+                Review your student ID, major, standing and assigned advisor.
+              </span>
+            </button>
+          </li>
+          <li>
+            <div
+              aria-disabled="true"
+              className="w-full cursor-not-allowed rounded-xl border border-slate-800/80 bg-slate-900/30 p-4"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+                <CalendarDays className="h-4 w-4" aria-hidden />
+                My Schedule
+                <span className="rounded-full bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Soon
+                </span>
+              </span>
+              <span className="mt-1 block text-xs text-slate-600">
+                View your weekly timetable once scheduling is in place.
+              </span>
             </div>
-            <span className="text-sm font-medium text-slate-300">{user.role}</span>
-          </div>
-        </header>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div onClick={() => handleComingSoon('Weekly Schedule')} className="p-8 bg-slate-900 border border-slate-800 rounded-3xl hover:border-indigo-500 transition-all cursor-pointer group relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-600/10 rounded-full blur-2xl group-hover:bg-indigo-600/20 transition-all"></div>
-            <div className="w-14 h-14 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">📅</div>
-            <h3 className="text-xl font-bold text-white mb-2">Weekly Schedule</h3>
-            <p className="text-slate-400 leading-relaxed">Access your current timetable and check for any slot changes.</p>
-          </div>
-          <div onClick={() => navigate('/profile')} className="p-8 bg-slate-900 border border-slate-800 rounded-3xl hover:border-emerald-500 transition-all cursor-pointer group relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl group-hover:bg-emerald-600/20 transition-all"></div>
-            <div className="w-14 h-14 bg-emerald-600/20 text-emerald-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">👤</div>
-            <h3 className="text-xl font-bold text-white mb-2">Academic Profile</h3>
-            <p className="text-slate-400 leading-relaxed">Review your GPA, credits, and current academic standing.</p>
-          </div>
-          <div onClick={() => handleComingSoon('Notifications')} className="p-8 bg-slate-900 border border-slate-800 rounded-3xl hover:border-amber-500 transition-all cursor-pointer group relative overflow-hidden">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-600/10 rounded-full blur-2xl group-hover:bg-amber-600/20 transition-all"></div>
-            <div className="w-14 h-14 bg-amber-600/20 text-amber-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">🔔</div>
-            <h3 className="text-xl font-bold text-white mb-2">Recent Alerts</h3>
-            <p className="text-slate-400 leading-relaxed">Stay updated with notifications from your advisor.</p>
-          </div>
-        </div>
-      </main>
-    </div>
+          </li>
+        </ul>
+      </Card>
+    </>
   );
 };
+
+interface StatCardProps {
+  label: string;
+  value: number;
+  detail: string;
+  icon: React.ReactNode;
+  tone: 'indigo' | 'sky' | 'amber' | 'rose';
+}
+
+const TONE_CLASSES: Record<StatCardProps['tone'], string> = {
+  indigo: 'bg-indigo-500/15 text-indigo-400',
+  sky: 'bg-sky-500/15 text-sky-400',
+  amber: 'bg-amber-500/15 text-amber-400',
+  rose: 'bg-rose-500/15 text-rose-400',
+};
+
+const StatCard: React.FC<StatCardProps> = ({ label, value, detail, icon, tone }) => (
+  <Card className="p-5">
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+        <p className="mt-1 text-3xl font-bold tracking-tight text-white">{value}</p>
+        <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
+      </div>
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONE_CLASSES[tone]}`}>
+        {icon}
+      </span>
+    </div>
+  </Card>
+);
 
 export default DashboardPage;
