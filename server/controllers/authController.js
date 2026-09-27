@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { notifyByEmail } = require('../services/notificationService');
 
 exports.login = async (req, res) => {
   try {
@@ -47,6 +48,17 @@ exports.resetPassword = async (req, res) => {
     user.resetPasswordToken = undefined;
     user.resetPasswordExpires = undefined;
     await user.save();
+
+    // Req 2: a security event the account should see next time it signs in.
+    // Never carries the OTP or the password itself.
+    await notifyByEmail(user.email, {
+      type: 'warning',
+      title: 'Your password was changed',
+      message:
+        'The password for your GUC account was updated. If this was not you, contact your coordinator immediately.',
+      link: '/notifications',
+    });
+
     res.status(200).json({ message: 'Password updated successfully!' });
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });

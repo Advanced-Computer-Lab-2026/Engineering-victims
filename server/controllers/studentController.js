@@ -3,6 +3,7 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const { buildStudentQuery } = require('../services/studentQueryService');
 const { recalculate, getStatusesFor } = require('../services/workflowService');
+const { notifyByEmail } = require('../services/notificationService');
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -160,6 +161,19 @@ exports.setAccountStatus = async (req, res) => {
 
     student.isActive = isActive;
     await recalculate(student);
+
+    // Req 10 is the one account-state event that already exists, so it is a
+    // real notification source rather than seed data. A deactivated student
+    // cannot sign in to read it, but the record is there when they are
+    // reactivated, and activation is read immediately.
+    await notifyByEmail(student.email, {
+      type: isActive ? 'success' : 'warning',
+      title: isActive ? 'Your account was activated' : 'Your account was deactivated',
+      message: isActive
+        ? 'Your account is active again and you can sign in with your GUC email.'
+        : 'Your account was deactivated, so you cannot sign in. Your academic, scheduling and audit history is unchanged.',
+      link: '/notifications',
+    });
 
     res.status(200).json({
       message: `${student.fullName}'s account is now ${isActive ? 'active' : 'inactive'}.`,

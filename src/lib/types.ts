@@ -78,5 +78,24 @@ export const EMPTY_FILTERS: StudentFilters = {
   isActive: '',
 };
 
+/** FR 5.0 — in-app notifications. */
+export type NotificationType = 'info' | 'success' | 'warning' | 'schedule' | 'approval' | 'payment';
+
+export interface NotificationSummary {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link: string | null;
+  isRead: boolean;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationSummary[];
+  unreadCount: number;
+}
+
 export const hasActiveFilters = (filters: StudentFilters): boolean =>
   Object.entries(filters).some(([key, value]) => key !== 'search' && value !== '');

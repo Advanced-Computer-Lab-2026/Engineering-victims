@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Student = require('../models/Student');
+const Notification = require('../models/Notification');
 const { recalculate } = require('../services/workflowService');
 
 const ADVISORS = [
@@ -34,12 +35,61 @@ const STUDENTS = [
 ];
 
 /**
+ * FR 5.0 demo data: each role gets notifications that would realistically land
+ * on that account, a mix of read and unread so the individual "mark as read"
+ * and "mark all as read" can both be exercised without creating records by hand.
+ */
+const NOTIFICATION_TEMPLATES = {
+  Student: [
+    { type: 'schedule', title: 'Your schedule has been assigned', message: 'Your standard schedule for this term has been processed. Open My Profile to review your registered courses.', isRead: false },
+    { type: 'approval', title: 'Slot-change request approved', message: 'Your request to move CSEN 501 to another tutorial group was approved by your advisor.', isRead: false },
+    { type: 'payment', title: 'Extra-hours payment received', message: 'EGP 800 was charged for 1 additional credit hour. Your receipt is available in your wallet.', isRead: true },
+    { type: 'warning', title: 'Registration deadline approaching', message: 'Whole-schedule swap requests close at the end of the advising season.', isRead: true },
+    { type: 'info', title: 'Welcome to the scheduling portal', message: 'Your account was activated. Use the sidebar to reach your dashboard, notifications and profile.', isRead: true },
+  ],
+  Advisor: [
+    { type: 'approval', title: 'New slot-change request', message: 'An advising student submitted a slot-change request that is waiting for your decision.', isRead: false },
+    { type: 'warning', title: 'Advising deadline reminder', message: 'Some of your assigned students still have an open, unprocessed schedule.', isRead: false },
+    { type: 'info', title: 'You were assigned a new student', message: 'A new advising student has been assigned to you. Their draft schedule has not been started yet.', isRead: true },
+    { type: 'success', title: 'Graduation plan accepted', message: 'The Coordinator accepted the graduation plan you submitted.', isRead: true },
+  ],
+  Coordinator: [
+    { type: 'approval', title: 'Extra-hours request awaiting decision', message: 'An advisor submitted an extra-hours request that needs your approval.', isRead: false },
+    { type: 'info', title: 'Graduation plan submitted', message: 'An advisor submitted a graduation plan for your review.', isRead: false },
+    { type: 'warning', title: 'Mandatory-course removal pending', message: 'A mandatory-course removal request is waiting for a response note.', isRead: true },
+    { type: 'success', title: 'Weekly report received', message: 'A team submitted their weekly report to the CMS.', isRead: true },
+  ],
+  Administrator: [
+    { type: 'info', title: 'Term dates updated', message: 'The registration and advising-season dates for the new term were saved.', isRead: false },
+    { type: 'warning', title: 'Account deactivation requested', message: 'An account was flagged for deactivation. Academic history will be preserved.', isRead: false },
+    { type: 'success', title: 'Course catalogue import finished', message: '12 courses were validated and imported from CSV with no row errors.', isRead: true },
+  ],
+  default: [
+    { type: 'info', title: 'Welcome to the scheduling portal', message: 'Your account was activated. Use the sidebar to reach your dashboard, notifications and profile.', isRead: false },
+    { type: 'success', title: 'Account activated', message: 'Your account is active and you can now sign in with your GUC email.', isRead: true },
+  ],
+};
+
+/** Builds the demo notifications for one account, staggering their timestamps. */
+const buildNotifications = (user) =>
+  (NOTIFICATION_TEMPLATES[user.role] ?? NOTIFICATION_TEMPLATES.default).map((template, index) => ({
+    ...template,
+    user: user._id,
+    link: '/notifications',
+    // Spread over the last few hours so the relative times read naturally.
+    createdAt: new Date(Date.now() - (index + 1) * 5 * 60 * 60 * 1000),
+    updatedAt: new Date(Date.now() - (index + 1) * 5 * 60 * 60 * 1000),
+    readAt: template.isRead ? new Date(Date.now() - (index + 1) * 4 * 60 * 60 * 1000) : null,
+  }));
+
+/**
  * Rebuilds users and students from scratch. Called on every boot so the demo
  * data is always in a known state, matching the existing behaviour.
  */
 const seed = async () => {
   await User.deleteMany({});
   await Student.deleteMany({});
+  await Notification.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
@@ -60,7 +110,15 @@ const seed = async () => {
   // Derive blocking step and last-updated rather than storing them by hand.
   await Promise.all(students.map((student) => recalculate(student)));
 
-  return { users: created.length, students: students.length, advisors: advisors.length };
+  // FR 5.0: every seeded account gets its own demo notifications.
+  const notifications = await Notification.insertMany(created.flatMap(buildNotifications));
+
+  return {
+    users: created.length,
+    students: students.length,
+    advisors: advisors.length,
+    notifications: notifications.length,
+  };
 };
 
 module.exports = { seed, ADVISORS, STAFF, STUDENTS };
