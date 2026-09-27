@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
   role: { type: String, enum: ['Student', 'Advisor', 'Coordinator', 'Administrator'], required: true },
   isActive: { type: Boolean, default: true },
+  resetPasswordToken: { type: String },
+  resetPasswordExpires: { type: Date },
   studentId: { type: String },
   studentType: { type: String },
   major: { type: String },
@@ -16,7 +18,6 @@ const userSchema = new mongoose.Schema({
   scheduleStatus: { type: String },
 }, { timestamps: true });
 
-// Hashing middleware
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   try {
