@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { LogIn, ShieldCheck } from 'lucide-react';
 import { ApiError, apiFetch } from '../../lib/api';
 import type { SessionUser } from '../../lib/types';
@@ -19,7 +19,6 @@ const LoginPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
 
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -51,9 +50,10 @@ const LoginPage: React.FC = () => {
       // role-gated route does not render before the session is known.
       window.dispatchEvent(new Event('auth-changed'));
 
-      // Return the user to wherever the guard interrupted them.
-      const from = (location.state as { from?: string } | null)?.from;
-      navigate(from && from !== '/' ? from : '/dashboard', { replace: true });
+      // Always land on the dashboard. The guard may remember the page a dead
+      // session interrupted, and that page can be one this role cannot open —
+      // a predictable landing page avoids both surprises and the role screen.
+      navigate('/dashboard', { replace: true });
     } catch (err) {
       setError((err as ApiError).message);
     } finally {

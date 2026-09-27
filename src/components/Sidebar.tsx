@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { CalendarDays, Contact, LayoutDashboard, LogOut, Users, X } from 'lucide-react';
+import { Bell, CalendarDays, Contact, LayoutDashboard, LogOut, Users, X } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
+import { useUnreadCount } from '../hooks/useUnreadCount';
 import CustomButton from './ui/CustomButton';
 import type { Role } from '../lib/types';
 
@@ -27,6 +28,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/students', label: 'Students', icon: Users, roles: ['Coordinator', 'Administrator'] },
+  { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/schedule', label: 'My Schedule', icon: CalendarDays, unavailable: true },
   { to: '/profile', label: 'My Profile', icon: Contact },
 ];
@@ -34,6 +36,7 @@ const NAV_ITEMS: NavItem[] = [
 const Sidebar: React.FC<SidebarProps> = ({ role, open, onClose }) => {
   const navigate = useNavigate();
   const { logout } = useSession();
+  const { unreadCount } = useUnreadCount();
 
   const handleLogout = () => {
     // Clearing the shared session also collapses the role-gated nav items, so
@@ -116,6 +119,12 @@ const Sidebar: React.FC<SidebarProps> = ({ role, open, onClose }) => {
                   <>
                     <Icon className="h-4 w-4 shrink-0" aria-hidden />
                     <span className="flex-1 truncate text-left">{item.label}</span>
+                    {/* Unread badge on the notifications item, for every role. */}
+                    {item.to === '/notifications' && !!unreadCount && (
+                      <span className="min-w-[1.3rem] rounded-full bg-indigo-500 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                     {isActive && <span className="sr-only">(current page)</span>}
                   </>
                 )}

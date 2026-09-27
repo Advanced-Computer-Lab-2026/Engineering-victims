@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Bell, CalendarDays, Contact, UserX, Users } from 'lucide-react';
 import { ApiError, apiFetch } from '../lib/api';
 import { useSession } from '../hooks/useSession';
+import { useUnreadCount } from '../hooks/useUnreadCount';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 
@@ -18,6 +19,7 @@ interface StatsResponse {
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useSession();
+  const { unreadCount } = useUnreadCount();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,6 +126,28 @@ const DashboardPage: React.FC = () => {
               </span>
               <span className="mt-1 block text-xs text-slate-400">
                 Review your student ID, major, standing and assigned advisor.
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              type="button"
+              onClick={() => navigate('/notifications')}
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-sky-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Bell className="h-4 w-4 text-sky-400" aria-hidden />
+                Notifications
+                {!!unreadCount && (
+                  <span className="ml-auto rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                    {unreadCount > 99 ? '99+' : unreadCount}
+                  </span>
+                )}
+              </span>
+              <span className="mt-1 block text-xs text-slate-400">
+                {unreadCount
+                  ? `${unreadCount} unread — open it to mark them as read.`
+                  : 'Review updates and mark them as read.'}
               </span>
             </button>
           </li>

@@ -7,6 +7,7 @@ const { ensureEnvFile, DEFAULT_MONGO_URI } = require('./config/ensureEnv');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const studentRoutes = require('./routes/studentRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const { seed } = require('./config/seedData');
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
@@ -24,6 +25,7 @@ app.use(morgan('dev'));
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/notifications', notificationRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 
 const PORT = process.env.PORT || 5000;
@@ -38,8 +40,8 @@ async function startServer() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const { users, students } = await seed();
-    console.log(`✅ Seeded ${users} users and ${students} students`);
+    const { users, students, notifications } = await seed();
+    console.log(`✅ Seeded ${users} users, ${students} students and ${notifications} notifications`);
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {
