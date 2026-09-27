@@ -254,9 +254,19 @@ Or start both at once with prefixed logs:
 npm run dev
 ```
 
-The Vite dev server proxies `/api/*` to `VITE_API_PROXY_TARGET`, so the app calls
-relative URLs in development and there is no CORS setup to maintain. Keep that
-value in sync with `PORT` in `server/.env`.
+By default the Vite dev server proxies `/api/*` to `VITE_API_PROXY_TARGET`, so the
+app calls relative URLs in development and there is no CORS setup to maintain.
+Keep that value in sync with `PORT` in `server/.env`.
+
+If the two processes are on **different machines** — the client under WSL and the
+API on Windows, for example — the proxy cannot be used, because WSL has no route
+to the Windows host. Set an absolute `VITE_API_URL` instead and the browser
+talks to the API directly; the server already sends permissive CORS headers:
+
+```bash
+# .env
+VITE_API_URL=http://localhost:8000
+```
 
 Seeded logins (the database is re-seeded on every server start):
 
@@ -285,6 +295,11 @@ networkingMode=mirrored
 
 then run `wsl --shutdown` from PowerShell, or start the server with the Windows
 Node binary (`node.exe server.js`) so it shares Windows' network stack.
+
+**`http proxy error: /api/... connect ECONNREFUSED 127.0.0.1:8000`** — the dev
+server is proxying to an API it cannot route to. This is the same WSL-to-Windows
+networking gap as above. Set `VITE_API_URL` in `.env` to the API's absolute URL so
+the browser calls it directly instead of through the proxy.
 
 ## 🔐 Environment Variables
 
