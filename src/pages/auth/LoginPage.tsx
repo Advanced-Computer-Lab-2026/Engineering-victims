@@ -29,13 +29,10 @@ const LoginPage: React.FC = () => {
       }
 
       localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      
       navigate('/dashboard');
       
     } catch (err: any) {
       setError(err.message);
-    } finally {
       setIsLoading(false);
     }
   };
@@ -64,17 +61,28 @@ const LoginPage: React.FC = () => {
             required 
           />
           
-          <CustomInput 
-            label="Password" 
-            type="password" 
-            placeholder="••••••••" 
-            value={password} 
-            onChange={(e: any) => setPassword(e.target.value)}
-            required 
-          />
+          <div className="relative mb-4">
+            <CustomInput 
+              label="Password" 
+              type="password" 
+              placeholder="••••••••" 
+              value={password} 
+              onChange={(e: any) => setPassword(e.target.value)}
+              required 
+            />
+            <div className="text-right mt-1">
+              <button 
+                type="button"
+                onClick={() => navigate('/forgot-password')}
+                className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors underline"
+              >
+                Forgot Password?
+              </button>
+            </div>
+          </div>
 
           <CustomButton type="submit" isLoading={isLoading}>
-            Sign In
+            {isLoading ? 'Authenticating...' : 'Sign In'}
           </CustomButton>
         </form>
         
