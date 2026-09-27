@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { apiUrl, authHeaders } from '../lib/api';
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,8 +16,8 @@ const DashboardPage: React.FC = () => {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
+        const response = await fetch(apiUrl('/api/auth/me'), {
+          headers: authHeaders(),
         });
 
         if (!response.ok) throw new Error('Session expired');

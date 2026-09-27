@@ -212,3 +212,83 @@ university-schedule-management/
 ├── .env.example
 ├── package.json
 └── README.md
+```
+
+## 🚀 Installation
+
+```bash
+# 1. Install dependencies for the frontend and the backend
+npm install
+npm install --prefix server
+
+# 2. Create any missing env files (.env and server/.env).
+#    This also generates a JWT secret and a local MongoDB connection string.
+npm run setup
+```
+
+`npm run setup` never overwrites existing files. To point at MongoDB Atlas instead
+of a local database, edit `MONGODB_URI` in `server/.env`.
+
+## ▶️ Running the app
+
+The client and server are two separate processes:
+
+```bash
+# Run 1 - API server (http://localhost:5000 by default)
+npm run dev:server
+
+# Run 2 - Vite dev server (http://localhost:5173)
+npm run dev:client
+```
+
+Or start both at once with prefixed logs:
+
+```bash
+npm run dev
+```
+
+The Vite dev server proxies `/api/*` to `VITE_API_PROXY_TARGET`, so the app calls
+relative URLs in development and there is no CORS setup to maintain. Keep that
+value in sync with `PORT` in `server/.env`.
+
+Seeded logins (the database is re-seeded on every server start):
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Student | `samy.elgedaily@student.guc.edu.eg` | `SamySamy2006` |
+| Advisor | `advisor@guc.edu.eg` | `password123` |
+| Administrator | `admin@guc.edu.eg` | `password123` |
+
+### Troubleshooting
+
+**`ECONNREFUSED 127.0.0.1:27017` from WSL** — MongoDB is installed on Windows and
+binds to Windows' loopback, which WSL cannot reach unless mirrored networking is
+enabled. Either enable it in `%UserProfile%\.wslconfig`:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+then run `wsl --shutdown` from PowerShell, or start the server with the Windows
+Node binary (`node.exe server.js`) so it shares Windows' network stack.
+
+## 🔐 Environment Variables
+
+`server/.env`
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `PORT` | `5000` | Port the API listens on |
+| `MONGODB_URI` | `mongodb://127.0.0.1:27017/university_schedule` | Local DB or Atlas `mongodb+srv://` URI |
+| `JWT_SECRET` | generated | Secret used to sign session tokens |
+| `NODE_ENV` | `development` | Runtime mode |
+
+`.env` (client)
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `VITE_API_PROXY_TARGET` | `http://localhost:5000` | Dev-only proxy target for `/api` |
+| `VITE_API_URL` | empty | Absolute backend URL for production builds |
+| `CLIENT_PORT` | `5173` | Port for the Vite dev server |
+
