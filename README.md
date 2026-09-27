@@ -1,20 +1,7 @@
-<!--
-  ╔══════════════════════════════════════════════════════════════════╗
-  ║  University Schedule Management System — README                  ║
-  ║  Course: CSEN 704 / DMET 706 — Advanced Computer Lab (Winter 26) ║
-  ║  Stack: MERN (MongoDB, Express, React, Node.js)                  ║
-  ╚══════════════════════════════════════════════════════════════════╝
-  NOTE FOR AI TOOLS:
-  This repository is a full-stack MERN application built as a course
-  project. Requirements live in `docs/requirements.xlsx`. Sprint plan,
-  architecture, and API contracts are documented in `/docs`. The team
-  follows Scrum; see `/REPORTS` branch for weekly reports.
--->
-
 <h1 align="center">🎓 University Schedule Management System</h1>
 
 <p align="center">
-  <em>A full-stack MERN platform for managing student schedules, advising workflows, and course offerings at the German University in Cairo.</em>
+  <em>A full-stack MERN platform for managing university schedules, advising workflows, course offerings, and academic finances.</em>
 </p>
 
 <p align="center">
@@ -24,20 +11,20 @@
 </p>
 
 <p align="center">
-  <img alt="Build" src="https://img.shields.io/badge/build-passing-brightgreen?style=for-the-badge" />
-  <img alt="Sprint" src="https://img.shields.io/badge/sprint-1%20%7C%202%20%7C%203-blueviolet?style=for-the-badge" />
   <img alt="License" src="https://img.shields.io/badge/license-MIT-blue?style=for-the-badge" />
-  <img alt="Status" src="https://img.shields.io/badge/status-in%20development-yellow?style=for-the-badge" />
+  <img alt="Version" src="https://img.shields.io/badge/version-1.0.0-blueviolet?style=for-the-badge" />
+  <img alt="PRs" src="https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge" />
+  <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18-339933?style=for-the-badge&logo=node.js&logoColor=white" />
 </p>
 
 ---
 
 ## 📖 Table of Contents
 
+- [Overview](#-overview)
 - [Motivation](#-motivation)
-- [Build Status](#-build-status)
 - [Screenshots](#-screenshots)
-- [Tech Stack & Frameworks](#-tech-stack--frameworks)
+- [Tech Stack](#-tech-stack)
 - [Features](#-features)
 - [Project Structure](#-project-structure)
 - [Code Style](#-code-style)
@@ -46,59 +33,47 @@
 - [Environment Variables](#-environment-variables)
 - [API Reference](#-api-reference)
 - [Tests](#-tests)
-- [Scrum & Team](#-scrum--team)
+- [Roadmap](#-roadmap)
 - [Contribute](#-contribute)
 - [Credits](#-credits)
 - [License](#-license)
 
 ---
 
-## 🎯 Motivation
+## 🌍 Overview
 
-The German University in Cairo (GUC) manages course registration, advising, and scheduling across multiple faculties and majors. Today, these workflows are scattered across spreadsheets, email threads, and manual advisor effort — making them error-prone, hard to audit, and slow to resolve.
+The **University Schedule Management System** is a full-stack web application that centralizes how universities handle course registration, academic advising, schedule building, and student finances.
 
-This project delivers a **centralized University Schedule Management System** that:
+It replaces the fragmented mix of spreadsheets, email threads, and manual advisor effort with a single platform that enforces academic rules automatically — prerequisites, credit-hour limits, probation allowances, seat capacity, timetable clashes, and deadlines.
 
-- Gives **students** a clear weekly schedule, swap options, and self-service tools.
-- Empowers **advisors** to build and validate advising schedules faster.
-- Provides **coordinators and administrators** real-time visibility into every student's workflow state, requests, and financial records.
-- Enforces **academic rules automatically** (prerequisites, credit-hour limits, probation allowances, deadlines).
+### Who it's for
 
-The system is built as part of the **CSEN 704 / DMET 706 Advanced Computer Lab** course, following Agile/Scrum over three sprints.
+| Role | What they get |
+|---|---|
+| 🎓 **Student** | Weekly schedule, course swaps, slot-change requests, wallet, payments |
+| 🧑‍🏫 **Advisor** | Draft schedule builder, validation engine, graduation planning |
+| 🗂️ **Coordinator** | Review queues, approval workflows, financial oversight |
+| 🛡️ **Administrator** | Course catalogue, offerings, terms, user management |
 
 ---
 
-## 🚧 Build Status
+## 🎯 Motivation
 
-> ⚠️ **This project is under active development.** It is not yet feature-complete. Below is the honest status of each area — no project is perfect, and this section is intentionally candid.
+Universities manage thousands of students across multiple faculties, majors, and semesters. Registration, advising, and scheduling are typically spread across disconnected tools — causing mistakes, delays, and endless back-and-forth between students and advisors.
 
-| Module | Status | Notes |
-|---|---|---|
-| 🔐 Authentication & Profiles | ✅ Complete | Login, logout, password reset, profile view, notifications |
-| 🗂️ Course Catalogue & Terms | ✅ Complete | CRUD, CSV import, academic term dates |
-| 📚 Course Offerings & Slots | 🟡 In Progress | Create/update/delete working; publish toggle pending |
-| 🧩 Standard Schedule Templates | 🟡 In Progress | Template CRUD done; group assignment in testing |
-| 🗓️ Student Schedule Views | 🟡 In Progress | Weekly calendar renders; PDF download pending |
-| 🔁 Whole-Schedule Swap | 🔴 Not Started | Sprint 2 scope |
-| 🧑‍🏫 Advising Draft Workflow | 🔴 Not Started | Sprint 2 scope |
-| 🔄 Slot-Change Requests | 🔴 Not Started | Sprint 2 scope |
-| 💸 Extra Hours & Payments | 🔴 Not Started | Sprint 2 scope |
-| 🎓 Graduation & Exit Exams | 🔴 Not Started | Sprint 2 scope |
-| 🔔 Notifications & Calendar Sync | 🔴 Not Started | Sprint 2 scope |
-| 📊 Dashboards & Audit History | 🔴 Not Started | Sprint 2 scope |
-| 🎨 UI/UX Polish | 🟡 In Progress | Ongoing per sprint |
-| 📱 Mobile Responsiveness | 🟡 In Progress | Partial — some tables overflow on small screens |
+This project solves that by providing:
 
-**Known Issues:**
-- Race conditions under rapid concurrent seat assignment are guarded by transactions but not yet stress-tested.
-- Sandbox payment gateway occasionally times out — retry flow (Req 93) mitigates this.
-- Calendar OAuth tokens are stored but not refreshed automatically yet.
+- **A single source of truth** for courses, offerings, and schedules
+- **Automated enforcement** of academic rules and deadlines
+- **Role-aware workflows** for students, advisors, coordinators, and admins
+- **Full auditability** of every scheduling action
+- **Integrated finance** for extra hours, payments, and refunds
+
+The result is faster advising, fewer errors, and complete visibility for everyone involved.
 
 ---
 
 ## 📸 Screenshots
-
-> Add at least **5 screenshots** here before Sprint 2 evaluation.
 
 | Login | Weekly Schedule |
 |---|---|
@@ -116,7 +91,7 @@ The system is built as part of the **CSEN 704 / DMET 706 Advanced Computer Lab**
 
 ---
 
-## 🛠️ Tech Stack & Frameworks
+## 🛠️ Tech Stack
 
 <p align="left">
   <a href="https://skillicons.dev">
@@ -137,13 +112,13 @@ The system is built as part of the **CSEN 704 / DMET 706 Advanced Computer Lab**
 - 🟢 **Node.js** — runtime
 - 🚂 **Express.js** — REST API
 - 🔐 **JWT + bcrypt** — authentication & password hashing
-- ✅ **Joi / express-validator** — request validation
+- ✅ **Zod / express-validator** — request validation
 
 ### Database
 - 🍃 **MongoDB** — document store
 - 🧭 **Mongoose** — ODM, schemas, transactions
 
-### Dev & DevOps
+### Tooling
 - 🐙 **Git + GitHub** — version control, PRs, protected `main`
 - 🧪 **Postman** — API testing collection
 - 🧪 **Jest + Supertest** — unit & integration tests
@@ -153,13 +128,11 @@ The system is built as part of the **CSEN 704 / DMET 706 Advanced Computer Lab**
 
 ## ✨ Features
 
-> Full feature list with requirement IDs is in [`docs/requirements.xlsx`](./docs/requirements.xlsx). Below is the human-readable summary.
-
 ### 🔐 Authentication & Users
 - GUC email + password login (no sign-up)
-- Role-based access: Normal Student, Advising Student, Advisor, Coordinator, Administrator
-- One-time password reset via GUC email
-- Profile view scoped to role
+- Role-based access control (Student, Advisor, Coordinator, Administrator)
+- One-time password reset via email
+- Role-scoped profile views
 - In-app notifications with mark-as-read
 
 ### 🗂️ Academic Administration
@@ -204,7 +177,7 @@ The system is built as part of the **CSEN 704 / DMET 706 Advanced Computer Lab**
 
 ### 📅 Integrations
 - Third-party calendar sync via OAuth (Google / Outlook)
-- Email notifications (GUC inbox)
+- Email notifications
 
 ---
 
@@ -234,7 +207,7 @@ university-schedule-management/
 │   └── server.js
 ├── seed/                      # MongoDB seed scripts
 ├── postman/                   # Postman collection + env
-├── docs/                      # Requirements, diagrams, screenshots
+├── docs/                      # Diagrams, screenshots, docs
 ├── tests/                     # Jest + Supertest
 ├── .env.example
 ├── package.json
