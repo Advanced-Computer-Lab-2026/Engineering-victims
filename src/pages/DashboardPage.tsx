@@ -1,5 +1,20 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  BellIcon,
+  CalendarIcon,
+  DashboardIcon,
+  ExitIcon,
+  IdCardIcon,
+  PersonIcon,
+} from '@radix-ui/react-icons';
+import { apiUrl, authHeaders } from '../lib/api';
+
+const NAV_ITEMS = [
+  { label: 'Dashboard', icon: DashboardIcon, isActive: true },
+  { label: 'My Schedule', icon: CalendarIcon, isActive: false },
+  { label: 'My Profile', icon: PersonIcon, isActive: false },
+];
 
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -15,8 +30,8 @@ const DashboardPage: React.FC = () => {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/api/auth/me', {
-          headers: { 'Authorization': `Bearer ${token}` },
+        const response = await fetch(apiUrl('/api/auth/me'), {
+          headers: authHeaders(),
         });
 
         if (!response.ok) throw new Error('Session expired');
@@ -42,7 +57,7 @@ const DashboardPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white">
+      <div className="min-h-screen flex items-center justify-center app-gradient text-white">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
       </div>
     );
@@ -63,28 +78,34 @@ const DashboardPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex bg-slate-950 text-slate-200 font-sans">
-      <aside className="w-72 bg-slate-900 border-r border-slate-800 flex flex-col shadow-xl">
+    <div className="min-h-screen flex app-gradient text-slate-200 font-sans">
+      <aside className="w-72 bg-slate-900/60 backdrop-blur-sm border-r border-slate-800 flex flex-col shadow-xl">
         <div className="p-8">
           <div className="flex items-center gap-3 mb-8">
             <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-xl">U</div>
             <h1 className="text-xl font-bold tracking-tight text-white">USMS Portal</h1>
           </div>
           <nav className="space-y-1">
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium transition-all shadow-lg shadow-indigo-500/20">
-              <span>🏠</span> Dashboard
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-              <span>📅</span> My Schedule
-            </button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all">
-              <span>👤</span> My Profile
-            </button>
+            {NAV_ITEMS.map(({ label, icon: Icon, isActive }) => (
+              <button
+                key={label}
+                aria-current={isActive ? 'page' : undefined}
+                className={
+                  isActive
+                    ? 'w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-600 text-white font-medium transition-all shadow-lg shadow-indigo-500/20'
+                    : 'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-slate-800 hover:text-white transition-all'
+                }
+              >
+                <Icon className="w-4 h-4 shrink-0" aria-hidden />
+                {label}
+              </button>
+            ))}
           </nav>
         </div>
         <div className="mt-auto p-6 border-t border-slate-800">
           <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-slate-400 hover:bg-red-900/20 hover:text-red-400 transition-all">
-            <span>🚪</span> Sign Out
+            <ExitIcon className="w-4 h-4 shrink-0" aria-hidden />
+            Sign Out
           </button>
         </div>
       </aside>
@@ -104,19 +125,25 @@ const DashboardPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="p-8 bg-slate-900 border border-slate-800 rounded-3xl hover:border-indigo-500 transition-all cursor-pointer group relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-600/10 rounded-full blur-2xl group-hover:bg-indigo-600/20 transition-all"></div>
-            <div className="w-14 h-14 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">📅</div>
+            <div className="w-14 h-14 bg-indigo-600/20 text-indigo-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <CalendarIcon className="w-6 h-6" aria-hidden />
+            </div>
             <h3 className="text-xl font-bold text-white mb-2">Weekly Schedule</h3>
             <p className="text-slate-400 leading-relaxed">Access your current timetable and check for any slot changes.</p>
           </div>
           <div className="p-8 bg-slate-900 border border-slate-800 rounded-3xl hover:border-emerald-500 transition-all cursor-pointer group relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-600/10 rounded-full blur-2xl group-hover:bg-emerald-600/20 transition-all"></div>
-            <div className="w-14 h-14 bg-emerald-600/20 text-emerald-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">👤</div>
+            <div className="w-14 h-14 bg-emerald-600/20 text-emerald-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <IdCardIcon className="w-6 h-6" aria-hidden />
+            </div>
             <h3 className="text-xl font-bold text-white mb-2">Academic Profile</h3>
             <p className="text-slate-400 leading-relaxed">Review your GPA, credits, and current academic standing.</p>
           </div>
           <div className="p-8 bg-slate-900 border border-slate-800 rounded-3xl hover:border-amber-500 transition-all cursor-pointer group relative overflow-hidden">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-amber-600/10 rounded-full blur-2xl group-hover:bg-amber-600/20 transition-all"></div>
-            <div className="w-14 h-14 bg-amber-600/20 text-amber-400 rounded-2xl flex items-center justify-center text-2xl mb-6 group-hover:scale-110 transition-transform">🔔</div>
+            <div className="w-14 h-14 bg-amber-600/20 text-amber-400 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+              <BellIcon className="w-6 h-6" aria-hidden />
+            </div>
             <h3 className="text-xl font-bold text-white mb-2">Recent Alerts</h3>
             <p className="text-slate-400 leading-relaxed">Stay updated with notifications from your advisor.</p>
           </div>
