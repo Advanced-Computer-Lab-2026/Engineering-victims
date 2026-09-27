@@ -113,6 +113,21 @@ const DashboardPage: React.FC = () => {
             </li>
           )}
           <li>
+            <button
+              type="button"
+              onClick={() => navigate('/profile')}
+              className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-emerald-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
+            >
+              <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                <Contact className="h-4 w-4 text-emerald-400" aria-hidden />
+                My Profile
+              </span>
+              <span className="mt-1 block text-xs text-slate-400">
+                Review your student ID, major, standing and assigned advisor.
+              </span>
+            </button>
+          </li>
+          <li>
             <div
               aria-disabled="true"
               className="w-full cursor-not-allowed rounded-xl border border-slate-800/80 bg-slate-900/30 p-4"

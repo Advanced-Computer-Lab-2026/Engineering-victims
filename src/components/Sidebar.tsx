@@ -28,7 +28,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/students', label: 'Students', icon: Users, roles: ['Coordinator', 'Administrator'] },
   { to: '/schedule', label: 'My Schedule', icon: CalendarDays, unavailable: true },
-  { to: '/profile', label: 'My Profile', icon: Contact, unavailable: true },
+  { to: '/profile', label: 'My Profile', icon: Contact },
 ];
 
 const Sidebar: React.FC<SidebarProps> = ({ role, open, onClose }) => {

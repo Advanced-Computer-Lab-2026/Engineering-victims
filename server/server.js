@@ -5,6 +5,7 @@ const dotenv = require('dotenv');
 const morgan = require('morgan');
 const { ensureEnvFile, DEFAULT_MONGO_URI } = require('./config/ensureEnv');
 const authRoutes = require('./routes/authRoutes');
+const userRoutes = require('./routes/userRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const { seed } = require('./config/seedData');
 
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 
 app.use('/api/auth', authRoutes);
+app.use('/api/user', userRoutes);
 app.use('/api/students', studentRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 
