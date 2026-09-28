@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import StudentsPage from './pages/StudentsPage';
+import AdvisorsPage from './pages/AdvisorsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -29,6 +30,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/students" element={<StudentsPage />} />
+          <Route path="/advisors" element={<AdvisorsPage />} />
         </Route>
 
         <Route
