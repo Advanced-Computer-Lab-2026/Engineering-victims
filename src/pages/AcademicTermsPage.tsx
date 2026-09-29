@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { CalendarRange, Loader2, Save } from 'lucide-react';
+import { CalendarRange, Loader2, Pencil, Plus, Save } from 'lucide-react';
 import AlertBanner from '../components/ui/AlertBanner';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
@@ -35,6 +35,7 @@ const AcademicTermsPage: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const formRef = React.useRef<HTMLFormElement>(null);
 
   const loadTerms = async () => {
     setIsLoading(true);
@@ -42,21 +43,9 @@ const AcademicTermsPage: React.FC = () => {
 
     try {
       const response = await fetchAcademicTerms();
+      // The form stays in create mode until a term is picked from the list, so
+      // saving never quietly edits a term the user did not choose.
       setTerms(response.terms);
-      if (response.terms.length > 0) {
-        const latest = response.terms[0];
-        setSelectedId(latest.id);
-        setDraft({
-          academicYear: latest.academicYear,
-          season: latest.season,
-          termStartDate: formatDateValue(latest.termStartDate),
-          termEndDate: formatDateValue(latest.termEndDate),
-          teachingStartDate: formatDateValue(latest.teachingStartDate),
-          teachingEndDate: formatDateValue(latest.teachingEndDate),
-          advisingDeadline: formatDateValue(latest.advisingDeadline),
-          swapDeadline: formatDateValue(latest.swapDeadline),
-        });
-      }
     } catch (err) {
       setError((err as ApiError).message);
     } finally {
@@ -70,6 +59,8 @@ const AcademicTermsPage: React.FC = () => {
 
   const handleSelectTerm = (term: AcademicTerm) => {
     setSelectedId(term.id);
+    setError(null);
+    setNotice(null);
     setDraft({
       academicYear: term.academicYear,
       season: term.season,
@@ -80,6 +71,12 @@ const AcademicTermsPage: React.FC = () => {
       advisingDeadline: formatDateValue(term.advisingDeadline),
       swapDeadline: formatDateValue(term.swapDeadline),
     });
+
+    // Below the xl breakpoint the form sits under the list, so bring the
+    // editor into view instead of leaving the click looking unanswered.
+    if (window.innerWidth < 1280) {
+      formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   const resetForm = () => {
@@ -87,6 +84,8 @@ const AcademicTermsPage: React.FC = () => {
     setDraft(emptyDraft());
     setNotice(null);
   };
+
+  const selectedTerm = terms.find((term) => term.id === selectedId) ?? null;
 
   const handleChange = (field: keyof AcademicTermDraft, value: string) => {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -122,13 +121,19 @@ const AcademicTermsPage: React.FC = () => {
     <>
       <PageHeader
         title="Academic Terms"
-        description="Create and update term dates used by advising, registration and swaps."
+        description="Create a term, or select a saved term on the left to edit its registration and advising-season dates."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
       />
 
       {error && (
         <div className="mb-4">
-          <AlertBanner tone="error" title="Term update failed">{error}</AlertBanner>
+          <AlertBanner
+            tone="error"
+            title={selectedId ? 'Could not update the term' : 'Could not create the term'}
+            onDismiss={() => setError(null)}
+          >
+            {error}
+          </AlertBanner>
         </div>
       )}
 
@@ -140,10 +145,27 @@ const AcademicTermsPage: React.FC = () => {
 
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <Card className="p-4">
-          <div className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
-            <CalendarRange className="h-4 w-4 text-indigo-400" aria-hidden />
-            Saved Terms
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
+              <CalendarRange className="h-4 w-4 text-indigo-400" aria-hidden />
+              Saved Terms
+            </div>
+            <CustomButton
+              variant="secondary"
+              size="sm"
+              onClick={resetForm}
+              disabled={!selectedId}
+              icon={<Plus className="h-3.5 w-3.5" aria-hidden />}
+            >
+              New term
+            </CustomButton>
           </div>
+
+          {!isLoading && terms.length > 0 && (
+            <p className="mb-3 mt-2 text-xs text-slate-500">
+              Select a term to edit its dates.
+            </p>
+          )}
 
           {isLoading ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
@@ -154,41 +176,64 @@ const AcademicTermsPage: React.FC = () => {
             <p className="text-sm text-slate-400">No academic terms yet. Create the first one.</p>
           ) : (
             <div className="space-y-2">
-              {terms.map((term) => (
-                <button
-                  key={term.id}
-                  type="button"
-                  onClick={() => handleSelectTerm(term)}
-                  className={`w-full rounded-xl border p-3 text-left transition-colors ${
-                    selectedId === term.id
-                      ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                      : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold">{term.season}</span>
-                    <span className="text-xs text-slate-400">{term.academicYear}</span>
-                  </div>
-                  <p className="mt-1 text-xs text-slate-400">
-                    {new Date(term.advisingDeadline).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })}
-                  </p>
-                </button>
-              ))}
+              {terms.map((term) => {
+                const isSelected = selectedId === term.id;
+
+                return (
+                  <button
+                    key={term.id}
+                    type="button"
+                    onClick={() => handleSelectTerm(term)}
+                    aria-label={`Edit the ${term.season} ${term.academicYear} term`}
+                    aria-pressed={isSelected}
+                    className={`group w-full rounded-xl border p-3 text-left transition-colors ${
+                      isSelected
+                        ? 'border-indigo-500 bg-indigo-500/10 text-white'
+                        : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold">{term.season}</span>
+                      <span className="text-xs text-slate-400">{term.academicYear}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-slate-400">
+                      {new Date(term.advisingDeadline).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })}
+                    </p>
+                    <span
+                      className={`mt-2 inline-flex items-center gap-1.5 text-xs font-medium ${
+                        isSelected ? 'text-indigo-200' : 'text-indigo-300 group-hover:text-indigo-200'
+                      }`}
+                    >
+                      <Pencil className="h-3 w-3" aria-hidden />
+                      {isSelected ? 'Editing this term' : 'Edit'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </Card>
 
         <Card className="p-6">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold text-white">
-                {selectedId ? 'Edit academic term' : 'Create academic term'}
-              </h2>
-              {selectedId && (
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-white">
+                  {selectedTerm
+                    ? `Edit ${selectedTerm.season} ${selectedTerm.academicYear}`
+                    : 'Create academic term'}
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-400">
+                  {selectedTerm
+                    ? 'Change the dates below, then save your updates.'
+                    : 'Set the registration and advising dates for a new term.'}
+                </p>
+              </div>
+              {selectedTerm && (
                 <CustomButton variant="secondary" size="sm" onClick={resetForm} type="button">
                   New term
                 </CustomButton>
