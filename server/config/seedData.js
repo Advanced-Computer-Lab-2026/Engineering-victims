@@ -12,6 +12,10 @@ const STAFF = [
   { fullName: 'Dr. Advisor', email: 'advisor@guc.edu.eg', password: 'password123', role: 'Advisor' },
   { fullName: 'Nour Coordinator', email: 'coordinator@guc.edu.eg', password: 'password123', role: 'Coordinator' },
   { fullName: 'Admin User', email: 'admin@guc.edu.eg', password: 'password123', role: 'Administrator' },
+  // Additional staff that can be converted to advisors for testing
+  { fullName: 'Dr. Sara Ahmed', email: 'sara.ahmed@guc.edu.eg', password: 'password123', role: 'Student' },
+  { fullName: 'Dr. Hassan Mahmoud', email: 'hassan.mahmoud@guc.edu.eg', password: 'password123', role: 'Student' },
+  { fullName: 'Prof. Laila Youssef', email: 'laila.youssef@guc.edu.eg', password: 'password123', role: 'Student' },
 ];
 
 /**
