@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useSession } from '../hooks/useSession';
+import HistoryButtons from './HistoryButtons';
 import Sidebar from './Sidebar';
 
 const AppLayout: React.FC = () => {
@@ -19,6 +20,10 @@ const AppLayout: React.FC = () => {
       <Sidebar role={user?.role ?? null} open={navOpen} onClose={() => setNavOpen(false)} />
 
       <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
+        {/* Same spot on every page, the way a browser keeps its own controls. */}
+        <div className="-ml-1.5 mb-3">
+          <HistoryButtons />
+        </div>
         <Outlet />
       </main>
     </div>
