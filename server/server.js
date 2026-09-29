@@ -9,6 +9,7 @@ const userRoutes = require('./routes/userRoutes');
 const studentRoutes = require('./routes/studentRoutes');
 const academicTermRoutes = require('./routes/academicTermRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const advisorRoutes = require('./routes/advisorRoutes');
 const { seed } = require('./config/seedData');
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
@@ -28,6 +29,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/terms', academicTermRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/advisors', advisorRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 
 const PORT = process.env.PORT || 5000;
