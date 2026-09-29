@@ -272,10 +272,33 @@ Seeded logins (the database is re-seeded on every server start):
 
 | Role | Email | Password |
 | --- | --- | --- |
-| Student | `samy.elgedaily@student.guc.edu.eg` | `SamySamy2006` |
 | Advisor | `advisor@guc.edu.eg` | `password123` |
+| Advisor | `mona.adel@guc.edu.eg` | `password123` |
+| Advisor | `karim.fahmy@guc.edu.eg` | `password123` |
 | Coordinator | `coordinator@guc.edu.eg` | `password123` |
 | Administrator | `admin@guc.edu.eg` | `password123` |
+
+Every student in the directory also gets a login account — passwords follow
+`FirstnameLastname2006`:
+
+| Student type | Email | Password |
+| --- | --- | --- |
+| Normal | `samy.elgedaily@student.guc.edu.eg` | `SamyElgedaily2006` |
+| Normal | `mariam.fouad@student.guc.edu.eg` | `MariamFouad2006` |
+| Normal | `youssef.kamal@student.guc.edu.eg` | `YoussefKamal2006` |
+| Advising | `laila.hassan@student.guc.edu.eg` | `LailaHassan2006` |
+| Advising | `omar.nabil@student.guc.edu.eg` | `OmarNabil2006` |
+| Advising | `salma.ibrahim@student.guc.edu.eg` | `SalmaIbrahim2006` |
+| Advising | `ahmed.sherif@student.guc.edu.eg` | `AhmedSherif2006` |
+| Advising | `hana.mahmoud@student.guc.edu.eg` | `HanaMahmoud2006` |
+| Advising | `karim.emad@student.guc.edu.eg` | `KarimEmad2006` |
+| Advising | `nour.elsayed@student.guc.edu.eg` | `NourElsayed2006` |
+| Advising | `mariam.said@student.guc.edu.eg` | `MariamSaid2006` |
+| Normal | `zeyad.tarek@student.guc.edu.eg` | `ZeyadTarek2006` |
+
+`youssef.kamal@student.guc.edu.eg` is seeded deactivated (matching his
+directory record), so his login is rejected with "account is currently
+inactive" — useful for exercising that path.
 
 The seed also creates 12 students spanning both student types, every workflow
 status, both account states and both academic standings, so the students list,

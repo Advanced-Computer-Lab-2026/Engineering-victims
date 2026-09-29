@@ -77,14 +77,10 @@ exports.getMe = async (req, res) => {
 
 exports.seed = async (req, res) => {
   try {
-    await User.deleteMany({});
-    const testUsers = [
-      { fullName: 'Samy Elgedaily', email: 'samy.elgedaily@student.guc.edu.eg', password: 'SamySamy2006', role: 'Student', studentId: 'S12345', major: 'Computer Science', isActive: true },
-      { fullName: 'Dr. Advisor', email: 'advisor@guc.edu.eg', password: 'password123', role: 'Advisor', isActive: true },
-      { fullName: 'Admin User', email: 'admin@guc.edu.eg', password: 'password123', role: 'Administrator', isActive: true }
-    ];
-    for (const u of testUsers) { await User.create(u); }
-    res.status(200).json({ message: 'Database seeded successfully!' });
+    // Same source of truth as the boot-time seed, so hitting this route can
+    // never leave the database with a different set of accounts.
+    const result = await require('../config/seedData').seed();
+    res.status(200).json({ message: 'Database seeded successfully!', ...result });
   } catch (error) {
     res.status(500).json({ message: 'Seeding failed', error: error.message });
   }
