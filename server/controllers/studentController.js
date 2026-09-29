@@ -35,6 +35,25 @@ const serialize = (student) => ({
  * Req 6, 7, 8: list students with search and filters, plus the distinct values
  * the filter dropdowns need. Returned together so the UI makes one request.
  */
+exports.listAdvisors = async (req, res) => {
+  try {
+    const advisors = await User.find({ role: 'Advisor', isActive: true })
+      .select('fullName email')
+      .sort({ fullName: 1 })
+      .lean();
+
+    res.status(200).json({
+      advisors: advisors.map((advisor) => ({
+        id: advisor._id,
+        fullName: advisor.fullName,
+        email: advisor.email,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load advisors', error: error.message });
+  }
+};
+
 exports.listStudents = async (req, res) => {
   try {
     const filter = buildStudentQuery(req.query);
@@ -143,6 +162,52 @@ exports.getStudent = async (req, res) => {
  * Req 10: activate or deactivate an account. Deactivation blocks login without
  * touching academic, scheduling or audit history, so nothing else is modified.
  */
+exports.assignAdvisor = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'That student link is not valid.' });
+    }
+
+    const { advisorId } = req.body;
+    if (!mongoose.isValidObjectId(advisorId)) {
+      return res.status(400).json({ message: 'A valid advisorId is required.' });
+    }
+
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (student.studentType !== 'Advising Student') {
+      return res.status(400).json({ message: 'Only advising students can be assigned an advisor.' });
+    }
+
+    const advisor = await User.findById(advisorId);
+    if (!advisor || advisor.role !== 'Advisor') {
+      return res.status(404).json({ message: 'Advisor not found or not eligible for assignment.' });
+    }
+
+    const previous = student.assignedAdvisor ? String(student.assignedAdvisor) : null;
+    student.assignedAdvisor = advisor._id;
+    student.lastUpdateAt = new Date();
+    await student.save();
+    await student.populate('assignedAdvisor', 'fullName email');
+
+    // Requirement 14 explicitly preserves the student's schedule, requests,
+    // plans and advisor history; this action only swaps the assigned advisor.
+    const responseMessage = previous && previous !== String(advisor._id)
+      ? `${student.fullName}'s advisor was reassigned successfully.`
+      : `${student.fullName}'s advisor was assigned successfully.`;
+
+    res.status(200).json({
+      message: responseMessage,
+      student: serialize(student),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not assign the advisor', error: error.message });
+  }
+};
+
 exports.setAccountStatus = async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {

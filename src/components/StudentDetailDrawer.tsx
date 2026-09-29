@@ -69,8 +69,13 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [advisors, setAdvisors] = useState<Array<{ id: string; fullName: string; email: string }>>([]);
+  const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>('');
+  const [isSavingAdvisor, setIsSavingAdvisor] = useState(false);
+  const [advisorError, setAdvisorError] = useState<string | null>(null);
 
   const canManage = role === 'Administrator';
+  const canAssignAdvisor = (role === 'Coordinator' || role === 'Administrator') && data?.student.studentType === 'Advising Student';
 
   useEffect(() => {
     if (!studentId) return;
@@ -79,10 +84,15 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
     setData(null);
     setError(null);
     setNotice(null);
+    setAdvisorError(null);
+    setAdvisors([]);
 
     apiFetch<StudentDetailResponse>(`/api/students/${studentId}`)
       .then((response) => {
-        if (!cancelled) setData(response);
+        if (!cancelled) {
+          setData(response);
+          setSelectedAdvisorId(response.student.assignedAdvisor?.id ?? '');
+        }
       })
       .catch((err: ApiError) => {
         if (!cancelled) setError(err.message);
@@ -92,6 +102,28 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
       cancelled = true;
     };
   }, [studentId]);
+
+  useEffect(() => {
+    if (!canAssignAdvisor) return;
+
+    let cancelled = false;
+    apiFetch<{ advisors: Array<{ id: string; fullName: string; email: string }> }>('/api/students/advisors')
+      .then((response) => {
+        if (!cancelled) {
+          setAdvisors(response.advisors);
+          if (!selectedAdvisorId && data?.student.assignedAdvisor) {
+            setSelectedAdvisorId(data.student.assignedAdvisor.id);
+          }
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAdvisorError('Could not load the advisor list.');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [canAssignAdvisor, data?.student.assignedAdvisor, selectedAdvisorId]);
 
   // Escape closes the panel, matching the close button.
   useEffect(() => {
@@ -128,6 +160,35 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
       setError((err as ApiError).message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAssignAdvisor = async () => {
+    if (!data || !selectedAdvisorId) return;
+
+    setIsSavingAdvisor(true);
+    setAdvisorError(null);
+
+    try {
+      const response = await apiFetch<{ message: string; student: StudentDetailResponse['student'] }>(
+        `/api/students/${data.student.id}/advisor`,
+        {
+          method: 'PATCH',
+          body: JSON.stringify({ advisorId: selectedAdvisorId }),
+        }
+      );
+
+      setData((current) =>
+        current
+          ? { ...current, student: response.student }
+          : current
+      );
+      setSelectedAdvisorId(response.student.assignedAdvisor?.id ?? '');
+      setNotice(response.message);
+    } catch (err) {
+      setAdvisorError((err as ApiError).message);
+    } finally {
+      setIsSavingAdvisor(false);
     }
   };
 
@@ -214,6 +275,44 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                   </DetailRow>
                 </dl>
               </section>
+
+              {canAssignAdvisor && (
+                <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Advisor assignment
+                  </h3>
+
+                  {advisorError && <AlertBanner tone="error">{advisorError}</AlertBanner>}
+
+                  <div className="flex flex-col gap-3">
+                    <label className="flex flex-col gap-1.5">
+                      <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Assigned advisor</span>
+                      <select
+                        value={selectedAdvisorId}
+                        onChange={(event) => setSelectedAdvisorId(event.target.value)}
+                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                      >
+                        <option value="">Select an advisor</option>
+                        {advisors.map((advisor) => (
+                          <option key={advisor.id} value={advisor.id}>
+                            {advisor.fullName} ({advisor.email})
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+
+                    <CustomButton
+                      variant="primary"
+                      size="sm"
+                      onClick={handleAssignAdvisor}
+                      isLoading={isSavingAdvisor}
+                      disabled={!selectedAdvisorId}
+                    >
+                      Save advisor
+                    </CustomButton>
+                  </div>
+                </section>
+              )}
 
               <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">

@@ -7,8 +7,14 @@ const studentController = require('../controllers/studentController');
 const staffOnly = [authenticate, requireRole('Coordinator', 'Administrator')];
 
 router.get('/', ...staffOnly, studentController.listStudents);
+router.get('/advisors', ...staffOnly, studentController.listAdvisors);
 // Declared before '/:id' so "stats" is not swallowed as an ObjectId.
 router.get('/stats', ...staffOnly, studentController.getStats);
+router.patch(
+  '/:id/advisor',
+  ...staffOnly,
+  studentController.assignAdvisor
+);
 router.get('/:id', ...staffOnly, studentController.getStudent);
 
 // Req 10 is Administrator only.
