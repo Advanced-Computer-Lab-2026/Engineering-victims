@@ -53,6 +53,37 @@ export interface StudentDetailResponse {
   availableStatuses: string[];
 }
 
+export type AcademicTermSeason = 'Winter' | 'Spring' | 'Summer';
+
+export interface AcademicTerm {
+  id: string;
+  academicYear: string;
+  season: AcademicTermSeason;
+  termStartDate: string;
+  termEndDate: string;
+  teachingStartDate: string;
+  teachingEndDate: string;
+  advisingDeadline: string;
+  swapDeadline: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AcademicTermDraft {
+  academicYear: string;
+  season: AcademicTermSeason;
+  termStartDate: string;
+  termEndDate: string;
+  teachingStartDate: string;
+  teachingEndDate: string;
+  advisingDeadline: string;
+  swapDeadline: string;
+}
+
+export interface AcademicTermsResponse {
+  terms: AcademicTerm[];
+}
+
 /** Every filter in req 8, as URL params. Empty string means "not filtering". */
 export interface StudentFilters {
   search: string;

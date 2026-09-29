@@ -7,6 +7,7 @@ const { ensureEnvFile, DEFAULT_MONGO_URI } = require('./config/ensureEnv');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const studentRoutes = require('./routes/studentRoutes');
+const academicTermRoutes = require('./routes/academicTermRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const { seed } = require('./config/seedData');
 
@@ -25,6 +26,7 @@ app.use(morgan('dev'));
 app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/terms', academicTermRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 

@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import StudentsPage from './pages/StudentsPage';
+import AcademicTermsPage from './pages/AcademicTermsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -29,6 +30,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/students" element={<StudentsPage />} />
+        </Route>
+
+        <Route
+          element={
+            <ProtectedRoute roles={['Administrator']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/terms" element={<AcademicTermsPage />} />
         </Route>
 
         <Route

@@ -28,6 +28,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/students', label: 'Students', icon: Users, roles: ['Coordinator', 'Administrator'] },
+  { to: '/terms', label: 'Academic Terms', icon: CalendarDays, roles: ['Administrator'] },
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/schedule', label: 'My Schedule', icon: CalendarDays, unavailable: true },
   { to: '/profile', label: 'My Profile', icon: Contact },

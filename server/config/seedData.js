@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const Student = require('../models/Student');
+const AcademicTerm = require('../models/AcademicTerm');
 const Notification = require('../models/Notification');
 const { recalculate } = require('../services/workflowService');
 
@@ -89,6 +90,7 @@ const buildNotifications = (user) =>
 const seed = async () => {
   await User.deleteMany({});
   await Student.deleteMany({});
+  await AcademicTerm.deleteMany({});
   await Notification.deleteMany({});
 
   const created = await User.create([
@@ -110,6 +112,20 @@ const seed = async () => {
   // Derive blocking step and last-updated rather than storing them by hand.
   await Promise.all(students.map((student) => recalculate(student)));
 
+  const defaultTerms = await AcademicTerm.create([
+    {
+      academicYear: '2026/2027',
+      season: 'Winter',
+      termStartDate: new Date('2026-09-15T00:00:00.000Z'),
+      termEndDate: new Date('2026-12-20T00:00:00.000Z'),
+      teachingStartDate: new Date('2026-09-22T00:00:00.000Z'),
+      teachingEndDate: new Date('2026-12-18T00:00:00.000Z'),
+      advisingDeadline: new Date('2026-09-30T00:00:00.000Z'),
+      swapDeadline: new Date('2026-09-25T00:00:00.000Z'),
+      createdBy: created[0]?._id ?? null,
+    },
+  ]);
+
   // FR 5.0: every seeded account gets its own demo notifications.
   const notifications = await Notification.insertMany(created.flatMap(buildNotifications));
 
@@ -117,6 +133,7 @@ const seed = async () => {
     users: created.length,
     students: students.length,
     advisors: advisors.length,
+    terms: defaultTerms.length,
     notifications: notifications.length,
   };
 };
