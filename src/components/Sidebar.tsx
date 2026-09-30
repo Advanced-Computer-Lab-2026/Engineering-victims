@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, Contact, GraduationCap, LayoutDashboard, Layers, LogOut, Users, UserCog, Wallet, X } from 'lucide-react';
+import { Bell, BookOpen, CalendarDays, Contact, GraduationCap, LayoutDashboard, Layers, LogOut, ScrollText, Users, UserCog, Wallet, X } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import CustomButton from './ui/CustomButton';
@@ -53,6 +53,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/offerings', label: 'Course Offerings', icon: Layers, roles: ['Administrator'] },
   // Req 89: Normal Students have no wallet, so the item is hidden from them.
   { to: '/wallet', label: 'My Wallet', icon: Wallet, roles: ['Student'], studentTypes: ['Advising Student'] },
+  // Req 54: staff reach a student's history from the student lists instead.
+  { to: '/academic-history', label: 'Academic History', icon: ScrollText, roles: ['Student'], studentTypes: ['Advising Student'] },
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/schedule', label: 'My Schedule', icon: CalendarDays, unavailable: true },
   { to: '/profile', label: 'My Profile', icon: Contact },

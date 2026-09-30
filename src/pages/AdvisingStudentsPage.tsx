@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { GraduationCap, Loader2, RotateCcw, UserCheck, UserX, Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { GraduationCap, Loader2, RotateCcw, ScrollText, UserCheck, UserX, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
@@ -111,6 +112,9 @@ const AdvisingStudentsPage: React.FC = () => {
                   <th scope="col" className="px-4 py-3 font-semibold">Workflow status</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Blocking step</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Last update</th>
+                  <th scope="col" className="px-4 py-3 text-right font-semibold">
+                    <span className="sr-only">Actions</span>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -136,38 +140,53 @@ const CountTile: React.FC<{ label: string; value: number; icon: React.ReactNode 
   </Card>
 );
 
-const AdvisingStudentTableRow: React.FC<{ student: AdvisingStudentRow }> = ({ student }) => (
-  <tr className={`transition-colors hover:bg-slate-800/40 ${student.isMine ? 'bg-indigo-500/5' : ''}`}>
-    <td className="px-4 py-3">
-      <span className="block font-medium text-slate-100">{student.fullName}</span>
-      <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
-        <GraduationCap className="h-3 w-3" aria-hidden />
-        {student.email}
-      </span>
-    </td>
-    <td className="px-4 py-3 font-mono text-xs text-slate-300">{student.studentId}</td>
-    <td className="px-4 py-3 text-slate-300">{student.major}</td>
-    <td className="px-4 py-3 text-slate-300">{student.currentSemester}</td>
-    <td className="px-4 py-3 text-slate-300">
-      {student.assignedAdvisor ? (
-        <span className="flex flex-wrap items-center gap-1.5">
-          {student.assignedAdvisor.fullName}
-          {student.isMine && <Badge tone="indigo">You</Badge>}
+const AdvisingStudentTableRow: React.FC<{ student: AdvisingStudentRow }> = ({ student }) => {
+  const navigate = useNavigate();
+
+  return (
+    <tr className={`transition-colors hover:bg-slate-800/40 ${student.isMine ? 'bg-indigo-500/5' : ''}`}>
+      <td className="px-4 py-3">
+        <span className="block font-medium text-slate-100">{student.fullName}</span>
+        <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
+          <GraduationCap className="h-3 w-3" aria-hidden />
+          {student.email}
         </span>
-      ) : (
-        <span className="text-slate-500">Unassigned</span>
-      )}
-    </td>
-    <td className="px-4 py-3">
-      <StatusPill state={student.isActive ? 'active' : 'inactive'} workflowStatus={student.workflowStatus} />
-    </td>
-    <td className="px-4 py-3 text-xs text-slate-400">
-      {student.blockingStep ?? <span className="text-slate-600">None</span>}
-    </td>
-    <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500" title={formatDate(student.lastUpdateAt)}>
-      {formatRelative(student.lastUpdateAt)}
-    </td>
-  </tr>
-);
+      </td>
+      <td className="px-4 py-3 font-mono text-xs text-slate-300">{student.studentId}</td>
+      <td className="px-4 py-3 text-slate-300">{student.major}</td>
+      <td className="px-4 py-3 text-slate-300">{student.currentSemester}</td>
+      <td className="px-4 py-3 text-slate-300">
+        {student.assignedAdvisor ? (
+          <span className="flex flex-wrap items-center gap-1.5">
+            {student.assignedAdvisor.fullName}
+            {student.isMine && <Badge tone="indigo">You</Badge>}
+          </span>
+        ) : (
+          <span className="text-slate-500">Unassigned</span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <StatusPill state={student.isActive ? 'active' : 'inactive'} workflowStatus={student.workflowStatus} />
+      </td>
+      <td className="px-4 py-3 text-xs text-slate-400">
+        {student.blockingStep ?? <span className="text-slate-600">None</span>}
+      </td>
+      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500" title={formatDate(student.lastUpdateAt)}>
+        {formatRelative(student.lastUpdateAt)}
+      </td>
+      <td className="px-4 py-3 text-right">
+        {/* Req 54: Advisors may open any advising student's academic history. */}
+        <CustomButton
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/academic-history/${student.id}`)}
+          icon={<ScrollText className="h-4 w-4" aria-hidden />}
+        >
+          History
+        </CustomButton>
+      </td>
+    </tr>
+  );
+};
 
 export default AdvisingStudentsPage;

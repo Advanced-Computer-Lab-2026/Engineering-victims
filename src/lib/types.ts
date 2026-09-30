@@ -218,6 +218,57 @@ export interface CoursesResponse {
   courses: Course[];
 }
 
+/** Req 54 — a student's academic history. */
+export interface HistoryCourse {
+  id: string;
+  code: string;
+  name: string;
+  creditHours: number;
+}
+
+export interface CompletedCourse {
+  id: string;
+  course: HistoryCourse;
+  grade: string;
+  gradePoints: number;
+  passed: boolean;
+  term: string;
+  semester: number;
+}
+
+export interface CurrentCourse {
+  id: string;
+  course: HistoryCourse;
+  term: string;
+  semester: number;
+}
+
+export interface RemainingCourse extends HistoryCourse {
+  courseType: CourseType;
+  recommendedSemester: number;
+  offeringSeasons: AcademicTermSeason[];
+  prerequisites: Array<{ id: string; code: string; name: string; passed: boolean }>;
+  /** Failed before, so it is owed again. */
+  isRetake: boolean;
+}
+
+export interface AcademicHistoryResponse {
+  student: {
+    id: string;
+    fullName: string;
+    email: string;
+    studentId: string;
+    major: string;
+    currentSemester: number;
+    academicStanding: string;
+    assignedAdvisor: AdvisorSummary | null;
+  };
+  summary: { gpa: number | null; completedHours: number; currentHours: number; remainingHours: number };
+  completed: CompletedCourse[];
+  current: CurrentCourse[];
+  remaining: RemainingCourse[];
+}
+
 /** Req 89 — Advising Student wallet. */
 export type WalletTransactionType = 'Refund' | 'Payment';
 
