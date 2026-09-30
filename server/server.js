@@ -10,6 +10,7 @@ const studentRoutes = require('./routes/studentRoutes');
 const academicTermRoutes = require('./routes/academicTermRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const advisorRoutes = require('./routes/advisorRoutes');
+const courseRoutes = require('./routes/courseRoutes');
 const { seed } = require('./config/seedData');
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
@@ -30,6 +31,7 @@ app.use('/api/students', studentRoutes);
 app.use('/api/terms', academicTermRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/advisors', advisorRoutes);
+app.use('/api/courses', courseRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 
 const PORT = process.env.PORT || 5000;
@@ -44,8 +46,8 @@ async function startServer() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const { users, students, notifications } = await seed();
-    console.log(`✅ Seeded ${users} users, ${students} students and ${notifications} notifications`);
+    const { users, students, courses, notifications } = await seed();
+    console.log(`✅ Seeded ${users} users, ${students} students, ${courses} courses and ${notifications} notifications`);
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {
