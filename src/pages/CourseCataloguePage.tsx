@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, ChevronRight, ListFilter, Loader2, Plus, Search, X } from 'lucide-react';
+import { BookOpen, ChevronRight, ListFilter, Loader2, Plus, Search, Trash2, X } from 'lucide-react';
 import CourseDrawer, { COURSE_TYPE_TONE, type CourseDrawerMode } from '../components/CourseDrawer';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
@@ -9,7 +9,7 @@ import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 import { ApiError } from '../lib/api';
-import { fetchCourses } from '../lib/coursesService';
+import { fetchCourses, deleteCourse } from '../lib/coursesService';
 import { COURSE_MAJORS, COURSE_SEASONS, COURSE_TYPES, type Course } from '../lib/types';
 
 interface CourseFilters {
@@ -109,6 +109,24 @@ const CourseCataloguePage: React.FC = () => {
   };
 
   const closeDrawer = useCallback(() => setDrawerMode(null), []);
+
+  // Req 21: delete a course from the catalogue (the server flags it inactive).
+  const handleDelete = async (course: Course, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (
+      !window.confirm(
+        `Are you sure you want to delete course ${course.code}? This action will mark the course as inactive.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await deleteCourse(course.id);
+      await loadCourses();
+    } catch (err) {
+      setError((err as ApiError).message);
+    }
+  };
 
   const handleSaved = (saved: Course, created: boolean) => {
     setCourses((current) => {
@@ -295,17 +313,27 @@ const CourseCataloguePage: React.FC = () => {
                           : course.prerequisites.map((prerequisite) => prerequisite.code).join(', ')}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            openCourse(course);
-                          }}
-                          aria-label={`View ${course.code}`}
-                          className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-white"
-                        >
-                          <ChevronRight className="h-4 w-4" aria-hidden />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            type="button"
+                            onClick={(event) => handleDelete(course, event)}
+                            aria-label={`Delete ${course.code}`}
+                            className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              openCourse(course);
+                            }}
+                            aria-label={`View ${course.code}`}
+                            className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-white"
+                          >
+                            <ChevronRight className="h-4 w-4" aria-hidden />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

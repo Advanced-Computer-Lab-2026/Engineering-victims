@@ -69,6 +69,8 @@ const courseSchema = new mongoose.Schema(
     },
     prerequisites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    // Req 21 soft-deletes by flipping this flag; list endpoints hide inactive rows.
+    isActive: { type: Boolean, default: true },
   },
   { timestamps: true }
 );

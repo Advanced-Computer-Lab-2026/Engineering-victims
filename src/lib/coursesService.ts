@@ -32,3 +32,10 @@ export const updateCourse = async (id: string, draft: CourseDraft): Promise<{ co
     body: JSON.stringify(toPayload(draft)),
   });
 };
+
+// Req 21: soft-deletes the course on the server (it is flagged inactive, not dropped).
+export const deleteCourse = async (id: string): Promise<{ message: string }> => {
+  return apiFetch<{ message: string }>(`/api/courses/${id}`, {
+    method: 'DELETE',
+  });
+};

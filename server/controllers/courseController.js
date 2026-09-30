@@ -65,6 +65,7 @@ const toCourseResponse = (course) => ({
     code: prerequisite.code,
     name: prerequisite.name,
   })),
+  isActive: course.isActive !== false,
   createdAt: course.createdAt,
   updatedAt: course.updatedAt,
 });
@@ -138,9 +139,11 @@ const resolvePrerequisites = async (rawIds, courseId = null) => {
   return ids;
 };
 
+// Req 19: the catalogue lists every active course, prerequisites populated.
+// Soft-deleted courses (req 21) stay in the database but are hidden here.
 exports.listCourses = async (req, res) => {
   try {
-    const courses = await Course.find()
+    const courses = await Course.find({ isActive: true })
       .populate('prerequisites', 'code name')
       .sort({ recommendedSemester: 1, code: 1 })
       .lean();
@@ -150,6 +153,7 @@ exports.listCourses = async (req, res) => {
   }
 };
 
+// Req 18: create a course in the catalogue.
 exports.createCourse = async (req, res) => {
   let course;
   try {
@@ -166,6 +170,7 @@ exports.createCourse = async (req, res) => {
   }
 };
 
+// Req 20: update a course in the catalogue.
 exports.updateCourse = async (req, res) => {
   let course;
   try {
@@ -189,5 +194,29 @@ exports.updateCourse = async (req, res) => {
   } catch (error) {
     const status = error.status || (error.code === 11000 ? 409 : 400);
     res.status(status).json({ message: formatCourseError(error, course?.code) });
+  }
+};
+
+// Req 21: delete a course from the catalogue (soft delete, so history survives).
+exports.deleteCourse = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'That course link is not valid.' });
+    }
+
+    const course = await Course.findById(req.params.id);
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found' });
+    }
+
+    // Soft delete following the project pattern (e.g., studentController.setAccountStatus)
+    course.isActive = false;
+    await course.save();
+
+    res.status(200).json({
+      message: `Course ${course.code} was deleted successfully.`,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not delete the course', error: error.message });
   }
 };

@@ -1,3 +1,28 @@
+export interface CourseOffering {
+  id: string;
+  courseId: Course | string;
+  termId: any;
+  publicationStatus: 'Draft' | 'Published';
+  eligibleMajors: string[];
+  eligibleSemesters: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CourseSlot {
+  id: string;
+  offeringId: string;
+  instructorId: any;
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  groupNumber: number;
+  dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
+  startTime: string;
+  endTime: string;
+  roomId: string;
+  maxCapacity: number;
+  assignedCount: number;
+}
+
 export type Role = 'Student' | 'Advisor' | 'Coordinator' | 'Administrator';
 
 export interface SessionUser {

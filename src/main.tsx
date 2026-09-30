@@ -13,6 +13,7 @@ import StudentsPage from './pages/StudentsPage';
 import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
+import CourseOfferingsPage from './pages/CourseOfferingsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -44,6 +45,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         >
           <Route path="/terms" element={<AcademicTermsPage />} />
           <Route path="/courses" element={<CourseCataloguePage />} />
+          <Route path="/offerings" element={<CourseOfferingsPage />} />
         </Route>
 
         <Route

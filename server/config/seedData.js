@@ -68,7 +68,7 @@ const NOTIFICATION_TEMPLATES = {
   Administrator: [
     { type: 'info', title: 'Term dates updated', message: 'The registration and advising-season dates for the new term were saved.', isRead: false },
     { type: 'warning', title: 'Account deactivation requested', message: 'An account was flagged for deactivation. Academic history will be preserved.', isRead: false },
-    { type: 'success', title: 'Course catalogue import finished', message: '12 courses were validated and imported from CSV with no row errors.', isRead: true },
+    { type: 'success', title: 'Course catalogue import finished', message: 'The full MET and DMET curriculum was validated and imported into the catalogue with no row errors.', isRead: true },
   ],
   default: [
     { type: 'info', title: 'Welcome to the scheduling portal', message: 'Your account was activated. Use the sidebar to reach your dashboard, notifications and profile.', isRead: false },
