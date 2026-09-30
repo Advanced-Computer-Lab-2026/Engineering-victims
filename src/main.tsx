@@ -14,6 +14,7 @@ import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
+import WalletPage from './pages/WalletPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -45,6 +46,18 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/advisors" element={<AdvisorsPage />} />
+        </Route>
+
+        {/* Req 89: students only. A Normal Student who types the URL is told
+            by the API that the wallet is for Advising Students. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Student']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/wallet" element={<WalletPage />} />
         </Route>
 
         <Route
