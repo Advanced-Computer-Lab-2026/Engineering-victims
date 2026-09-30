@@ -1,13 +1,15 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, Contact, LayoutDashboard, Layers, LogOut, Users, UserCog, X } from 'lucide-react';
+import { Bell, BookOpen, CalendarDays, Contact, GraduationCap, LayoutDashboard, Layers, LogOut, ScrollText, Users, UserCog, Wallet, X } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import CustomButton from './ui/CustomButton';
-import type { Role } from '../lib/types';
+import type { Role, StudentType } from '../lib/types';
 
 interface SidebarProps {
   role: Role | null;
+  /** Set for students only, so Advising-Student pages can be told apart. */
+  studentType?: StudentType | null;
   open: boolean;
   onClose: () => void;
 }
@@ -18,6 +20,8 @@ interface NavItem {
   icon: React.ComponentType<{ className?: string }>;
   /** Roles allowed to see the item. Omit to show it to everyone. */
   roles?: Role[];
+  /** Further limits a student item to these student types, e.g. the wallet. */
+  studentTypes?: StudentType[];
   /** Per-role overrides for `label`, e.g. "Students" is "My Students" for an Advisor. */
   labels?: Partial<Record<Role, string>>;
   /**
@@ -37,6 +41,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     roles: ['Coordinator', 'Administrator', 'Advisor'],
   },
+  // Req 50: the school-wide list, next to the Advisor's own roster above.
+  { to: '/advising-students', label: 'All Advising Students', icon: GraduationCap, roles: ['Advisor'] },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.
   { to: '/advisors', label: 'Advisors', icon: UserCog, roles: ['Coordinator', 'Administrator'] },
@@ -45,12 +51,16 @@ const NAV_ITEMS: NavItem[] = [
   // The route existed with no nav entry, so the offerings seeded for each term
   // were only reachable by typing the URL.
   { to: '/offerings', label: 'Course Offerings', icon: Layers, roles: ['Administrator'] },
+  // Req 89: Normal Students have no wallet, so the item is hidden from them.
+  { to: '/wallet', label: 'My Wallet', icon: Wallet, roles: ['Student'], studentTypes: ['Advising Student'] },
+  // Req 54: staff reach a student's history from the student lists instead.
+  { to: '/academic-history', label: 'Academic History', icon: ScrollText, roles: ['Student'], studentTypes: ['Advising Student'] },
   { to: '/notifications', label: 'Notifications', icon: Bell },
   { to: '/schedule', label: 'My Schedule', icon: CalendarDays, unavailable: true },
   { to: '/profile', label: 'My Profile', icon: Contact },
 ];
 
-const Sidebar: React.FC<SidebarProps> = ({ role, open, onClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClose }) => {
   const navigate = useNavigate();
   const { logout } = useSession();
   const { unreadCount } = useUnreadCount();
@@ -97,7 +107,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, open, onClose }) => {
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-4 pb-4">
-          {NAV_ITEMS.filter((item) => !item.roles || (role && item.roles.includes(role))).map((item) => {
+          {NAV_ITEMS.filter(
+            (item) =>
+              (!item.roles || (role && item.roles.includes(role))) &&
+              (!item.studentTypes || (studentType && item.studentTypes.includes(studentType)))
+          ).map((item) => {
             const Icon = item.icon;
             const label = (role && item.labels?.[role]) || item.label;
             const baseClasses =

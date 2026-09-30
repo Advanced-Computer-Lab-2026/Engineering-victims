@@ -14,6 +14,9 @@ import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
+import WalletPage from './pages/WalletPage';
+import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
+import AcademicHistoryPage from './pages/AcademicHistoryPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -36,6 +39,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/students" element={<StudentsPage />} />
         </Route>
 
+        {/* Req 50: every advising student, for Advisors only. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Advisor']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/advising-students" element={<AdvisingStudentsPage />} />
+        </Route>
+
         {/* Req 11-12: managing the advising roster itself stays staff-only. */}
         <Route
           element={
@@ -45,6 +59,31 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/advisors" element={<AdvisorsPage />} />
+        </Route>
+
+        {/* Req 89: students only. A Normal Student who types the URL is told
+            by the API that the wallet is for Advising Students. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Student']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/wallet" element={<WalletPage />} />
+          {/* Req 54: an Advising Student's own history. */}
+          <Route path="/academic-history" element={<AcademicHistoryPage />} />
+        </Route>
+
+        {/* Req 54: Advisors and Coordinators open any advising student's history. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Advisor', 'Coordinator']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/academic-history/:studentId" element={<AcademicHistoryPage />} />
         </Route>
 
         <Route

@@ -12,6 +12,8 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const advisorRoutes = require('./routes/advisorRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const offeringRoutes = require('./routes/offeringRoutes');
+const walletRoutes = require('./routes/walletRoutes');
+const academicHistoryRoutes = require('./routes/academicHistoryRoutes');
 const { seed } = require('./config/seedData');
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
@@ -34,6 +36,8 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/advisors', advisorRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/offerings', offeringRoutes);
+app.use('/api/wallet', walletRoutes);
+app.use('/api/academic-history', academicHistoryRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 
 const PORT = process.env.PORT || 5000;

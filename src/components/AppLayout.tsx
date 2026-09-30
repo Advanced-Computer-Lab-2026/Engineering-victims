@@ -17,7 +17,7 @@ const AppLayout: React.FC = () => {
 
   return (
     <div className="app-gradient flex min-h-screen font-sans text-slate-200">
-      <Sidebar role={user?.role ?? null} open={navOpen} onClose={() => setNavOpen(false)} />
+      <Sidebar role={user?.role ?? null} studentType={user?.studentType ?? null} open={navOpen} onClose={() => setNavOpen(false)} />
 
       <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6 lg:p-8">
         {/* Same spot on every page, the way a browser keeps its own controls. */}

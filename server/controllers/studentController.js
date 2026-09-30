@@ -276,3 +276,7 @@ exports.setAccountStatus = async (req, res) => {
     res.status(500).json({ message: 'Could not update the account', error: error.message });
   }
 };
+
+// Shared with the Advisor's all-advising-students list (req 50), so both lists
+// describe a student with the same fields.
+exports.serialize = serialize;
