@@ -18,26 +18,35 @@ export default function CoordinatorQueuePage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    loadQueue();
-  }, []);
-
   const loadQueue = async () => {
     try {
       setLoading(true);
-      // The queue specifically filters for students awaiting coordinator approval
+      setError(null);
+
+      // We fetch students with the 'Pending Approval' status.
+      // We use a large limit to ensure the queue is complete.
       const response = await fetchStudents({
         ...EMPTY_FILTERS,
         workflowStatus: 'Pending Approval',
         search: searchTerm
       }, 1, 100);
-      setStudents(response.students);
+
+      if (response && response.students) {
+        setStudents(response.students);
+      } else {
+        setStudents([]);
+      }
     } catch (err: any) {
-      setError((err as ApiError).message);
+      console.error('Queue fetch error:', err);
+      setError((err as ApiError).message || 'Failed to load the approval queue');
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadQueue();
+  }, []);
 
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {

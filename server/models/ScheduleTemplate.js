@@ -23,6 +23,12 @@ const scheduleTemplateSchema = new mongoose.Schema(
       ref: 'AcademicTerm',
       required: true,
     },
+    publicationStatus: {
+      type: String,
+      enum: ['Draft', 'Published'],
+      default: 'Draft',
+      required: true,
+    },
     slots: [
       {
         type: mongoose.Schema.Types.ObjectId,

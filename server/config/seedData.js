@@ -15,13 +15,12 @@ const ADVISOR_NAMES = [
 ];
 
 const STAFF = [
-  { fullName: 'Dr. Advisor', email: 'advisor@guc.edu.eg', password: 'password123', role: 'Advisor' },
+  { fullName: 'Dr. Advisor', email: 'advisor.main@guc.edu.eg', password: 'password123', role: 'Advisor' },
   { fullName: 'Nour Coordinator', email: 'coordinator@guc.edu.eg', password: 'password123', role: 'Coordinator' },
   { fullName: 'Admin User', email: 'admin@guc.edu.eg', password: 'password123', role: 'Administrator' },
 ];
 
 const MAJORS = ['Computer Science', 'Electrical Engineering', 'DMET', 'Mechanical Engineering', 'Undeclared'];
-const WORKFLOW_STATUSES = ['Not Started', 'Draft', 'Ready for Student Review', 'Pending Approval', 'Awaiting Payment Choice', 'Processed', 'Reopened', 'Deferred to Next Installment', 'Schedule Assigned', 'Swap Request Open', 'Swap Expired', 'Swap Completed'];
 const STUDENT_TYPES = ['Normal Student', 'Advising Student'];
 
 /**
@@ -33,19 +32,21 @@ const generateDummyStudents = (count) => {
     const firstName = ['Samy', 'Mariam', 'Youssef', 'Laila', 'Omar', 'Salma', 'Ahmed', 'Hana', 'Karim', 'Nour', 'Zeyad', 'Maya', 'Tarek', 'Amira', 'Khaled'][Math.floor(Math.random() * 15)];
     const lastName = ['Elgedaily', 'Fouad', 'Kamal', 'Hassan', 'Nabil', 'Ibrahim', 'Sherif', 'Mahmoud', 'Emad', 'El-Sayed', 'Tarek', 'Zaki', 'Omar', 'Adel', 'Fahmy'][Math.floor(Math.random() * 15)];
     const fullName = `${firstName} ${lastName}`;
-    const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@student.guc.edu.eg`;
+    const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${i + 1}@student.guc.edu.eg`;
     const studentId = `64-${10000 + i}`;
+    const studentType = STUDENT_TYPES[Math.floor(Math.random() * STUDENT_TYPES.length)];
+    const workflowStatuses = Student.statusesForType(studentType);
 
     students.push({
       fullName,
       email,
       password: `${firstName}${lastName}2006`,
       studentId,
-      studentType: STUDENT_TYPES[Math.floor(Math.random() * STUDENT_TYPES.length)],
+      studentType,
       major: MAJORS[Math.floor(Math.random() * MAJORS.length)],
       currentSemester: Math.floor(Math.random() * 8) + 1,
       academicStanding: Math.random() > 0.2 ? 'Good Standing' : 'Probation',
-      workflowStatus: WORKFLOW_STATUSES[Math.floor(Math.random() * WORKFLOW_STATUSES.length)],
+      workflowStatus: workflowStatuses[Math.floor(Math.random() * workflowStatuses.length)],
       isActive: Math.random() > 0.1,
     });
   }

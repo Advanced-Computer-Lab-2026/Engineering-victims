@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, Contact, LayoutDashboard, LogOut, Users, UserCog, X } from 'lucide-react';
+import { Bell, BookOpen, CalendarDays, Contact, LayoutDashboard, LogOut, Users, UserCog, X, CalendarRange } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import CustomButton from './ui/CustomButton';
@@ -29,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/coordinator/queue', label: 'Approval Queue', icon: Bell, roles: ['Coordinator', 'Administrator'] },
   { to: '/students', label: 'Students', icon: Users, roles: ['Coordinator', 'Administrator'] },
+  { to: '/schedule-templates', label: 'Schedule Groups', icon: CalendarRange, roles: ['Coordinator', 'Administrator'] },
   { to: '/advisors', label: 'Advisors', icon: UserCog, roles: ['Coordinator'] },
   { to: '/terms', label: 'Academic Terms', icon: CalendarDays, roles: ['Administrator'] },
   { to: '/courses', label: 'Course Catalogue', icon: BookOpen, roles: ['Administrator'] },

@@ -19,6 +19,7 @@ const serialize = (student) => ({
   studentType: student.studentType,
   major: student.major,
   currentSemester: student.currentSemester,
+  studyGroup: student.studyGroup,
   academicStanding: student.academicStanding,
   assignedAdvisor: student.assignedAdvisor
     ? {
@@ -275,6 +276,7 @@ exports.assignToGroup = async (req, res) => {
       semester: student.currentSemester,
       studyGroup,
       termId,
+      publicationStatus: { $ne: 'Draft' },
     });
 
     if (!template) {
@@ -298,6 +300,9 @@ exports.assignToGroup = async (req, res) => {
 
     // 4. Update the student's record
     student.studyGroup = studyGroup;
+    student.workflowStatus = 'Schedule Assigned';
+    student.blockingStep = null;
+    student.lastUpdateAt = new Date();
     await student.save();
 
     res.status(200).json({

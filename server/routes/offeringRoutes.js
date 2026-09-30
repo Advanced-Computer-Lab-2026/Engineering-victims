@@ -3,12 +3,14 @@ const router = express.Router();
 const offeringController = require('../controllers/offeringController');
 const { authenticate, requireRole } = require('../middleware/authMiddleware');
 
-router.use(authenticate);
-router.use(requireRole('Administrator'));
+const staffReadOnly = [authenticate, requireRole('Coordinator', 'Administrator')];
+const administratorOnly = [authenticate, requireRole('Administrator')];
+
+router.get('/', ...staffReadOnly, offeringController.getOfferings);
+router.get('/:id', ...staffReadOnly, offeringController.getOfferingDetails);
+router.use(...administratorOnly);
 
 router.post('/', offeringController.createOffering);
-router.get('/', offeringController.getOfferings);
-router.get('/:id', offeringController.getOfferingDetails);
 router.patch('/:id', offeringController.updateOffering);
 router.patch('/:id/publish', offeringController.togglePublishStatus);
 router.delete('/:id', offeringController.deleteOffering);
