@@ -6,9 +6,12 @@ const Course = require('../models/Course');
 const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
 
-const ADVISORS = [
-  { fullName: 'Dr. Mona Adel', email: 'mona.adel@guc.edu.eg', role: 'Advisor' },
-  { fullName: 'Dr. Karim Fahmy', email: 'karim.fahmy@guc.edu.eg', role: 'Advisor' },
+const ADVISOR_NAMES = [
+  { fullName: 'Dr. Mona Adel', email: 'mona.adel@guc.edu.eg' },
+  { fullName: 'Dr. Karim Fahmy', email: 'karim.fahmy@guc.edu.eg' },
+  { fullName: 'Dr. Sarah Hassan', email: 'sarah.hassan@guc.edu.eg' },
+  { fullName: 'Dr. Ahmed Zaki', email: 'ahmed.zaki@guc.edu.eg' },
+  { fullName: 'Dr. Leila Omar', email: 'leila.omar@guc.edu.eg' },
 ];
 
 const STAFF = [
@@ -17,34 +20,38 @@ const STAFF = [
   { fullName: 'Admin User', email: 'admin@guc.edu.eg', password: 'password123', role: 'Administrator' },
 ];
 
-/**
- * A spread of students covering both types, every workflow status, both account
- * states and both academic standings, so the list, search, filters and the
- * activate/deactivate action can all be exercised without seeding by hand.
- *
- * Each entry also becomes the student's login account; passwords follow
- * FirstnameLastname2006.
- */
-const STUDENTS = [
-  { fullName: 'Samy Elgedaily', email: 'samy.elgedaily@student.guc.edu.eg', password: 'SamyElgedaily2006', studentId: '64-12345', studentType: 'Normal Student', major: 'Computer Science', currentSemester: 5, academicStanding: 'Good Standing', workflowStatus: 'Schedule Assigned', isActive: true },
-  { fullName: 'Mariam Fouad', email: 'mariam.fouad@student.guc.edu.eg', password: 'MariamFouad2006', studentId: '64-12346', studentType: 'Normal Student', major: 'Computer Science', currentSemester: 5, academicStanding: 'Good Standing', workflowStatus: 'Swap Request Open', isActive: true },
-  { fullName: 'Youssef Kamal', email: 'youssef.kamal@student.guc.edu.eg', password: 'YoussefKamal2006', studentId: '63-10021', studentType: 'Normal Student', major: 'Electrical Engineering', currentSemester: 7, academicStanding: 'Good Standing', workflowStatus: 'Swap Expired', isActive: false },
-  { fullName: 'Laila Hassan', email: 'laila.hassan@student.guc.edu.eg', password: 'LailaHassan2006', studentId: '64-20045', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 6, academicStanding: 'Probation', workflowStatus: 'Not Started', isActive: true },
-  { fullName: 'Omar Nabil', email: 'omar.nabil@student.guc.edu.eg', password: 'OmarNabil2006', studentId: '64-20046', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 6, academicStanding: 'Good Standing', workflowStatus: 'Draft', isActive: true },
-  { fullName: 'Salma Ibrahim', email: 'salma.ibrahim@student.guc.edu.eg', password: 'SalmaIbrahim2006', studentId: '64-30010', studentType: 'Advising Student', major: 'DMET', currentSemester: 4, academicStanding: 'Good Standing', workflowStatus: 'Ready for Student Review', isActive: true },
-  { fullName: 'Ahmed Sherif', email: 'ahmed.sherif@student.guc.edu.eg', password: 'AhmedSherif2006', studentId: '64-30011', studentType: 'Advising Student', major: 'DMET', currentSemester: 4, academicStanding: 'Probation', workflowStatus: 'Pending Approval', isActive: true },
-  { fullName: 'Hana Mahmoud', email: 'hana.mahmoud@student.guc.edu.eg', password: 'HanaMahmoud2006', studentId: '64-40077', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 7, academicStanding: 'Good Standing', workflowStatus: 'Awaiting Payment Choice', isActive: true },
-  { fullName: 'Karim Emad', email: 'karim.emad@student.guc.edu.eg', password: 'KarimEmad2006', studentId: '64-40078', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 7, academicStanding: 'Good Standing', workflowStatus: 'Processed', isActive: true },
-  { fullName: 'Nour El-Sayed', email: 'nour.elsayed@student.guc.edu.eg', password: 'NourElsayed2006', studentId: '64-50033', studentType: 'Advising Student', major: 'Undeclared', currentSemester: 3, academicStanding: 'Good Standing', workflowStatus: 'Reopened', isActive: true },
-  { fullName: 'Mariam Said', email: 'mariam.said@student.guc.edu.eg', password: 'MariamSaid2006', studentId: '64-50034', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 8, academicStanding: 'Good Standing', workflowStatus: 'Deferred to Next Installment', isActive: true },
-  { fullName: 'Zeyad Tarek', email: 'zeyad.tarek@student.guc.edu.eg', password: 'ZeyadTarek2006', studentId: '65-60012', studentType: 'Normal Student', major: 'Mechanical Engineering', currentSemester: 2, academicStanding: 'Good Standing', workflowStatus: 'Swap Completed', isActive: true },
-];
+const MAJORS = ['Computer Science', 'Electrical Engineering', 'DMET', 'Mechanical Engineering', 'Undeclared'];
+const WORKFLOW_STATUSES = ['Not Started', 'Draft', 'Ready for Student Review', 'Pending Approval', 'Awaiting Payment Choice', 'Processed', 'Reopened', 'Deferred to Next Installment', 'Schedule Assigned', 'Swap Request Open', 'Swap Expired', 'Swap Completed'];
+const STUDENT_TYPES = ['Normal Student', 'Advising Student'];
 
 /**
- * FR 5.0 demo data: each role gets notifications that would realistically land
- * on that account, a mix of read and unread so the individual "mark as read"
- * and "mark all as read" can both be exercised without creating records by hand.
+ * Generates a realistic set of dummy students to populate the system.
  */
+const generateDummyStudents = (count) => {
+  const students = [];
+  for (let i = 0; i < count; i++) {
+    const firstName = ['Samy', 'Mariam', 'Youssef', 'Laila', 'Omar', 'Salma', 'Ahmed', 'Hana', 'Karim', 'Nour', 'Zeyad', 'Maya', 'Tarek', 'Amira', 'Khaled'][Math.floor(Math.random() * 15)];
+    const lastName = ['Elgedaily', 'Fouad', 'Kamal', 'Hassan', 'Nabil', 'Ibrahim', 'Sherif', 'Mahmoud', 'Emad', 'El-Sayed', 'Tarek', 'Zaki', 'Omar', 'Adel', 'Fahmy'][Math.floor(Math.random() * 15)];
+    const fullName = `${firstName} ${lastName}`;
+    const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}@student.guc.edu.eg`;
+    const studentId = `64-${10000 + i}`;
+
+    students.push({
+      fullName,
+      email,
+      password: `${firstName}${lastName}2006`,
+      studentId,
+      studentType: STUDENT_TYPES[Math.floor(Math.random() * STUDENT_TYPES.length)],
+      major: MAJORS[Math.floor(Math.random() * MAJORS.length)],
+      currentSemester: Math.floor(Math.random() * 8) + 1,
+      academicStanding: Math.random() > 0.2 ? 'Good Standing' : 'Probation',
+      workflowStatus: WORKFLOW_STATUSES[Math.floor(Math.random() * WORKFLOW_STATUSES.length)],
+      isActive: Math.random() > 0.1,
+    });
+  }
+  return students;
+};
+
 const NOTIFICATION_TEMPLATES = {
   Student: [
     { type: 'schedule', title: 'Your schedule has been assigned', message: 'Your standard schedule for this term has been processed. Open My Profile to review your registered courses.', isRead: false },
@@ -76,22 +83,16 @@ const NOTIFICATION_TEMPLATES = {
   ],
 };
 
-/** Builds the demo notifications for one account, staggering their timestamps. */
 const buildNotifications = (user) =>
   (NOTIFICATION_TEMPLATES[user.role] ?? NOTIFICATION_TEMPLATES.default).map((template, index) => ({
     ...template,
     user: user._id,
     link: '/notifications',
-    // Spread over the last few hours so the relative times read naturally.
     createdAt: new Date(Date.now() - (index + 1) * 5 * 60 * 60 * 1000),
     updatedAt: new Date(Date.now() - (index + 1) * 5 * 60 * 60 * 1000),
     readAt: template.isRead ? new Date(Date.now() - (index + 1) * 4 * 60 * 60 * 1000) : null,
   }));
 
-/**
- * Req 18-20: the catalogue lists prerequisites by code, so courses are created
- * first and their prerequisites linked by id once every code exists.
- */
 const seedCourses = async () => {
   const courses = await Course.insertMany(COURSES.map(({ prerequisites, ...course }) => course));
   const idByCode = new Map(courses.map((course) => [course.code, course._id]));
@@ -108,10 +109,6 @@ const seedCourses = async () => {
   return courses;
 };
 
-/**
- * Rebuilds users and students from scratch. Called on every boot so the demo
- * data is always in a known state, matching the existing behaviour.
- */
 const seed = async () => {
   await User.deleteMany({});
   await Student.deleteMany({});
@@ -119,32 +116,36 @@ const seed = async () => {
   await Notification.deleteMany({});
   await Course.deleteMany({});
 
-  const created = await User.create([
-    ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
-    ...STAFF,
-    // Every student in the directory also gets a login account, so nobody in
-    // the database exists only half-way. isActive mirrors the directory record
-    // (a deactivated student is deactivated at the login too).
-    ...STUDENTS.map((student) => ({
+  // Seed Advisors
+  const seededAdvisors = await User.create(
+    ADVISOR_NAMES.map((adv) => ({ ...adv, password: 'password123', role: 'Advisor', isActive: true }))
+  );
+
+  // Seed Other Staff
+  const otherStaff = await User.create(STAFF);
+
+  // Seed Students
+  const dummyStudents = generateDummyStudents(40);
+  const createdStudents = await User.create(
+    dummyStudents.map((student) => ({
       fullName: student.fullName,
       email: student.email,
       password: student.password,
       role: 'Student',
       isActive: student.isActive,
-    })),
-  ]);
+    }))
+  );
 
-  const advisors = created.filter((user) => user.role === 'Advisor');
+  const allUsers = [...seededAdvisors, ...otherStaff, ...createdStudents];
+  const advisors = allUsers.filter((user) => user.role === 'Advisor');
 
-  // Advisors are assigned round-robin so the filter has more than one option.
   const students = await Student.create(
-    STUDENTS.map((student, index) => ({
+    dummyStudents.map((student, index) => ({
       ...student,
       assignedAdvisor: student.studentType === 'Advising Student' ? advisors[index % advisors.length]._id : null,
     }))
   );
 
-  // Derive blocking step and last-updated rather than storing them by hand.
   await Promise.all(students.map((student) => recalculate(student)));
 
   const defaultTerms = await AcademicTerm.create([
@@ -157,17 +158,15 @@ const seed = async () => {
       teachingEndDate: new Date('2026-12-18T00:00:00.000Z'),
       advisingDeadline: new Date('2026-09-30T00:00:00.000Z'),
       swapDeadline: new Date('2026-09-25T00:00:00.000Z'),
-      createdBy: created[0]?._id ?? null,
+      createdBy: allUsers[0]?._id ?? null,
     },
   ]);
 
   const courses = await seedCourses();
-
-  // FR 5.0: every seeded account gets its own demo notifications.
-  const notifications = await Notification.insertMany(created.flatMap(buildNotifications));
+  const notifications = await Notification.insertMany(allUsers.flatMap(buildNotifications));
 
   return {
-    users: created.length,
+    users: allUsers.length,
     students: students.length,
     advisors: advisors.length,
     terms: defaultTerms.length,
@@ -176,4 +175,4 @@ const seed = async () => {
   };
 };
 
-module.exports = { seed, ADVISORS, STAFF, STUDENTS };
+module.exports = { seed, ADVISORS: ADVISOR_NAMES, STAFF, STUDENTS: generateDummyStudents(40) };

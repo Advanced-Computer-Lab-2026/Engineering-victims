@@ -80,6 +80,7 @@ const DashboardPage: React.FC = () => {
             detail="Review or slot-change pending"
             icon={<Bell className="h-5 w-5" aria-hidden />}
             tone="amber"
+            onClick={() => navigate('/coordinator/queue')}
           />
           <StatCard
             label="Inactive accounts"
@@ -180,6 +181,7 @@ interface StatCardProps {
   detail: string;
   icon: React.ReactNode;
   tone: 'indigo' | 'sky' | 'amber' | 'rose';
+  onClick?: () => void;
 }
 
 const TONE_CLASSES: Record<StatCardProps['tone'], string> = {
@@ -189,19 +191,23 @@ const TONE_CLASSES: Record<StatCardProps['tone'], string> = {
   rose: 'bg-rose-500/15 text-rose-400',
 };
 
-const StatCard: React.FC<StatCardProps> = ({ label, value, detail, icon, tone }) => (
-  <Card className="p-5">
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-        <p className="mt-1 text-3xl font-bold tracking-tight text-white">{value}</p>
-        <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
+const StatCard: React.FC<StatCardProps> = ({ label, value, detail, icon, tone, onClick }) => {
+  const isClickable = !!onClick;
+
+  return (
+    <Card className={`p-5 transition-all ${isClickable ? 'cursor-pointer hover:border-indigo-500/50 hover:bg-indigo-500/5' : ''}`} onClick={onClick}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-white">{value}</p>
+          <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
+        </div>
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONE_CLASSES[tone]}`}>
+          {icon}
+        </span>
       </div>
-      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONE_CLASSES[tone]}`}>
-        {icon}
-      </span>
-    </div>
-  </Card>
-);
+    </Card>
+  );
+};
 
 export default DashboardPage;

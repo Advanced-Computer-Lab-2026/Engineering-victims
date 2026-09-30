@@ -14,6 +14,7 @@ import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
+import CoordinatorQueuePage from './pages/CoordinatorQueuePage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -32,6 +33,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             </ProtectedRoute>
           }
         >
+          <Route path="/coordinator/queue" element={<CoordinatorQueuePage />} />
           <Route path="/students" element={<StudentsPage />} />
           <Route path="/advisors" element={<AdvisorsPage />} />
         </Route>
