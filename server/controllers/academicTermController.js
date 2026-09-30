@@ -76,10 +76,20 @@ const normalizeDateFields = (payload = {}) => {
   return next;
 };
 
+/**
+ * The terms page identifies a term by `id`, but Mongo documents only carry
+ * `_id`. Without this the page cannot tell which term was selected, so saving
+ * an edit falls through to creating a duplicate term.
+ */
+const toTermResponse = (term) => {
+  const plain = typeof term.toObject === 'function' ? term.toObject() : term;
+  return { ...plain, id: String(plain._id) };
+};
+
 exports.listTerms = async (req, res) => {
   try {
     const terms = await AcademicTerm.find().sort({ academicYear: -1, season: 1 }).lean();
-    res.status(200).json({ terms });
+    res.status(200).json({ terms: terms.map(toTermResponse) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load academic terms', error: error.message });
   }
@@ -96,7 +106,7 @@ exports.createTerm = async (req, res) => {
     await term.validate();
     await term.save();
 
-    res.status(201).json({ term });
+    res.status(201).json({ term: toTermResponse(term) });
   } catch (error) {
     const status = error.status || (error.code === 11000 ? 409 : 400);
     res.status(status).json({ message: formatTermError(error) });
@@ -116,7 +126,7 @@ exports.updateTerm = async (req, res) => {
     await term.validate();
     await term.save();
 
-    res.status(200).json({ term });
+    res.status(200).json({ term: toTermResponse(term) });
   } catch (error) {
     const status = error.status || (error.code === 11000 ? 409 : 400);
     res.status(status).json({ message: formatTermError(error) });
