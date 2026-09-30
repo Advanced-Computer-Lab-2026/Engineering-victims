@@ -5,11 +5,10 @@ import {
   RotateCcw,
   Plus,
   Eye,
-  ChevronRight,
 } from 'lucide-react';
 import { ApiError } from '../lib/api';
 import { courseOfferingService } from '../lib/courseOfferingService';
-import { AcademicTerm } from '../lib/types';
+import { fetchAcademicTerms } from '../lib/termsService';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Card from '../components/ui/Card';
@@ -28,12 +27,28 @@ const CourseOfferingsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // In a real app, we would fetch available terms from an AcademicTerm service.
-  // For this demo, I'll assume we have some mock terms or the user can enter an ID.
-  const [terms, setTerms] = useState<{ id: string; label: string }[]>([
-    { id: 'mock-term-1', label: 'Winter 2026' },
-    { id: 'mock-term-2', label: 'Spring 2026' },
-  ]);
+  // Real academic terms from the database (the same records the terms page manages).
+  const [terms, setTerms] = useState<{ id: string; label: string }[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAcademicTerms()
+      .then((response) => {
+        if (cancelled) return;
+        setTerms(
+          response.terms.map((term) => ({
+            id: term.id,
+            label: `${term.academicYear} ${term.season}`,
+          }))
+        );
+      })
+      .catch((err) => {
+        if (!cancelled) setError((err as ApiError).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const loadOfferings = useCallback(async (isRefresh = false) => {
     if (!selectedTerm) return;

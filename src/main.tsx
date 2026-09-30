@@ -12,7 +12,7 @@ import NotificationsPage from './pages/NotificationsPage';
 import StudentsPage from './pages/StudentsPage';
 import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
-import CoursesPage from './pages/CoursesPage';
+import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
 import './index.css';
 
@@ -44,7 +44,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/terms" element={<AcademicTermsPage />} />
-          <Route path="/courses" element={<CoursesPage />} />
+          <Route path="/courses" element={<CourseCataloguePage />} />
           <Route path="/offerings" element={<CourseOfferingsPage />} />
         </Route>
 

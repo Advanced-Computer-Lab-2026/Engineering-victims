@@ -3,11 +3,12 @@ const router = express.Router();
 const courseController = require('../controllers/courseController');
 const { authenticate, requireRole } = require('../middleware/authMiddleware');
 
-// All course management is restricted to Administrators
-router.use(authenticate);
-router.use(requireRole('Administrator'));
+// All course management is restricted to Administrators (req 18-21).
+const administratorOnly = [authenticate, requireRole('Administrator')];
 
-router.get('/', courseController.getCourses);
-router.delete('/:id', courseController.deleteCourse);
+router.get('/', ...administratorOnly, courseController.listCourses);
+router.post('/', ...administratorOnly, courseController.createCourse);
+router.patch('/:id', ...administratorOnly, courseController.updateCourse);
+router.delete('/:id', ...administratorOnly, courseController.deleteCourse);
 
 module.exports = router;

@@ -48,8 +48,8 @@ async function startServer() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const { users, students, notifications } = await seed();
-    console.log(`✅ Seeded ${users} users, ${students} students and ${notifications} notifications`);
+    const { users, students, courses, notifications } = await seed();
+    console.log(`✅ Seeded ${users} users, ${students} students, ${courses} courses and ${notifications} notifications`);
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {
