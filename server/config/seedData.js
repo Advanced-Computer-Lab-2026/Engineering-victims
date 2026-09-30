@@ -7,6 +7,7 @@ const CourseOffering = require('../models/CourseOffering');
 const CourseSlot = require('../models/CourseSlot');
 const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
+const { seedWallets } = require('./walletSeed');
 
 /**
  * The demo dataset.
@@ -632,6 +633,8 @@ const seed = async () => {
 
   const courses = await seedCourses(administrator?._id ?? null);
   const { offerings, slots } = await seedOfferings({ terms, courses, instructors: advisors });
+  // Req 89: wallet history for the Advising Students.
+  const walletTransactions = await seedWallets(students);
 
   const currentTerm =
     terms.find((term) => term.season === 'Winter') ?? terms[terms.length - 1] ?? null;
@@ -685,6 +688,7 @@ const seed = async () => {
     courses: courses.length,
     offerings: offerings.length,
     slots,
+    walletTransactions,
     notifications: notifications.length,
   };
 };
