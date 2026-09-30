@@ -51,7 +51,7 @@ It replaces the fragmented mix of spreadsheets, email threads, and manual adviso
 | Role | What they get |
 |---|---|
 | 🎓 **Student** | Weekly schedule, course swaps, slot-change requests, wallet, payments |
-| 🧑‍🏫 **Advisor** | Draft schedule builder, validation engine, graduation planning |
+| 🧑‍🏫 **Advisor** | Assigned-student roster ("My Students"), draft schedule builder, validation engine, graduation planning |
 | 🗂️ **Coordinator** | Review queues, approval workflows, financial oversight |
 | 🛡️ **Administrator** | Course catalogue, offerings, terms, user management |
 
@@ -175,12 +175,18 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Search, filter, export audit logs
 - Notifications for every workflow event
 
-### 👥 Student Directory (Coordinator / Administrator)
+### 👥 Student Directory (Coordinator / Administrator / Advisor)
 - Every GUC student with their workflow status, blocking step and last update
 - Search by student ID, full name or GUC email
 - Filter by type, advisor, major, semester, standing, status, blocking step, account
 - Open one student's full details from the results
 - Administrator can activate or deactivate an account
+- An Advisor gets the same list, drawer and filters, but scoped server-side to
+  the students assigned to them — the scope is applied after the query is
+  built, so `?assignedAdvisor=` cannot widen it, and the detail route rejects
+  any student who is not assigned to the signed-in advisor. Advisor assignment,
+  directory statistics and the advisor dropdown stay Coordinator/Administrator
+  only.
 
 ### 📅 Integrations
 - Third-party calendar sync via OAuth (Google / Outlook)
@@ -270,13 +276,15 @@ VITE_API_URL=http://localhost:8000
 
 Seeded logins (the database is re-seeded on every server start):
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Advisor | `advisor@guc.edu.eg` | `password123` |
-| Advisor | `mona.adel@guc.edu.eg` | `password123` |
-| Advisor | `karim.fahmy@guc.edu.eg` | `password123` |
-| Coordinator | `coordinator@guc.edu.eg` | `password123` |
-| Administrator | `admin@guc.edu.eg` | `password123` |
+| Role | Email | Password | Why this account exists |
+| --- | --- | --- | --- |
+| Advisor | `mona.adel@guc.edu.eg` | `password123` | Holds advising students |
+| Advisor | `karim.fahmy@guc.edu.eg` | `password123` | Holds advising students |
+| Advisor | `advisor@guc.edu.eg` | `password123` | Holds advising students |
+| Advisor | `hind.rashwan@guc.edu.eg` | `password123` | **No** assigned students, so *Remove advisor* can succeed |
+| Coordinator | `coordinator@guc.edu.eg` | `password123` | Primary coordinator |
+| Coordinator | `rania.hosny@guc.edu.eg` | `password123` | Spare account, so *Add advisor* has something to promote without destroying a demo login |
+| Administrator | `admin@guc.edu.eg` | `password123` | Full access, and the `createdBy` on every term and course |
 
 Every student in the directory also gets a login account — passwords follow
 `FirstnameLastname2006`:
@@ -285,25 +293,56 @@ Every student in the directory also gets a login account — passwords follow
 | --- | --- | --- |
 | Normal | `samy.elgedaily@student.guc.edu.eg` | `SamyElgedaily2006` |
 | Normal | `mariam.fouad@student.guc.edu.eg` | `MariamFouad2006` |
+| Normal | `zeyad.tarek@student.guc.edu.eg` | `ZeyadTarek2006` |
+| Normal | `farida.wagdy@student.guc.edu.eg` | `FaridaWagdy2006` |
 | Normal | `youssef.kamal@student.guc.edu.eg` | `YoussefKamal2006` |
 | Advising | `laila.hassan@student.guc.edu.eg` | `LailaHassan2006` |
 | Advising | `omar.nabil@student.guc.edu.eg` | `OmarNabil2006` |
 | Advising | `salma.ibrahim@student.guc.edu.eg` | `SalmaIbrahim2006` |
+| Advising | `rana.adel@student.guc.edu.eg` | `RanaAdel2006` |
 | Advising | `ahmed.sherif@student.guc.edu.eg` | `AhmedSherif2006` |
 | Advising | `hana.mahmoud@student.guc.edu.eg` | `HanaMahmoud2006` |
+| Advising | `mariam.said@student.guc.edu.eg` | `MariamSaid2006` |
+| Advising | `tamer.lotfy@student.guc.edu.eg` | `TamerLotfy2006` |
 | Advising | `karim.emad@student.guc.edu.eg` | `KarimEmad2006` |
 | Advising | `nour.elsayed@student.guc.edu.eg` | `NourElsayed2006` |
-| Advising | `mariam.said@student.guc.edu.eg` | `MariamSaid2006` |
-| Normal | `zeyad.tarek@student.guc.edu.eg` | `ZeyadTarek2006` |
+| Advising | `dina.mostafa@student.guc.edu.eg` | `DinaMostafa2006` |
+| Advising | `hassan.rifaat@student.guc.edu.eg` | `HassanRifaat2006` |
+| Advising | `yasmin.adly@student.guc.edu.eg` | `YasminAdly2006` |
 
-`youssef.kamal@student.guc.edu.eg` is seeded deactivated (matching his
-directory record), so his login is rejected with "account is currently
-inactive" — useful for exercising that path.
+`youssef.kamal@student.guc.edu.eg` is seeded deactivated in **both** the
+directory and the login record, so his login is rejected with "account is
+currently inactive" — useful for exercising that path.
 
-The seed also creates 12 students spanning both student types, every workflow
-status, both account states and both academic standings, so the students list,
-search, filters and the activate/deactivate action can all be exercised without
-adding data by hand.
+### What the seed guarantees
+
+The dataset is built so that no screen, filter or action is decorative:
+
+- **18 students** cover all 15 workflow statuses (every status the filter offers
+  matches at least one row), all 3 academic standings including `Dismissed`,
+  both student types, both account states, all 8 semesters, and both majors the
+  catalogue actually serves.
+- **Every student has a login account** with the same email and the same
+  `isActive` flag, so the profile join never falls back to "Not set" and a
+  deactivated student really cannot sign in.
+- **Two advising students have no advisor**, so first-time assignment and the
+  *Unassigned* filter have a target; the rest are spread over three advisors so
+  reassignment and the advisor filter have options. One advisor deliberately has
+  none, because *Remove advisor* refuses to run while students are assigned.
+- **3 terms** (one closed, the current one, one ahead), each with **course
+  offerings** — 25 in total, a mix of `Published` and `Draft` — and **54
+  lecture/tutorial/lab slots** laid out on a grid that cannot trip the
+  instructor or room conflict rules. No term is left empty: the catalogue only
+  offers Winter and Spring courses, so a Summer term could never hold an
+  offering and is deliberately not seeded.
+- **75 courses** with prerequisites linked by id (no dangling codes, no cycles),
+  so the prerequisite picker and the *Required by* panel both have content.
+- **81 notifications**, written *from* the state above rather than from a fixed
+  script: a student's notifications match their workflow status, an inactive
+  student is not told they can sign in, an advisor's message names their actual
+  students, and the Coordinator/Administrator counts are computed off the
+  records. Every account has at least one unread and one read row, so both
+  *mark as read* and *mark all as read* work everywhere.
 
 ### Troubleshooting
 

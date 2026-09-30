@@ -113,8 +113,12 @@ const StudentsPage: React.FC = () => {
   return (
     <>
       <PageHeader
-        title="Students"
-        description="Every GUC student and where they sit in the scheduling workflow."
+        title={role === 'Advisor' ? 'My Students' : 'Students'}
+        description={
+          role === 'Advisor'
+            ? 'The students assigned to you and where they sit in the scheduling workflow.'
+            : 'Every GUC student and where they sit in the scheduling workflow.'
+        }
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
           <CustomButton
@@ -186,16 +190,22 @@ const StudentsPage: React.FC = () => {
               onChange={(event) => updateFilter('studentType', event.target.value)}
               options={filterOptions.studentTypes.map((value) => ({ value, label: value }))}
             />
-            <Select
-              label="Assigned advisor"
-              placeholder="All advisors"
-              value={filters.assignedAdvisor}
-              onChange={(event) => updateFilter('assignedAdvisor', event.target.value)}
-              options={[
-                { value: 'none', label: 'Unassigned' },
-                ...filterOptions.advisors,
-              ]}
-            />
+            {/* Every row on an Advisor's screen is already theirs, so the
+                advisor filter is meaningless for them (and the API returns no
+                options for it) — the control is dropped rather than shown
+                empty. */}
+            {role !== 'Advisor' && (
+              <Select
+                label="Assigned advisor"
+                placeholder="All advisors"
+                value={filters.assignedAdvisor}
+                onChange={(event) => updateFilter('assignedAdvisor', event.target.value)}
+                options={[
+                  { value: 'none', label: 'Unassigned' },
+                  ...filterOptions.advisors,
+                ]}
+              />
+            )}
             <Select
               label="Major"
               placeholder="All majors"

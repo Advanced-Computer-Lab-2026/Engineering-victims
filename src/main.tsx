@@ -24,7 +24,19 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-        {/* Req 6-10 are a Coordinator and Administrator area. */}
+        {/* Req 6-9: the student directory. An Advisor sees the same screens
+            but only over their own assigned students, which the API enforces. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Coordinator', 'Administrator', 'Advisor']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/students" element={<StudentsPage />} />
+        </Route>
+
+        {/* Req 11-12: managing the advising roster itself stays staff-only. */}
         <Route
           element={
             <ProtectedRoute roles={['Coordinator', 'Administrator']}>
@@ -32,7 +44,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             </ProtectedRoute>
           }
         >
-          <Route path="/students" element={<StudentsPage />} />
           <Route path="/advisors" element={<AdvisorsPage />} />
         </Route>
 

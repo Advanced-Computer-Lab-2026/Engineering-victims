@@ -25,7 +25,9 @@ export const courseOfferingService = {
   },
 
   async updateSlot(id: string, data: Partial<CourseSlot>): Promise<{ message: string; slot: CourseSlot }> {
-    return apiFetch<{ message: string; slot: CourseSlot }>(`/api/slots/${id}`, {
+    // The server mounts this under /api/offerings/slots/:id; calling /api/slots
+    // never matched a route, so every slot edit 404'd.
+    return apiFetch<{ message: string; slot: CourseSlot }>(`/api/offerings/slots/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
