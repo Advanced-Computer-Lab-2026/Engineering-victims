@@ -2,6 +2,8 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const AcademicTerm = require('../models/AcademicTerm');
 const Notification = require('../models/Notification');
+const Course = require('../models/Course');
+const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
 
 const ADVISORS = [
@@ -66,7 +68,7 @@ const NOTIFICATION_TEMPLATES = {
   Administrator: [
     { type: 'info', title: 'Term dates updated', message: 'The registration and advising-season dates for the new term were saved.', isRead: false },
     { type: 'warning', title: 'Account deactivation requested', message: 'An account was flagged for deactivation. Academic history will be preserved.', isRead: false },
-    { type: 'success', title: 'Course catalogue import finished', message: '12 courses were validated and imported from CSV with no row errors.', isRead: true },
+    { type: 'success', title: 'Course catalogue import finished', message: 'The full MET and DMET curriculum was validated and imported into the catalogue with no row errors.', isRead: true },
   ],
   default: [
     { type: 'info', title: 'Welcome to the scheduling portal', message: 'Your account was activated. Use the sidebar to reach your dashboard, notifications and profile.', isRead: false },
@@ -87,6 +89,26 @@ const buildNotifications = (user) =>
   }));
 
 /**
+ * Req 18-20: the catalogue lists prerequisites by code, so courses are created
+ * first and their prerequisites linked by id once every code exists.
+ */
+const seedCourses = async () => {
+  const courses = await Course.insertMany(COURSES.map(({ prerequisites, ...course }) => course));
+  const idByCode = new Map(courses.map((course) => [course.code, course._id]));
+
+  await Course.bulkWrite(
+    COURSES.filter((course) => course.prerequisites.length > 0).map((course) => ({
+      updateOne: {
+        filter: { _id: idByCode.get(course.code) },
+        update: { prerequisites: course.prerequisites.map((code) => idByCode.get(code)) },
+      },
+    }))
+  );
+
+  return courses;
+};
+
+/**
  * Rebuilds users and students from scratch. Called on every boot so the demo
  * data is always in a known state, matching the existing behaviour.
  */
@@ -95,6 +117,7 @@ const seed = async () => {
   await Student.deleteMany({});
   await AcademicTerm.deleteMany({});
   await Notification.deleteMany({});
+  await Course.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
@@ -138,6 +161,8 @@ const seed = async () => {
     },
   ]);
 
+  const courses = await seedCourses();
+
   // FR 5.0: every seeded account gets its own demo notifications.
   const notifications = await Notification.insertMany(created.flatMap(buildNotifications));
 
@@ -146,6 +171,7 @@ const seed = async () => {
     students: students.length,
     advisors: advisors.length,
     terms: defaultTerms.length,
+    courses: courses.length,
     notifications: notifications.length,
   };
 };

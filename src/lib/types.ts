@@ -1,17 +1,3 @@
-export interface Course {
-  id: string;
-  code: string;
-  name: string;
-  credits: number;
-  description: string;
-  isActive: boolean;
-}
-
-export interface CoursesResponse {
-  courses: Course[];
-  pagination: { page: number; limit: number; total: number; totalPages: number };
-}
-
 export interface CourseOffering {
   id: string;
   courseId: Course | string;
@@ -169,3 +155,52 @@ export interface NotificationsResponse {
 
 export const hasActiveFilters = (filters: StudentFilters): boolean =>
   Object.entries(filters).some(([key, value]) => key !== 'search' && value !== '');
+
+/** Req 18-20 — course catalogue. */
+export type CourseType = 'Core' | 'Elective' | 'Huma';
+export type CourseMajor = 'Computer Science' | 'DMET';
+
+export const COURSE_TYPES: CourseType[] = ['Core', 'Elective', 'Huma'];
+export const COURSE_MAJORS: CourseMajor[] = ['Computer Science', 'DMET'];
+export const COURSE_SEASONS: AcademicTermSeason[] = ['Winter', 'Spring', 'Summer'];
+
+export interface CourseSummary {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface Course extends CourseSummary {
+  creditHours: number;
+  lectureHours: number;
+  tutorialHours: number;
+  labHours: number;
+  courseType: CourseType;
+  faculty: string;
+  majors: CourseMajor[];
+  recommendedSemester: number;
+  offeringSeasons: AcademicTermSeason[];
+  prerequisites: CourseSummary[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Form state. Numbers stay strings while typing; prerequisites are course ids. */
+export interface CourseDraft {
+  code: string;
+  name: string;
+  creditHours: string;
+  lectureHours: string;
+  tutorialHours: string;
+  labHours: string;
+  courseType: CourseType;
+  faculty: string;
+  majors: CourseMajor[];
+  recommendedSemester: string;
+  offeringSeasons: AcademicTermSeason[];
+  prerequisites: string[];
+}
+
+export interface CoursesResponse {
+  courses: Course[];
+}
