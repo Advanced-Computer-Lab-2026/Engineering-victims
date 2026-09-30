@@ -75,6 +75,17 @@ export interface StudentsResponse {
   filterOptions: FilterOptions;
 }
 
+/** Req 50 — a row in the Advisor's all-advising-students list. */
+export interface AdvisingStudentRow extends StudentSummary {
+  /** True when the signed-in Advisor is this student's assigned Advisor. */
+  isMine: boolean;
+}
+
+export interface AdvisingStudentsResponse {
+  students: AdvisingStudentRow[];
+  summary: { total: number; mine: number; unassigned: number };
+}
+
 export interface StudentDetailResponse {
   student: StudentSummary;
   availableStatuses: string[];
