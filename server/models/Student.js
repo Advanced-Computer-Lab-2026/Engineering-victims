@@ -51,6 +51,7 @@ const studentSchema = new mongoose.Schema(
     },
     major: { type: String, required: true, trim: true, default: 'Undeclared' },
     currentSemester: { type: Number, min: 1, max: 8, default: 1 },
+    studyGroup: { type: String, trim: true, default: null },
     academicStanding: {
       type: String,
       enum: ['Good Standing', 'Probation', 'Dismissed'],

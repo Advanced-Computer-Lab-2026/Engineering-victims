@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const Student = require('../models/Student');
 const User = require('../models/User');
+const StudentSchedule = require('../models/StudentSchedule');
+const ScheduleTemplate = require('../models/ScheduleTemplate');
 const { buildStudentQuery } = require('../services/studentQueryService');
 const { recalculate, getStatusesFor } = require('../services/workflowService');
 const { notifyByEmail } = require('../services/notificationService');
@@ -246,5 +248,64 @@ exports.setAccountStatus = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not update the account', error: error.message });
+  }
+};
+
+exports.assignToGroup = async (req, res) => {
+  try {
+    const studentId = req.params.id;
+    const { studyGroup, termId } = req.body;
+
+    if (!studyGroup || !termId) {
+      return res.status(400).json({ message: 'studyGroup and termId are required.' });
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (student.studentType !== 'Normal Student') {
+      return res.status(400).json({ message: 'Only normal students can be assigned to standard schedule groups.' });
+    }
+
+    // 1. Find the template that matches student's major, semester, and the requested group/term
+    const template = await ScheduleTemplate.findOne({
+      major: student.major,
+      semester: student.currentSemester,
+      studyGroup,
+      termId,
+    });
+
+    if (!template) {
+      return res.status(404).json({
+        message: `No standard schedule template found for ${student.major}, semester ${student.currentSemester}, group ${studyGroup} in the specified term.`
+      });
+    }
+
+    // 2. Clear existing schedules for this student in this term to avoid overlaps
+    await StudentSchedule.deleteMany({ studentId: student._id, termId });
+
+    // 3. Create the processed schedule from the template slots
+    const scheduleEntries = template.slots.map((slotId) => ({
+      studentId: student._id,
+      slotId,
+      termId,
+      status: 'Processed',
+    }));
+
+    await StudentSchedule.insertMany(scheduleEntries);
+
+    // 4. Update the student's record
+    student.studyGroup = studyGroup;
+    await student.save();
+
+    res.status(200).json({
+      message: `${student.fullName} has been assigned to group ${studyGroup} and their processed schedule has been created.`,
+      student: serialize(student),
+      slotsCount: scheduleEntries.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error assigning student to group', error: error.message });
   }
 };

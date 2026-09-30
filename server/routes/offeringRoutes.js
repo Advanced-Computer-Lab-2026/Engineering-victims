@@ -10,6 +10,9 @@ router.post('/', offeringController.createOffering);
 router.get('/', offeringController.getOfferings);
 router.get('/:id', offeringController.getOfferingDetails);
 router.patch('/:id', offeringController.updateOffering);
+router.patch('/:id/publish', offeringController.togglePublishStatus);
+router.delete('/:id', offeringController.deleteOffering);
 router.patch('/slots/:id', offeringController.updateSlot);
+router.delete('/slots/:id', offeringController.deleteSlot);
 
 module.exports = router;
