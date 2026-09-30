@@ -16,6 +16,7 @@ import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
 import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
+import AcademicHistoryPage from './pages/AcademicHistoryPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -70,6 +71,19 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/wallet" element={<WalletPage />} />
+          {/* Req 54: an Advising Student's own history. */}
+          <Route path="/academic-history" element={<AcademicHistoryPage />} />
+        </Route>
+
+        {/* Req 54: Advisors and Coordinators open any advising student's history. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Advisor', 'Coordinator']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/academic-history/:studentId" element={<AcademicHistoryPage />} />
         </Route>
 
         <Route
