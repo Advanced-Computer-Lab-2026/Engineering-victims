@@ -30,6 +30,8 @@ export interface SessionUser {
   fullName: string;
   email: string;
   role: Role;
+  /** Only set for students; tells Normal and Advising Students apart. */
+  studentType?: StudentType | null;
 }
 
 export type StudentType = 'Normal Student' | 'Advising Student';
@@ -203,4 +205,25 @@ export interface CourseDraft {
 
 export interface CoursesResponse {
   courses: Course[];
+}
+
+/** Req 89 — Advising Student wallet. */
+export type WalletTransactionType = 'Refund' | 'Payment';
+
+export interface WalletTransaction {
+  id: string;
+  type: WalletTransactionType;
+  direction: 'Credit' | 'Debit';
+  amount: number;
+  balanceAfter: number;
+  requestReference: string | null;
+  paymentReference: string | null;
+  description: string;
+  occurredAt: string;
+}
+
+export interface WalletResponse {
+  wallet: { balance: number; currency: string; updatedAt: string | null };
+  summary: { totalCredits: number; totalDebits: number; count: number };
+  transactions: WalletTransaction[];
 }
