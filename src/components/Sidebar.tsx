@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, Contact, LayoutDashboard, Layers, LogOut, Users, UserCog, Wallet, X } from 'lucide-react';
+import { Bell, BookOpen, CalendarDays, Contact, GraduationCap, LayoutDashboard, Layers, LogOut, Users, UserCog, Wallet, X } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import CustomButton from './ui/CustomButton';
@@ -41,6 +41,8 @@ const NAV_ITEMS: NavItem[] = [
     icon: Users,
     roles: ['Coordinator', 'Administrator', 'Advisor'],
   },
+  // Req 50: the school-wide list, next to the Advisor's own roster above.
+  { to: '/advising-students', label: 'All Advising Students', icon: GraduationCap, roles: ['Advisor'] },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.
   { to: '/advisors', label: 'Advisors', icon: UserCog, roles: ['Coordinator', 'Administrator'] },

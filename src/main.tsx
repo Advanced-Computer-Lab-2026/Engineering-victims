@@ -15,6 +15,7 @@ import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
 import WalletPage from './pages/WalletPage';
+import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -35,6 +36,17 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/students" element={<StudentsPage />} />
+        </Route>
+
+        {/* Req 50: every advising student, for Advisors only. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Advisor']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/advising-students" element={<AdvisingStudentsPage />} />
         </Route>
 
         {/* Req 11-12: managing the advising roster itself stays staff-only. */}
