@@ -61,6 +61,12 @@ exports.listStudents = async (req, res) => {
   try {
     const filter = buildStudentQuery(req.query);
 
+    // An Advisor always sees their own roster. This is applied after the query
+    // is built, so an Advisor sending ?assignedAdvisor=<someone else> gets it
+    // overwritten rather than obeyed — the scope cannot be widened from outside.
+    const isAdvisor = req.user.role === 'Advisor';
+    if (isAdvisor) filter.assignedAdvisor = req.user.userId;
+
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(MAX_LIMIT, Math.max(1, Number(req.query.limit) || DEFAULT_LIMIT));
 
@@ -75,7 +81,13 @@ exports.listStudents = async (req, res) => {
       Student.distinct('studentType'),
     ]);
 
-    const advisors = await User.find({ _id: { $in: advisorIds.filter(Boolean) } }).select('fullName email');
+    // An Advisor has no "which advisor" filter to choose from — every row on
+    // their screen is already theirs — so the option set is left empty and the
+    // control is hidden in the UI. The lookup is skipped too, so the response
+    // does not carry the staff list to a role that has no use for it.
+    const advisors = isAdvisor
+      ? []
+      : await User.find({ _id: { $in: advisorIds.filter(Boolean) } }).select('fullName email');
     const majors = await Student.distinct('major');
     const blockingSteps = await Student.distinct('blockingStep');
 
@@ -150,6 +162,17 @@ exports.getStudent = async (req, res) => {
     const student = await Student.findById(req.params.id).populate('assignedAdvisor', 'fullName email');
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
+    }
+
+    // The list scope stops at the query, but a detail request carries only an
+    // id, so it has to be checked here: an Advisor may open a student only when
+    // that student's assignedAdvisor is this Advisor. A Normal Student (no
+    // advisor) can never be opened by one.
+    if (req.user.role === 'Advisor') {
+      const assignedTo = student.assignedAdvisor?._id ?? student.assignedAdvisor;
+      if (String(assignedTo) !== String(req.user.userId)) {
+        return res.status(403).json({ message: 'Advisors can only open students assigned to them.' });
+      }
     }
 
     res.status(200).json({
@@ -229,6 +252,11 @@ exports.setAccountStatus = async (req, res) => {
 
     student.isActive = isActive;
     await recalculate(student);
+
+    // Login is gated on User.isActive while the directory reads
+    // Student.isActive. Flipping only one of them would leave a "deactivated"
+    // student able to sign in, so the account state is written to both.
+    await User.updateOne({ email: student.email }, { isActive });
 
     // Req 10 is the one account-state event that already exists, so it is a
     // real notification source rather than seed data. A deactivated student
@@ -314,3 +342,7 @@ exports.assignToGroup = async (req, res) => {
     res.status(500).json({ message: 'Error assigning student to group', error: error.message });
   }
 };
+
+// Shared with the Advisor's all-advising-students list (req 50), so both lists
+// describe a student with the same fields.
+exports.serialize = serialize;

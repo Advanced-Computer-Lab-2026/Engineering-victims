@@ -37,6 +37,9 @@ exports.createOffering = async (req, res) => {
   }
 };
 
+/** lean() docs only carry `_id`; the client types and React keys read `id`. */
+const withId = (doc) => ({ ...doc, id: String(doc._id) });
+
 exports.getOfferings = async (req, res) => {
   try {
     const { termId } = req.query;
@@ -47,7 +50,7 @@ exports.getOfferings = async (req, res) => {
       .populate('termId', 'academicYear season')
       .lean();
 
-    res.status(200).json({ offerings });
+    res.status(200).json({ offerings: offerings.map(withId) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load course offerings', error: error.message });
   }
@@ -68,7 +71,7 @@ exports.getOfferingDetails = async (req, res) => {
       .populate('instructorId', 'fullName email')
       .lean();
 
-    res.status(200).json({ offering, slots });
+    res.status(200).json({ offering: withId(offering), slots: slots.map(withId) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load offering details', error: error.message });
   }

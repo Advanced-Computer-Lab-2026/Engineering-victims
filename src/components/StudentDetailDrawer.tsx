@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   BadgeCheck,
   Building2,
@@ -8,6 +9,7 @@ import {
   Hash,
   Loader2,
   Mail,
+  ScrollText,
   ShieldAlert,
   UserRound,
   X,
@@ -76,6 +78,8 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
 
   const canManage = role === 'Administrator';
   const canAssignAdvisor = (role === 'Coordinator' || role === 'Administrator') && data?.student.studentType === 'Advising Student';
+  const canViewHistory = (role === 'Advisor' || role === 'Coordinator') && data?.student.studentType === 'Advising Student';
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!studentId) return;
@@ -370,6 +374,20 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
               <p className="text-center text-xs text-slate-500">
                 Only an Administrator can change an account status.
               </p>
+            )}
+            {/* Req 54: the academic history is kept for Advising Students and
+                is open to Advisors and Coordinators. */}
+            {canViewHistory && (
+              <CustomButton
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={() => navigate(`/academic-history/${student.id}`)}
+                icon={<ScrollText className="h-4 w-4" aria-hidden />}
+                className="mt-2"
+              >
+                View academic history
+              </CustomButton>
             )}
             <CustomButton variant="ghost" size="sm" fullWidth onClick={onClose} className="mt-2">
               Close

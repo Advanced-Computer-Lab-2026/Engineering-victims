@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const Student = require('../models/Student');
 const jwt = require('jsonwebtoken');
 const { notifyByEmail } = require('../services/notificationService');
 
@@ -69,7 +70,16 @@ exports.getMe = async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) return res.status(404).json({ message: 'User not found' });
-    res.status(200).json({ user });
+
+    // Normal and Advising Students share the Student role, but some pages (the
+    // wallet, req 89) exist for Advising Students only. The type lives on the
+    // directory record, so it is attached here for the sidebar to read.
+    const payload = user.toObject();
+    if (user.role === 'Student') {
+      const student = await Student.findOne({ email: user.email }).select('studentType').lean();
+      payload.studentType = student?.studentType ?? null;
+    }
+    res.status(200).json({ user: payload });
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
   }
