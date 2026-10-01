@@ -31,6 +31,9 @@ async function run() {
     `✅ Seeded ${result.users} users, ${result.students} students and ${result.notifications} notifications`,
   );
   console.log(`   Advisors: ${result.advisors}, terms: ${result.terms}`);
+  console.log(
+    `   Offerings: ${result.offerings}, slots: ${result.slots}, schedule groups: ${result.groups}, student schedules: ${result.schedules} (${result.grouped} students in groups)`,
+  );
 
   await mongoose.disconnect();
 }
