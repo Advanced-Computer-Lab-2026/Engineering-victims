@@ -24,6 +24,11 @@ router.patch(
   studentController.assignAdvisor
 );
 router.get('/:id', ...directory, studentController.getStudent);
+router.patch(
+  '/:id/group',
+  ...staffOnly,
+  studentController.assignToGroup
+);
 
 // Req 10 is Administrator only.
 router.patch(

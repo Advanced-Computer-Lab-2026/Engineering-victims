@@ -23,6 +23,23 @@ export interface CourseSlot {
   assignedCount: number;
 }
 
+export type TemplatePublicationStatus = 'Draft' | 'Published';
+
+export interface ScheduleTemplate {
+  id: string;
+  major: string;
+  semester: number;
+  studyGroup: string;
+  termId: string;
+  publicationStatus: TemplatePublicationStatus;
+  slots: CourseSlot[];
+}
+
+export interface ScheduleSlotOption extends CourseSlot {
+  courseCode: string;
+  courseName: string;
+}
+
 export type Role = 'Student' | 'Advisor' | 'Coordinator' | 'Administrator';
 
 export interface SessionUser {
@@ -50,6 +67,7 @@ export interface StudentSummary {
   studentType: StudentType;
   major: string;
   currentSemester: number;
+  studyGroup: string | null;
   academicStanding: string;
   assignedAdvisor: AdvisorSummary | null;
   workflowStatus: string;

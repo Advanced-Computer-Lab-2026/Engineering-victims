@@ -5,10 +5,13 @@ const Notification = require('../models/Notification');
 const Course = require('../models/Course');
 const CourseOffering = require('../models/CourseOffering');
 const CourseSlot = require('../models/CourseSlot');
+const ScheduleTemplate = require('../models/ScheduleTemplate');
+const StudentSchedule = require('../models/StudentSchedule');
 const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
 const { seedWallets } = require('./walletSeed');
 const { seedAcademicHistory } = require('./academicHistorySeed');
+const { seedScheduleGroups } = require('./scheduleSeed');
 
 /**
  * The demo dataset.
@@ -155,6 +158,16 @@ const SPRING = '2026/2027 Spring';
  */
 const OFFERINGS = [
   // Current term (2026/2027 Winter) — mostly published.
+  //
+  // Winter carries the odd semesters, so it holds semester 1 and 3 courses as
+  // well as the 5/7 ones: a Coordinator opening Schedule Groups on any cohort
+  // then finds courses that actually belong to that cohort's semester.
+  { term: WINTER, code: 'CSEN 102', publicationStatus: 'Published' },
+  { term: WINTER, code: 'MATH 103', publicationStatus: 'Published' },
+  { term: WINTER, code: 'PHYS 101', publicationStatus: 'Published' },
+  { term: WINTER, code: 'CSEN 301', publicationStatus: 'Published' },
+  { term: WINTER, code: 'MATH 301', publicationStatus: 'Published' },
+  { term: WINTER, code: 'ELCT 301', publicationStatus: 'Published' },
   { term: WINTER, code: 'CSEN 501', publicationStatus: 'Published' },
   { term: WINTER, code: 'CSEN 503', publicationStatus: 'Published' },
   { term: WINTER, code: 'MATH 501', publicationStatus: 'Published' },
@@ -169,9 +182,13 @@ const OFFERINGS = [
   { term: WINTER, code: 'CSEN 905', publicationStatus: 'Draft' },
 
   // Next term (2026/2027 Spring) — a mix, so publish/unpublish both have rows.
+  // Even semesters run in Spring, so semester 4 and 6 courses are published
+  // next to the semester 2 ones.
   { term: SPRING, code: 'MATH 203', publicationStatus: 'Published' },
   { term: SPRING, code: 'CSEN 202', publicationStatus: 'Published' },
   { term: SPRING, code: 'ELCT 201', publicationStatus: 'Published' },
+  { term: SPRING, code: 'MATH 401', publicationStatus: 'Published' },
+  { term: SPRING, code: 'CSEN 604', publicationStatus: 'Published' },
   { term: SPRING, code: 'CSEN 403', publicationStatus: 'Draft' },
   { term: SPRING, code: 'CSIS 402', publicationStatus: 'Draft' },
   { term: SPRING, code: 'ELCT 401', publicationStatus: 'Draft' },
@@ -191,10 +208,13 @@ const OFFERINGS = [
  *
  * conflictService rejects an instructor or a room booked twice in overlapping
  * times, and it checks globally rather than per term. So slots are laid out on
- * a fixed grid instead of being picked at random: four weekday time blocks of
- * four slots each, where a slot's position on the grid fixes its instructor and
- * its room. Two slots can only ever share a cell's day and time by sharing an
- * index, and the index is what makes the instructor and room different.
+ * a fixed grid instead of being picked at random: five days of six time blocks,
+ * four rooms wide. A slot's index walks the grid cell by cell — day and time
+ * first, so a course's lecture, tutorial and lab land on different days and
+ * times instead of on top of each other — and only wraps back to the first cell
+ * once the whole week is full, taking the next room and instructor with it. Two
+ * slots can share a cell, then, only when their rooms and instructors differ,
+ * which is precisely what the conflict rules allow.
  */
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const BLOCKS = [
@@ -216,6 +236,23 @@ const SLOT_TYPES = [
   { slotType: 'Tutorial', hoursField: 'tutorialHours' },
   { slotType: 'Lab', hoursField: 'labHours' },
 ];
+
+/**
+ * Which cohorts may take a seeded offering's slots.
+ *
+ * Every seeded offering is open to every semester on purpose. The Schedule
+ * Groups screen lets a Coordinator pick any term, major and semester in any
+ * combination, and a term can only hold the courses its season allows (odd
+ * semesters in Winter, even ones in Spring), so tying eligibility to the
+ * course's `recommendedSemester` would hand that screen an empty slot list for
+ * every combination the term cannot answer — semester 1 in the Spring term, for
+ * one. The course still decides *which* slots a group gets: seedScheduleGroups
+ * offers the cohorts the courses closest to their own semester first.
+ *
+ * eligibleMajors stays the course's own majors; the seeded roster only contains
+ * the two majors the catalogue serves, so there is no gap to paper over there.
+ */
+const ALL_SEMESTERS = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
 /**
  * Per-status notifications. One unread row so the badge and "mark as read" have
@@ -516,7 +553,7 @@ const seedOfferings = async ({ terms, courses, instructors }) => {
       termId,
       publicationStatus,
       eligibleMajors: course.majors,
-      eligibleSemesters: [String(course.recommendedSemester)],
+      eligibleSemesters: ALL_SEMESTERS,
     };
   });
 
@@ -534,8 +571,8 @@ const seedOfferings = async ({ terms, courses, instructors }) => {
       if (!course[hoursField]) return;
 
       const index = slotDocs.length;
-      const position = index % ROOMS.length;
-      const cell = Math.floor(index / ROOMS.length) % gridCells;
+      const cell = index % gridCells;
+      const position = Math.floor(index / gridCells) % ROOMS.length;
       const [startTime, endTime] = BLOCKS[Math.floor(cell / DAYS.length) % BLOCKS.length];
       const capacity = SLOT_CAPACITY[slotType];
 
@@ -581,6 +618,11 @@ const seed = async () => {
   await Course.deleteMany({});
   await CourseOffering.deleteMany({});
   await CourseSlot.deleteMany({});
+  // Groups and the schedules inside them point at every id above (term, course,
+  // offering, slot and student are all regenerated below), so they go too.
+  // scheduleSeed.js rebuilds them once the offerings it draws from exist.
+  await ScheduleTemplate.deleteMany({});
+  await StudentSchedule.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
@@ -634,6 +676,14 @@ const seed = async () => {
 
   const courses = await seedCourses(administrator?._id ?? null);
   const { offerings, slots } = await seedOfferings({ terms, courses, instructors: advisors });
+  // Standard schedule groups built on those slots, and the processed schedules
+  // of the Normal Students that sit in them.
+  const { groups, schedules, grouped } = await seedScheduleGroups({
+    terms,
+    offerings,
+    courses,
+    students,
+  });
   // Req 89: wallet history for the Advising Students.
   const walletTransactions = await seedWallets(students);
   // Req 54: completed (graded) and current courses for the Advising Students.
@@ -691,6 +741,9 @@ const seed = async () => {
     courses: courses.length,
     offerings: offerings.length,
     slots,
+    groups,
+    schedules,
+    grouped,
     walletTransactions,
     courseRecords,
     notifications: notifications.length,

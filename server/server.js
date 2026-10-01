@@ -12,6 +12,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const advisorRoutes = require('./routes/advisorRoutes');
 const courseRoutes = require('./routes/courseRoutes');
 const offeringRoutes = require('./routes/offeringRoutes');
+const templateRoutes = require('./routes/templateRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const academicHistoryRoutes = require('./routes/academicHistoryRoutes');
 const { seed } = require('./config/seedData');
@@ -36,6 +37,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/advisors', advisorRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/offerings', offeringRoutes);
+app.use('/api/templates', templateRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/academic-history', academicHistoryRoutes);
 app.get('/', (req, res) => res.send('API running...'));
@@ -52,8 +54,11 @@ async function startServer() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const { users, students, courses, notifications } = await seed();
+    const { users, students, courses, offerings, slots, groups, schedules, notifications } = await seed();
     console.log(`✅ Seeded ${users} users, ${students} students, ${courses} courses and ${notifications} notifications`);
+    console.log(
+      `✅ Scheduling: ${offerings} offerings, ${slots} slots, ${groups} schedule groups, ${schedules} processed student schedules`
+    );
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {

@@ -14,6 +14,8 @@ import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
+import CoordinatorQueuePage from './pages/CoordinatorQueuePage';
+import ScheduleTemplatesPage from './pages/ScheduleTemplatesPage';
 import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
@@ -58,7 +60,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             </ProtectedRoute>
           }
         >
+          {/* /students lives in the directory guard above, where main widened it
+              to Advisors. Only Omars' own route belongs here. */}
+          <Route path="/coordinator/queue" element={<CoordinatorQueuePage />} />
           <Route path="/advisors" element={<AdvisorsPage />} />
+          <Route path="/schedule-templates" element={<ScheduleTemplatesPage />} />
         </Route>
 
         {/* Req 89: students only. A Normal Student who types the URL is told
