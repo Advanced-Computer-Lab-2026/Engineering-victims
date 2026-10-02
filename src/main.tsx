@@ -20,6 +20,7 @@ import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
 import WeeklySchedulePage from './pages/WeeklySchedulePage';
+import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -82,6 +83,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/academic-history" element={<AcademicHistoryPage />} />
           {/* Req 31: a student's own weekly schedule. */}
           <Route path="/schedule" element={<WeeklySchedulePage />} />
+          {/* Req 57: Advising Students' scheduling preferences. */}
+          <Route path="/preferences" element={<SchedulingPreferencesPage />} />
         </Route>
 
         {/* Req 31: staff open a student's schedule read-only; the API limits
