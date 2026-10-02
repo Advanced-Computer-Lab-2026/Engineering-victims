@@ -307,3 +307,79 @@ export interface WalletResponse {
   summary: { totalCredits: number; totalDebits: number; count: number };
   transactions: WalletTransaction[];
 }
+
+/** Req 31 — a student's weekly schedule. */
+export type WeekDay = 'Saturday' | 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday';
+
+/** Draft = still being built, Review-ready = completed draft in play, Processed = final. */
+export type ScheduleStage = 'Draft' | 'Review-ready' | 'Processed';
+
+export interface ScheduleSession {
+  id: string;
+  courseCode: string;
+  courseName: string;
+  creditHours: number;
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  groupNumber: number;
+  dayOfWeek: WeekDay;
+  startTime: string;
+  endTime: string;
+  room: string;
+  instructor: string | null;
+}
+
+export interface WeeklyScheduleResponse {
+  student: {
+    id: string;
+    fullName: string;
+    studentId: string;
+    studentType: StudentType;
+    major: string;
+    currentSemester: number;
+    studyGroup: string | null;
+  };
+  stage: ScheduleStage | null;
+  workflowStatus: string;
+  visible: boolean;
+  hiddenReason: string | null;
+  term: { id: string; label: string; termStartDate: string; termEndDate: string } | null;
+  days: WeekDay[];
+  daysOff: WeekDay[];
+  sessions: ScheduleSession[];
+}
+
+/** Req 57 — an Advising Student's ranked scheduling preferences. */
+export type PreferenceKind =
+  | 'Preferred day'
+  | 'Avoided day'
+  | 'Preferred time range'
+  | 'Avoided time range'
+  | 'Preferred group'
+  | 'Day off';
+
+export interface PreferenceEntry {
+  priority?: number;
+  kind: PreferenceKind;
+  day: WeekDay | null;
+  startTime: string | null;
+  endTime: string | null;
+  groupNumber: number | null;
+  courseCode: string | null;
+}
+
+export interface SchedulingPreferencesResponse {
+  term: {
+    id: string;
+    label: string;
+    advisingDeadline: string;
+    closesAt: string;
+    isOpen: boolean;
+  } | null;
+  preference: {
+    preferences: PreferenceEntry[];
+    note: string;
+    submittedAt: string;
+    updatedAt: string;
+  } | null;
+  options?: { kinds: PreferenceKind[]; days: WeekDay[]; maxPreferences: number };
+}

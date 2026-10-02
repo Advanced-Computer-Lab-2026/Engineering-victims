@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GraduationCap, Loader2, RotateCcw, ScrollText, UserCheck, UserX, Users } from 'lucide-react';
+import { CalendarDays, GraduationCap, Loader2, RotateCcw, ScrollText, UserCheck, UserX, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
@@ -174,7 +174,7 @@ const AdvisingStudentTableRow: React.FC<{ student: AdvisingStudentRow }> = ({ st
       <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500" title={formatDate(student.lastUpdateAt)}>
         {formatRelative(student.lastUpdateAt)}
       </td>
-      <td className="px-4 py-3 text-right">
+      <td className="whitespace-nowrap px-4 py-3 text-right">
         {/* Req 54: Advisors may open any advising student's academic history. */}
         <CustomButton
           variant="ghost"
@@ -183,6 +183,15 @@ const AdvisingStudentTableRow: React.FC<{ student: AdvisingStudentRow }> = ({ st
           icon={<ScrollText className="h-4 w-4" aria-hidden />}
         >
           History
+        </CustomButton>
+        {/* Req 31: the student's draft, review-ready or processed schedule. */}
+        <CustomButton
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/schedule/${student.id}`)}
+          icon={<CalendarDays className="h-4 w-4" aria-hidden />}
+        >
+          Schedule
         </CustomButton>
       </td>
     </tr>

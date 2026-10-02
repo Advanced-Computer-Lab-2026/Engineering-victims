@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, CalendarRange, Contact, GraduationCap, LayoutDashboard, Layers, LogOut, ScrollText, Users, UserCog, Wallet, X } from 'lucide-react';
+import { Bell, BookOpen, CalendarDays, CalendarRange, Contact, GraduationCap, LayoutDashboard, Layers, LogOut, ScrollText, SlidersHorizontal, Users, UserCog, Wallet, X } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import CustomButton from './ui/CustomButton';
@@ -59,8 +59,11 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/my-courses', label: 'My Registered Courses', icon: BookOpen, roles: ['Student'] },
   // Req 54: staff reach a student's history from the student lists instead.
   { to: '/academic-history', label: 'Academic History', icon: ScrollText, roles: ['Student'], studentTypes: ['Advising Student'] },
+  // Req 57: only Advising Students have their schedule built by an Advisor.
+  { to: '/preferences', label: 'Scheduling Preferences', icon: SlidersHorizontal, roles: ['Student'], studentTypes: ['Advising Student'] },
   { to: '/notifications', label: 'Notifications', icon: Bell },
-  { to: '/schedule', label: 'My Schedule', icon: CalendarDays, unavailable: true },
+  // Req 31: staff open a student's schedule from the student lists instead.
+  { to: '/schedule', label: 'My Schedule', icon: CalendarDays, roles: ['Student'] },
   { to: '/profile', label: 'My Profile', icon: Contact },
 ];
 

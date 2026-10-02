@@ -20,6 +20,8 @@ import ScheduleTemplatesPage from './pages/ScheduleTemplatesPage';
 import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
+import WeeklySchedulePage from './pages/WeeklySchedulePage';
+import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import './index.css';
 
@@ -85,6 +87,22 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           {/* Req 32: registered courses, credits per course and the total —
               for every student, Normal and Advising alike. */}
           <Route path="/my-courses" element={<MyRegisteredCoursesPage />} />
+          {/* Req 31: a student's own weekly schedule. */}
+          <Route path="/schedule" element={<WeeklySchedulePage />} />
+          {/* Req 57: Advising Students' scheduling preferences. */}
+          <Route path="/preferences" element={<SchedulingPreferencesPage />} />
+        </Route>
+
+        {/* Req 31: staff open a student's schedule read-only; the API limits
+            Advisors and Coordinators to Advising Students. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Advisor', 'Coordinator', 'Administrator']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/schedule/:studentId" element={<WeeklySchedulePage />} />
         </Route>
 
         {/* Req 54: Advisors and Coordinators open any advising student's history. */}
