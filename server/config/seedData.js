@@ -13,6 +13,7 @@ const { seedWallets } = require('./walletSeed');
 const { seedAcademicHistory } = require('./academicHistorySeed');
 const { seedScheduleGroups } = require('./scheduleSeed');
 const { seedAdvisingSchedules } = require('./advisingScheduleSeed');
+const { seedSchedulingPreferences } = require('./schedulingPreferenceSeed');
 
 /**
  * The demo dataset.
@@ -687,6 +688,8 @@ const seed = async () => {
   });
   // Req 31: each Advising Student's draft, review-ready or processed schedule.
   const advisingSchedules = await seedAdvisingSchedules({ terms, offerings, courses, students });
+  // Req 57: preferences submitted for the term being advised now.
+  const schedulingPreferences = await seedSchedulingPreferences(students);
   // Req 89: wallet history for the Advising Students.
   const walletTransactions = await seedWallets(students);
   // Req 54: completed (graded) and current courses for the Advising Students.
@@ -748,6 +751,7 @@ const seed = async () => {
     schedules,
     grouped,
     advisingSchedules,
+    schedulingPreferences,
     walletTransactions,
     courseRecords,
     notifications: notifications.length,
