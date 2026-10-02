@@ -2,11 +2,150 @@ const mongoose = require('mongoose');
 const CourseOffering = require('../models/CourseOffering');
 const CourseSlot = require('../models/CourseSlot');
 const StudentSchedule = require('../models/StudentSchedule');
+const Course = require('../models/Course');
+const AcademicTerm = require('../models/AcademicTerm');
+const User = require('../models/User');
 const { checkSlotConflict, validateCapacity } = require('../services/conflictService');
+
+const { FIELD_LABELS: OFFERING_LABELS } = CourseOffering;
+const { FIELD_LABELS: SLOT_LABELS } = CourseSlot;
+
+/** This endpoint saves offerings *and* their slots, so both label sets apply. */
+const FIELD_LABELS = { ...OFFERING_LABELS, ...SLOT_LABELS };
+const FIELD_ORDER = Object.keys(FIELD_LABELS);
+
+/** Model labels first, then the path rendered as words, so no error can fall
+ *  back to something as vague as "One of the fields is not a valid selection.". */
+const labelFor = (path) => {
+  const root = path.split('.')[0];
+  if (FIELD_LABELS[root]) return FIELD_LABELS[root];
+  const words = root.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
+  return `${words.charAt(0).toUpperCase()}${words.slice(1)}`.replace(/\bid\b/g, 'ID');
+};
+
+const schemaFor = (path) => {
+  const root = path.split('.')[0];
+  if (CourseOffering.schema.path(root)) return CourseOffering.schema;
+  if (CourseSlot.schema.path(root)) return CourseSlot.schema;
+  return null;
+};
+
+/**
+ * Same idea as the course and academic term errors: plain sentences the form
+ * can show as-is. Without this the UI ends up displaying
+ * `CourseOffering validation failed: courseId: Cast to ObjectId failed for
+ * value "" (type string) at path "courseId" because of "BSONError", ...`
+ * instead of "Course is required. Term is required.".
+ */
+const castMessage = (path, value, idMessage) => {
+  if (path === '_id') return idMessage;
+  const label = labelFor(path);
+  // An empty id trips the cast before the `required` check ever runs.
+  return value === '' || value == null ? `${label} is required.` : `${label} has an invalid value.`;
+};
+
+/**
+ * A tab left open across a re-seed still posts well-formed ObjectIds for rows
+ * that no longer exist. The cast and the required check both pass, so the write
+ * succeeds — and every later read then returns a null reference that used to
+ * take the whole page down. Returns a plain message, or null when all
+ * references are usable.
+ */
+const checkReferences = async ({ courseId, termId }) => {
+  if (courseId !== undefined) {
+    if (!mongoose.isValidObjectId(courseId)) return 'Select a course before saving.';
+    if (!(await Course.exists({ _id: courseId }))) {
+      return 'That course no longer exists. Refresh the page and pick another.';
+    }
+  }
+  if (termId !== undefined) {
+    if (!mongoose.isValidObjectId(termId)) return 'Select a term before saving.';
+    if (!(await AcademicTerm.exists({ _id: termId }))) {
+      return 'That academic term no longer exists. Refresh the page and pick another.';
+    }
+  }
+  return null;
+};
+
+/** The same staleness guard for the instructors picked inside slots. */
+const checkInstructors = async (instructorIds) => {
+  const ids = [...new Set(instructorIds.filter(Boolean))];
+  if (ids.some((id) => !mongoose.isValidObjectId(id))) {
+    return 'Pick an instructor from the list before saving.';
+  }
+  if (ids.length === 0) return null;
+  const found = await User.countDocuments({ _id: { $in: ids } });
+  if (found !== ids.length) {
+    return 'That instructor no longer exists. Refresh the page and pick another.';
+  }
+  return null;
+};
+
+const formatOfferingError = (error, fallback, idMessage = 'That offering link is not valid.') => {
+  if (!error) return fallback;
+
+  // Same course offered twice in the same term (unique index).
+  if (error.code === 11000) return 'This course is already offered in that term.';
+
+  if (error.name === 'ValidationError') {
+    const positionOf = (path) => {
+      const index = FIELD_ORDER.indexOf(path.split('.')[0]);
+      return index === -1 ? FIELD_ORDER.length : index;
+    };
+
+    const messages = Object.values(error.errors ?? {})
+      .sort((a, b) => positionOf(a.path) - positionOf(b.path))
+      .map((detail) => {
+        if (detail.name === 'CastError') return castMessage(detail.path, detail.value, idMessage);
+
+        const label = labelFor(detail.path);
+        if (detail.kind === 'required') return `${label} is required.`;
+        if (detail.kind === 'min') return `${label} must be at least ${detail.properties?.min}.`;
+        if (detail.kind === 'max') return `${label} must be no more than ${detail.properties?.max}.`;
+        if (detail.kind === 'enum') {
+          const values = schemaFor(detail.path)?.path(detail.path)?.enumValues;
+          if (Array.isArray(values) && values.length <= 5) return `${label} must be ${values.join(' or ')}.`;
+          return `${label} is not a valid option.`;
+        }
+        // Match/regex validators carry their own wording
+        // ("Start time must be in HH:mm format"), so pass them through.
+        return detail.message;
+      })
+      .filter(Boolean);
+
+    if (messages.length > 0) return [...new Set(messages)].join(' ');
+    return fallback;
+  }
+
+  if (error.name === 'CastError') return castMessage(error.path, error.value, idMessage);
+
+  // Conflicts (instructor/room/capacity) and explicit rejections are already
+  // worded for the user.
+  if (error.status) return error.message;
+
+  return fallback;
+};
+
+/** 409 for duplicates/conflicts, 400 for bad input, 500 for real faults. */
+const errorStatus = (error) => {
+  if (error.status) return error.status;
+  if (error.code === 11000) return 409;
+  return error.name === 'ValidationError' || error.name === 'CastError' ? 400 : 500;
+};
 
 exports.createOffering = async (req, res) => {
   try {
     const { courseId, termId, publicationStatus, eligibleMajors, eligibleSemesters, slots } = req.body;
+
+    // Stale ids (re-seeded database, form left open) are rejected here instead
+    // of being stored as references nothing can resolve later.
+    const refProblem = await checkReferences({ courseId, termId });
+    if (refProblem) return res.status(400).json({ message: refProblem });
+
+    const instructorProblem = await checkInstructors(
+      (Array.isArray(slots) ? slots : []).map((slot) => slot && slot.instructorId),
+    );
+    if (instructorProblem) return res.status(400).json({ message: instructorProblem });
 
     const offering = new CourseOffering({
       courseId,
@@ -16,24 +155,32 @@ exports.createOffering = async (req, res) => {
       eligibleSemesters,
     });
 
-    await offering.save();
-
+    // Check every slot before writing anything: saving the offering first
+    // would leave it behind on failure, and the retry would then answer
+    // "already offered in that term" instead of the real problem.
+    const slotDocs = [];
     if (slots && Array.isArray(slots)) {
       for (const slotData of slots) {
         await checkSlotConflict({ ...slotData, offeringId: offering._id });
-        await CourseSlot.create({
-          ...slotData,
-          offeringId: offering._id,
-        });
+        slotDocs.push(new CourseSlot({ ...slotData, offeringId: offering._id }));
+      }
+      for (const slotDoc of slotDocs) {
+        const invalid = slotDoc.validateSync();
+        if (invalid) throw invalid;
       }
     }
+
+    await offering.save();
+    for (const slotDoc of slotDocs) await slotDoc.save();
 
     res.status(201).json({
       message: 'Course offering and slots created successfully.',
       offering: offering,
     });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    res.status(errorStatus(error)).json({
+      message: formatOfferingError(error, 'Could not create the course offering.'),
+    });
   }
 };
 
@@ -79,6 +226,9 @@ exports.getOfferingDetails = async (req, res) => {
 
 exports.updateOffering = async (req, res) => {
   try {
+    const refProblem = await checkReferences(req.body);
+    if (refProblem) return res.status(400).json({ message: refProblem });
+
     const offering = await CourseOffering.findByIdAndUpdate(
       req.params.id,
       req.body,
@@ -94,7 +244,9 @@ exports.updateOffering = async (req, res) => {
       offering,
     });
   } catch (error) {
-    res.status(500).json({ message: 'Could not update offering', error: error.message });
+    res.status(errorStatus(error)).json({
+      message: formatOfferingError(error, 'Could not update the course offering.'),
+    });
   }
 };
 
@@ -102,6 +254,14 @@ exports.updateSlot = async (req, res) => {
   try {
     const slotId = req.params.id;
     const updates = req.body;
+
+    // Same staleness guard as create — checked before any lookup so a stale
+    // instructor id answers 400 instead of reaching the database.
+    if (updates.instructorId !== undefined) {
+      const instructorProblem = await checkInstructors([updates.instructorId]);
+      if (instructorProblem) return res.status(400).json({ message: instructorProblem });
+    }
+
     const slot = await CourseSlot.findById(slotId);
 
     if (!slot) {
@@ -131,7 +291,9 @@ exports.updateSlot = async (req, res) => {
       slot: updatedSlot,
     });
   } catch (error) {
-    res.status(error.status || 500).json({ message: error.message });
+    res.status(errorStatus(error)).json({
+      message: formatOfferingError(error, 'Could not update the course slot.', 'That slot link is not valid.'),
+    });
   }
 };
 

@@ -1,5 +1,13 @@
 const CourseSlot = require('../models/CourseSlot');
 
+/** Conflicts are the client's doing, not a server fault: 409, and a message
+ *  that is already worded for the user, so callers can pass it through. */
+const conflictError = (message, status) => {
+  const err = new Error(message);
+  err.status = status;
+  return err;
+};
+
 /**
  * Checks if two time ranges overlap.
  * Times are assumed to be in "HH:mm" format.
@@ -23,7 +31,7 @@ exports.checkSlotConflict = async (slotData, excludeSlotId = null) => {
   if (instructorConflict) {
     // Double check overlap precisely
     if (timesOverlap(startTime, endTime, instructorConflict.startTime, instructorConflict.endTime)) {
-      throw new Error(`Instructor is already assigned to another slot on ${dayOfWeek} at this time.`);
+      throw conflictError(`Instructor is already assigned to another slot on ${dayOfWeek} at this time.`, 409);
     }
   }
 
@@ -38,7 +46,7 @@ exports.checkSlotConflict = async (slotData, excludeSlotId = null) => {
 
   if (roomConflict) {
     if (timesOverlap(startTime, endTime, roomConflict.startTime, roomConflict.endTime)) {
-      throw new Error(`Room ${roomId} is already occupied on ${dayOfWeek} at this time.`);
+      throw conflictError(`Room ${roomId} is already occupied on ${dayOfWeek} at this time.`, 409);
     }
   }
 
@@ -47,7 +55,10 @@ exports.checkSlotConflict = async (slotData, excludeSlotId = null) => {
 
 exports.validateCapacity = (newMaxCapacity, currentAssignedCount) => {
   if (newMaxCapacity < currentAssignedCount) {
-    throw new Error(`Cannot reduce capacity to ${newMaxCapacity} because ${currentAssignedCount} students are already assigned.`);
+    throw conflictError(
+      `Cannot reduce capacity to ${newMaxCapacity} because ${currentAssignedCount} students are already assigned.`,
+      400
+    );
   }
   return true;
 };

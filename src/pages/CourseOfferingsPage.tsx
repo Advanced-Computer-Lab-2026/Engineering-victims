@@ -9,38 +9,41 @@ import {
 import { ApiError } from '../lib/api';
 import { courseOfferingService } from '../lib/courseOfferingService';
 import { fetchAcademicTerms } from '../lib/termsService';
+import { fetchCourses } from '../lib/coursesService';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
-import { type CourseOffering } from '../lib/types';
-
-// Note: I'll implement the OfferingDetailView separately or as a nested component
-// For now, let's focus on the main page and the list.
+import { type CourseOffering, type CourseSlot, type Course, type AcademicTerm } from '../lib/types';
+import OfferingDrawer, { type OfferingDrawerMode } from '../components/OfferingDrawer';
 
 const CourseOfferingsPage: React.FC = () => {
   const [selectedTerm, setSelectedTerm] = useState<string>('');
   const [offerings, setOfferings] = useState<CourseOffering[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Real academic terms from the database (the same records the terms page manages).
-  const [terms, setTerms] = useState<{ id: string; label: string }[]>([]);
+  // Data for the Offering Drawer
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [terms, setTerms] = useState<AcademicTerm[]>([]);
+  const [drawerMode, setDrawerMode] = useState<OfferingDrawerMode | null>(null);
+  const [selectedOffering, setSelectedOffering] = useState<CourseOffering | null>(null);
+  const [selectedSlots, setSelectedSlots] = useState<CourseSlot[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    fetchAcademicTerms()
-      .then((response) => {
+    Promise.all([
+      fetchAcademicTerms(),
+      fetchCourses()
+    ])
+      .then(([termsRes, coursesRes]) => {
         if (cancelled) return;
-        setTerms(
-          response.terms.map((term) => ({
-            id: term.id,
-            label: `${term.academicYear} ${term.season}`,
-          }))
-        );
+        setTerms(termsRes.terms);
+        setCourses(coursesRes.courses);
       })
       .catch((err) => {
         if (!cancelled) setError((err as ApiError).message);
@@ -58,7 +61,7 @@ const CourseOfferingsPage: React.FC = () => {
 
     try {
       const response = await courseOfferingService.getOfferingsByTerm(selectedTerm);
-      setOfferings(response.offerings);
+      setOfferings(response.offerings ?? []);
     } catch (err) {
       setError((err as ApiError).message);
     } finally {
@@ -73,6 +76,28 @@ const CourseOfferingsPage: React.FC = () => {
     }
   }, [selectedTerm, loadOfferings]);
 
+  const handleOpenDetails = async (offering: CourseOffering) => {
+    try {
+      setSelectedOffering(offering);
+      const res = await courseOfferingService.getOfferingDetails(offering.id);
+      setSelectedSlots(res.slots);
+      setDrawerMode('view');
+    } catch (err) {
+      setError((err as ApiError).message);
+    }
+  };
+
+  const handleSaved = (termId?: string, message?: string) => {
+    if (message) setNotice(message);
+    // Land the filter on the offering's term so the row it just saved is on
+    // screen; changing the filter reloads through the effect above.
+    if (termId && termId !== selectedTerm) {
+      setSelectedTerm(termId);
+      return;
+    }
+    loadOfferings(true);
+  };
+
   return (
     <>
       <PageHeader
@@ -84,8 +109,10 @@ const CourseOfferingsPage: React.FC = () => {
             variant="primary"
             size="sm"
             onClick={() => {
-              // Logic to open Create Offering form
-              alert('Create Offering form would open here');
+              setSelectedOffering(null);
+              setSelectedSlots([]);
+              setNotice(null);
+              setDrawerMode('create');
             }}
             icon={<Plus className="h-4 w-4" aria-hidden />}
           >
@@ -100,7 +127,7 @@ const CourseOfferingsPage: React.FC = () => {
           placeholder="Select a term..."
           value={selectedTerm}
           onChange={(event) => setSelectedTerm(event.target.value)}
-          options={terms.map(t => ({ value: t.id, label: t.label }))}
+          options={terms.map(t => ({ value: t.id, label: `${t.academicYear} ${t.season}` }))}
         />
         <CustomButton
           variant="secondary"
@@ -117,6 +144,14 @@ const CourseOfferingsPage: React.FC = () => {
         <div className="mb-4">
           <AlertBanner tone="error" title="Error" onDismiss={() => setError(null)}>
             {error}
+          </AlertBanner>
+        </div>
+      )}
+
+      {notice && (
+        <div className="mb-4">
+          <AlertBanner tone="success" onDismiss={() => setNotice(null)}>
+            {notice}
           </AlertBanner>
         </div>
       )}
@@ -152,11 +187,17 @@ const CourseOfferingsPage: React.FC = () => {
                 {offerings.map((offering) => (
                   <tr key={offering.id} className="group transition-colors hover:bg-slate-800/40">
                     <td className="px-4 py-3">
+                      {/* A deleted course leaves a null ref: `typeof null` is
+                          'object', so the guard must check truthiness first. */}
                       <div className="font-medium text-slate-100">
-                        {typeof offering.courseId === 'object' ? offering.courseId.name : 'Unknown'}
+                        {offering.courseId && typeof offering.courseId === 'object'
+                          ? offering.courseId.name
+                          : 'Unknown course'}
                       </div>
                       <div className="text-xs text-slate-500 font-mono">
-                        {typeof offering.courseId === 'object' ? offering.courseId.code : 'N/A'}
+                        {offering.courseId && typeof offering.courseId === 'object'
+                          ? offering.courseId.code
+                          : 'N/A'}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -169,15 +210,13 @@ const CourseOfferingsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-300 text-xs">
-                      {offering.eligibleMajors.join(', ') || 'All'}
+                      {offering.eligibleMajors?.join(', ') || 'All'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <CustomButton
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          alert(`Opening details for offering ${offering.id}`);
-                        }}
+                        onClick={() => handleOpenDetails(offering)}
                         icon={<Eye className="h-4 w-4" aria-hidden />}
                       >
                         View Details
@@ -190,6 +229,17 @@ const CourseOfferingsPage: React.FC = () => {
           </div>
         </Card>
       )}
+
+      <OfferingDrawer
+        mode={drawerMode}
+        offering={selectedOffering}
+        slots={selectedSlots}
+        courses={courses}
+        terms={terms}
+        onClose={() => setDrawerMode(null)}
+        onModeChange={setDrawerMode}
+        onSaved={handleSaved}
+      />
     </>
   );
 };

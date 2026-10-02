@@ -3,6 +3,10 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const StudentSchedule = require('../models/StudentSchedule');
 const ScheduleTemplate = require('../models/ScheduleTemplate');
+const CourseSlot = require('../models/CourseSlot');
+const CourseOffering = require('../models/CourseOffering');
+const Course = require('../models/Course');
+const AcademicTerm = require('../models/AcademicTerm');
 const { buildStudentQuery } = require('../services/studentQueryService');
 const { recalculate, getStatusesFor } = require('../services/workflowService');
 const { notifyByEmail } = require('../services/notificationService');
@@ -340,6 +344,79 @@ exports.assignToGroup = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error assigning student to group', error: error.message });
+  }
+};
+
+/**
+ * Req 32: the student's own registered courses, the credit hours of each, and
+ * the total. Registration lives in the schedule that req 30 processes, so one
+ * course usually spans several rows (lecture + tutorial + lab); the answer is
+ * built from the distinct courses behind the slots, which also drops the
+ * duplicates for free.
+ */
+exports.getMyCourses = async (req, res) => {
+  try {
+    // Resolved from the token, never from a URL parameter, so a student can
+    // only ever read their own registration.
+    const user = await User.findById(req.user.userId).select('email').lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const student = await Student.findOne({ email: user.email }).select('_id').lean();
+    if (!student) {
+      return res.status(404).json({ message: 'No student record is linked to this account.' });
+    }
+
+    // Drafts stay hidden (req 31): an incomplete advising draft must not read
+    // as registered courses, so only assigned/processed rows count.
+    const registered = { status: { $in: ['Active', 'Processed'] } };
+
+    // Registration is rewritten one term at a time, so the newest registered
+    // row says which term is the current one.
+    const latest = await StudentSchedule.findOne({ studentId: student._id, ...registered })
+      .sort({ createdAt: -1 })
+      .select('termId')
+      .lean();
+
+    if (!latest) {
+      return res.status(200).json({ courses: [], totalCreditHours: 0, term: null });
+    }
+
+    const entries = await StudentSchedule.find({ studentId: student._id, termId: latest.termId, ...registered })
+      .select('slotId')
+      .lean();
+
+    const slots = await CourseSlot.find({ _id: { $in: entries.map((entry) => entry.slotId) } })
+      .select('offeringId')
+      .lean();
+
+    const offerings = await CourseOffering.find({
+      _id: { $in: [...new Set(slots.map((slot) => slot.offeringId))] },
+    })
+      .select('courseId')
+      .lean();
+
+    const courseIds = [...new Set(offerings.map((offering) => offering.courseId))];
+    const courses = courseIds.length
+      ? await Course.find({ _id: { $in: courseIds } })
+          .select('code name creditHours')
+          .sort({ code: 1 })
+          .lean()
+      : [];
+
+    const term = await AcademicTerm.findById(latest.termId).select('academicYear season').lean();
+
+    res.status(200).json({
+      courses: courses.map((course) => ({
+        id: String(course._id),
+        code: course.code,
+        name: course.name,
+        creditHours: course.creditHours,
+      })),
+      totalCreditHours: courses.reduce((total, course) => total + (course.creditHours || 0), 0),
+      term: term ? { id: String(term._id), academicYear: term.academicYear, season: term.season } : null,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load your registered courses.', error: error.message });
   }
 };
 
