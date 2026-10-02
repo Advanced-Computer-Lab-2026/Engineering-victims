@@ -16,6 +16,7 @@ const templateRoutes = require('./routes/templateRoutes');
 const walletRoutes = require('./routes/walletRoutes');
 const academicHistoryRoutes = require('./routes/academicHistoryRoutes');
 const weeklyScheduleRoutes = require('./routes/weeklyScheduleRoutes');
+const schedulingPreferenceRoutes = require('./routes/schedulingPreferenceRoutes');
 const { seed } = require('./config/seedData');
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
@@ -42,6 +43,7 @@ app.use('/api/templates', templateRoutes);
 app.use('/api/wallet', walletRoutes);
 app.use('/api/academic-history', academicHistoryRoutes);
 app.use('/api/schedules', weeklyScheduleRoutes);
+app.use('/api/preferences', schedulingPreferenceRoutes);
 app.get('/', (req, res) => res.send('API running...'));
 
 const PORT = process.env.PORT || 5000;
