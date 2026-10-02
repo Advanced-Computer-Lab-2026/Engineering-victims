@@ -5,7 +5,6 @@ import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 import AlertBanner from '../components/ui/AlertBanner';
 import EmptyState from '../components/ui/EmptyState';
-import Badge from '../components/ui/Badge';
 import { Course } from '../lib/types';
 
 interface RegisteredCourse extends Course {
@@ -18,11 +17,14 @@ interface RegisteredCourse extends Course {
 interface MyCoursesResponse {
   courses: RegisteredCourse[];
   totalCreditHours: number;
+  /** The term the registration belongs to, so the page can say which one. */
+  term: { id: string; academicYear: string; season: string } | null;
 }
 
 const MyRegisteredCoursesPage: React.FC = () => {
   const [courses, setCourses] = useState<RegisteredCourse[]>([]);
   const [totalCredits, setTotalCredits] = useState(0);
+  const [term, setTerm] = useState<{ academicYear: string; season: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,6 +37,7 @@ const MyRegisteredCoursesPage: React.FC = () => {
         const response = await apiFetch<MyCoursesResponse>('/api/students/my-courses');
         setCourses(response.courses);
         setTotalCredits(response.totalCreditHours);
+        setTerm(response.term);
       } catch (err) {
         setError((err as ApiError).message);
       } finally {
@@ -49,7 +52,11 @@ const MyRegisteredCoursesPage: React.FC = () => {
     <>
       <PageHeader
         title="My Registered Courses"
-        description="List of courses you are currently registered for this term."
+        description={
+          term
+            ? `Courses you are registered for in ${term.academicYear} ${term.season}.`
+            : 'List of courses you are currently registered for this term.'
+        }
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
       />
 

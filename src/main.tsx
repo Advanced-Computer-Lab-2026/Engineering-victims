@@ -20,6 +20,7 @@ import ScheduleTemplatesPage from './pages/ScheduleTemplatesPage';
 import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
+import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -81,6 +82,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/wallet" element={<WalletPage />} />
           {/* Req 54: an Advising Student's own history. */}
           <Route path="/academic-history" element={<AcademicHistoryPage />} />
+          {/* Req 32: registered courses, credits per course and the total —
+              for every student, Normal and Advising alike. */}
+          <Route path="/my-courses" element={<MyRegisteredCoursesPage />} />
         </Route>
 
         {/* Req 54: Advisors and Coordinators open any advising student's history. */}
