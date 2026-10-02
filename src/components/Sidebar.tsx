@@ -58,7 +58,8 @@ const NAV_ITEMS: NavItem[] = [
   // Req 54: staff reach a student's history from the student lists instead.
   { to: '/academic-history', label: 'Academic History', icon: ScrollText, roles: ['Student'], studentTypes: ['Advising Student'] },
   { to: '/notifications', label: 'Notifications', icon: Bell },
-  { to: '/schedule', label: 'My Schedule', icon: CalendarDays, unavailable: true },
+  // Req 31: staff open a student's schedule from the student lists instead.
+  { to: '/schedule', label: 'My Schedule', icon: CalendarDays, roles: ['Student'] },
   { to: '/profile', label: 'My Profile', icon: Contact },
 ];
 

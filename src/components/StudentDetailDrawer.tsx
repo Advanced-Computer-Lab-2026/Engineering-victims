@@ -79,6 +79,9 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
   const canManage = role === 'Administrator';
   const canAssignAdvisor = (role === 'Coordinator' || role === 'Administrator') && data?.student.studentType === 'Advising Student';
   const canViewHistory = (role === 'Advisor' || role === 'Coordinator') && data?.student.studentType === 'Advising Student';
+  // Req 31: Advisors and Coordinators see Advising Students' schedules; an
+  // Administrator has read-only access to every student's.
+  const canViewSchedule = role === 'Administrator' || canViewHistory;
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -377,6 +380,18 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
             )}
             {/* Req 54: the academic history is kept for Advising Students and
                 is open to Advisors and Coordinators. */}
+            {canViewSchedule && (
+              <CustomButton
+                variant="secondary"
+                size="sm"
+                fullWidth
+                onClick={() => navigate(`/schedule/${student.id}`)}
+                icon={<CalendarDays className="h-4 w-4" aria-hidden />}
+                className="mt-2"
+              >
+                View weekly schedule
+              </CustomButton>
+            )}
             {canViewHistory && (
               <CustomButton
                 variant="secondary"

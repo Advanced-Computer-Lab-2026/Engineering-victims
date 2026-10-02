@@ -19,6 +19,7 @@ import ScheduleTemplatesPage from './pages/ScheduleTemplatesPage';
 import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
+import WeeklySchedulePage from './pages/WeeklySchedulePage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -79,6 +80,20 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/wallet" element={<WalletPage />} />
           {/* Req 54: an Advising Student's own history. */}
           <Route path="/academic-history" element={<AcademicHistoryPage />} />
+          {/* Req 31: a student's own weekly schedule. */}
+          <Route path="/schedule" element={<WeeklySchedulePage />} />
+        </Route>
+
+        {/* Req 31: staff open a student's schedule read-only; the API limits
+            Advisors and Coordinators to Advising Students. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Advisor', 'Coordinator', 'Administrator']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/schedule/:studentId" element={<WeeklySchedulePage />} />
         </Route>
 
         {/* Req 54: Advisors and Coordinators open any advising student's history. */}
