@@ -153,21 +153,36 @@ const DashboardPage: React.FC = () => {
             </button>
           </li>
           <li>
-            <div
-              aria-disabled="true"
-              className="w-full cursor-not-allowed rounded-xl border border-slate-800/80 bg-slate-900/30 p-4"
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                <CalendarDays className="h-4 w-4" aria-hidden />
-                My Schedule
-                <span className="rounded-full bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                  Soon
+            {/* Req 31 now serves /schedule, so students get a live shortcut;
+                staff open a student's schedule from the student lists. */}
+            {user?.role === 'Student' ? (
+              <button
+                type="button"
+                onClick={() => navigate('/schedule')}
+                className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-sky-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <CalendarDays className="h-4 w-4 text-sky-400" aria-hidden />
+                  My Schedule
                 </span>
-              </span>
-              <span className="mt-1 block text-xs text-slate-600">
-                View your weekly timetable once scheduling is in place.
-              </span>
-            </div>
+                <span className="mt-1 block text-xs text-slate-400">
+                  View your weekly timetable for the current term.
+                </span>
+              </button>
+            ) : (
+              <div
+                aria-disabled="true"
+                className="w-full cursor-not-allowed rounded-xl border border-slate-800/80 bg-slate-900/30 p-4"
+              >
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+                  <CalendarDays className="h-4 w-4" aria-hidden />
+                  My Schedule
+                </span>
+                <span className="mt-1 block text-xs text-slate-600">
+                  Staff open a student's schedule from the Students list.
+                </span>
+              </div>
+            )}
           </li>
         </ul>
       </Card>
