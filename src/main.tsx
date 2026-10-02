@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
+import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/RouteGuards';
 import LoginPage from './pages/auth/LoginPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
@@ -21,11 +22,13 @@ import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
 import WeeklySchedulePage from './pages/WeeklySchedulePage';
 import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
+import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
       <Routes>
         <Route path="/" element={<LoginPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -81,6 +84,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/wallet" element={<WalletPage />} />
           {/* Req 54: an Advising Student's own history. */}
           <Route path="/academic-history" element={<AcademicHistoryPage />} />
+          {/* Req 32: registered courses, credits per course and the total —
+              for every student, Normal and Advising alike. */}
+          <Route path="/my-courses" element={<MyRegisteredCoursesPage />} />
           {/* Req 31: a student's own weekly schedule. */}
           <Route path="/schedule" element={<WeeklySchedulePage />} />
           {/* Req 57: Advising Students' scheduling preferences. */}
@@ -137,5 +143,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 );

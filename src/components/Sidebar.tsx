@@ -55,6 +55,8 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/offerings', label: 'Course Offerings', icon: Layers, roles: ['Administrator'] },
   // Req 89: Normal Students have no wallet, so the item is hidden from them.
   { to: '/wallet', label: 'My Wallet', icon: Wallet, roles: ['Student'], studentTypes: ['Advising Student'] },
+  // Req 32: both student types see their own registered courses and credits.
+  { to: '/my-courses', label: 'My Registered Courses', icon: BookOpen, roles: ['Student'] },
   // Req 54: staff reach a student's history from the student lists instead.
   { to: '/academic-history', label: 'Academic History', icon: ScrollText, roles: ['Student'], studentTypes: ['Advising Student'] },
   // Req 57: only Advising Students have their schedule built by an Advisor.

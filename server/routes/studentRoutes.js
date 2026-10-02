@@ -18,6 +18,9 @@ router.get('/', ...directory, studentController.listStudents);
 router.get('/advisors', ...staffOnly, studentController.listAdvisors);
 // Declared before '/:id' so "stats" is not swallowed as an ObjectId.
 router.get('/stats', ...staffOnly, studentController.getStats);
+// Req 32: a student's own registered courses. Declared before '/:id' so
+// "my-courses" is never read as an ObjectId.
+router.get('/my-courses', authenticate, requireRole('Student'), studentController.getMyCourses);
 router.patch(
   '/:id/advisor',
   ...staffOnly,
