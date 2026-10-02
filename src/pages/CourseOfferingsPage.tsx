@@ -24,6 +24,7 @@ const CourseOfferingsPage: React.FC = () => {
   const [offerings, setOfferings] = useState<CourseOffering[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Data for the Offering Drawer
@@ -60,7 +61,7 @@ const CourseOfferingsPage: React.FC = () => {
 
     try {
       const response = await courseOfferingService.getOfferingsByTerm(selectedTerm);
-      setOfferings(response.offerings);
+      setOfferings(response.offerings ?? []);
     } catch (err) {
       setError((err as ApiError).message);
     } finally {
@@ -86,7 +87,14 @@ const CourseOfferingsPage: React.FC = () => {
     }
   };
 
-  const handleSaved = () => {
+  const handleSaved = (termId?: string, message?: string) => {
+    if (message) setNotice(message);
+    // Land the filter on the offering's term so the row it just saved is on
+    // screen; changing the filter reloads through the effect above.
+    if (termId && termId !== selectedTerm) {
+      setSelectedTerm(termId);
+      return;
+    }
     loadOfferings(true);
   };
 
@@ -103,6 +111,7 @@ const CourseOfferingsPage: React.FC = () => {
             onClick={() => {
               setSelectedOffering(null);
               setSelectedSlots([]);
+              setNotice(null);
               setDrawerMode('create');
             }}
             icon={<Plus className="h-4 w-4" aria-hidden />}
@@ -139,6 +148,14 @@ const CourseOfferingsPage: React.FC = () => {
         </div>
       )}
 
+      {notice && (
+        <div className="mb-4">
+          <AlertBanner tone="success" onDismiss={() => setNotice(null)}>
+            {notice}
+          </AlertBanner>
+        </div>
+      )}
+
       {isLoading ? (
         <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
@@ -170,11 +187,17 @@ const CourseOfferingsPage: React.FC = () => {
                 {offerings.map((offering) => (
                   <tr key={offering.id} className="group transition-colors hover:bg-slate-800/40">
                     <td className="px-4 py-3">
+                      {/* A deleted course leaves a null ref: `typeof null` is
+                          'object', so the guard must check truthiness first. */}
                       <div className="font-medium text-slate-100">
-                        {typeof offering.courseId === 'object' ? offering.courseId.name : 'Unknown'}
+                        {offering.courseId && typeof offering.courseId === 'object'
+                          ? offering.courseId.name
+                          : 'Unknown course'}
                       </div>
                       <div className="text-xs text-slate-500 font-mono">
-                        {typeof offering.courseId === 'object' ? offering.courseId.code : 'N/A'}
+                        {offering.courseId && typeof offering.courseId === 'object'
+                          ? offering.courseId.code
+                          : 'N/A'}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -187,7 +210,7 @@ const CourseOfferingsPage: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-slate-300 text-xs">
-                      {offering.eligibleMajors.join(', ') || 'All'}
+                      {offering.eligibleMajors?.join(', ') || 'All'}
                     </td>
                     <td className="px-4 py-3 text-right">
                       <CustomButton

@@ -56,4 +56,19 @@ const courseSlotSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+/** Readable names for the paths, so errors say "Instructor ID", not `instructorId`. */
+const FIELD_LABELS = {
+  offeringId: 'Offering',
+  instructorId: 'Instructor',
+  slotType: 'Slot type',
+  groupNumber: 'Group number',
+  dayOfWeek: 'Day',
+  startTime: 'Start time',
+  endTime: 'End time',
+  roomId: 'Room',
+  maxCapacity: 'Max capacity',
+  assignedCount: 'Assigned students',
+};
+
 module.exports = mongoose.model('CourseSlot', courseSlotSchema);
+module.exports.FIELD_LABELS = FIELD_LABELS;

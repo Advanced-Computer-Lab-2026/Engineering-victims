@@ -1,10 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  BookOpen,
-  CalendarDays,
-  Clock,
-  Eye,
-  Layers,
   Pencil,
   Plus,
   Save,
@@ -13,17 +8,21 @@ import {
 } from 'lucide-react';
 import { ApiError } from '../lib/api';
 import { courseOfferingService } from '../lib/courseOfferingService';
+import { listAdvisors, type Advisor } from '../lib/advisorService';
 import {
+  COURSE_MAJORS,
   Course,
+  CourseMajor,
   CourseOffering,
   CourseSlot,
   AcademicTerm,
 } from '../lib/types';
 import AlertBanner from './ui/AlertBanner';
+import Badge from './ui/Badge';
+import CheckboxGroup from './ui/CheckboxGroup';
 import CustomButton from './ui/CustomButton';
 import CustomInput from './ui/CustomInput';
 import Select from './ui/Select';
-import Badge from './ui/Badge';
 
 export type OfferingDrawerMode = 'view' | 'edit' | 'create';
 
@@ -35,15 +34,27 @@ interface OfferingDrawerProps {
   terms: AcademicTerm[];
   onClose: () => void;
   onModeChange: (mode: OfferingDrawerMode) => void;
-  onSaved: () => void;
+  /** Reloads the list; `termId` lands the filter on the offering's term and
+   *  `message` is shown by the page once the drawer is gone. */
+  onSaved: (termId?: string, message?: string) => void;
 }
 
 const emptyOfferingDraft = () => ({
   courseId: '',
   termId: '',
-  publicationStatus: 'Draft' as const,
-  eligibleMajors: [] as string[],
+  // Typed as the full union: editing a Published offering assigns into this.
+  publicationStatus: 'Draft' as CourseOffering['publicationStatus'],
+  eligibleMajors: [] as CourseMajor[],
 });
+
+/** Populated refs come back as objects; the selects need plain ids. */
+const refId = (value: unknown): string => {
+  if (value && typeof value === 'object') {
+    const ref = value as { id?: unknown; _id?: unknown };
+    return String(ref.id ?? ref._id ?? '');
+  }
+  return String(value ?? '');
+};
 
 const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   mode,
@@ -57,9 +68,27 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
 }) => {
   const [offeringDraft, setOfferingDraft] = useState(emptyOfferingDraft());
   const [slotsDraft, setSlotsDraft] = useState<CourseSlot[]>([]);
+  const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Instructors are advisors; the slot form picks one instead of asking for a
+  // User ObjectId nobody can look up.
+  useEffect(() => {
+    if (mode !== 'create' && mode !== 'edit') return;
+    let cancelled = false;
+    listAdvisors()
+      .then((res) => {
+        if (!cancelled) setAdvisors(res.advisors);
+      })
+      .catch((err) => {
+        if (!cancelled) setError((err as ApiError).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
 
   useEffect(() => {
     setError(null);
@@ -69,12 +98,19 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
       setSlotsDraft([]);
     } else if (mode === 'edit' && offering) {
       setOfferingDraft({
-        courseId: typeof offering.courseId === 'object' ? offering.courseId.id : offering.courseId,
-        termId: offering.termId as string,
+        courseId: refId(offering.courseId),
+        termId: refId(offering.termId),
         publicationStatus: offering.publicationStatus,
-        eligibleMajors: [...offering.eligibleMajors],
+        eligibleMajors: [...offering.eligibleMajors] as CourseMajor[],
       });
-      setSlotsDraft([...slots]);
+      // Populated refs arrive as objects; the inputs need plain ids.
+      setSlotsDraft(
+        slots.map((slot) => ({
+          ...slot,
+          offeringId: refId(slot.offeringId),
+          instructorId: refId(slot.instructorId),
+        }))
+      );
     }
   }, [mode, offering, slots]);
 
@@ -109,9 +145,32 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
     );
   };
 
+  /** Instructors are advisors. A slot can still point at someone who left the
+   *  directory, so keep that id selectable rather than silently blanking it. */
+  const instructorOptions = (current: string) => {
+    const options = advisors.map((advisor) => ({
+      value: advisor._id,
+      label: `${advisor.fullName} (${advisor.email})${advisor.isActive ? '' : ' — inactive'}`,
+    }));
+    if (current && !options.some((option) => option.value === current)) {
+      options.push({ value: current, label: 'Unknown instructor' });
+    }
+    return options;
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
+
+    // The server would only answer with a cast error; say exactly what is missing.
+    const missing: string[] = [];
+    if (!offeringDraft.courseId) missing.push('a course');
+    if (!offeringDraft.termId) missing.push('a term');
+    if (missing.length > 0) {
+      setError(`Select ${missing.join(' and ')} before saving.`);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -123,16 +182,18 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
           }
         }
         setNotice('Offering and slots updated successfully.');
+        onSaved(offeringDraft.termId);
+        onModeChange('view');
       } else {
         // Req 23: Create Offering and its slots
-        const res = await courseOfferingService.createOffering({
+        await courseOfferingService.createOffering({
           ...offeringDraft,
           slots: slotsDraft
         });
-        setNotice('New offering and slots created.');
+        // Nothing to show once it exists: close, and let the page confirm it.
+        onSaved(offeringDraft.termId, 'New offering and slots created.');
+        onClose();
       }
-      onSaved();
-      onModeChange('view');
     } catch (err) {
       setError((err as ApiError).message);
     } finally {
@@ -150,7 +211,11 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
               {mode === 'create' ? 'New Offering' : mode === 'edit' ? 'Edit Offering' : 'Offering Details'}
             </h2>
             <p className="mt-0.5 truncate text-sm text-slate-400">
-              {offering ? (typeof offering.courseId === 'object' ? offering.courseId.code : offering.courseId) : 'Configure a new course offering'}
+              {offering
+                ? offering.courseId && typeof offering.courseId === 'object'
+                  ? offering.courseId.code
+                  : 'Course no longer exists'
+                : 'Configure a new course offering'}
             </p>
           </div>
           <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
@@ -171,7 +236,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                 </div>
                 <div className="flex flex-col">
                   <dt className="text-slate-500">Eligible Majors</dt>
-                  <dd className="text-slate-200">{offering.eligibleMajors.join(', ') || 'All'}</dd>
+                  <dd className="text-slate-200">{offering.eligibleMajors?.join(', ') || 'All'}</dd>
                 </div>
               </div>
             </section>
@@ -212,6 +277,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                   value={offeringDraft.courseId}
                   onChange={(e) => setOfferingDraft(c => ({ ...c, courseId: e.target.value }))}
                   options={courses.map(c => ({ value: c.id, label: `${c.code} - ${c.name}` }))}
+                  placeholder="Select a course..."
                   required
                 />
                 <Select
@@ -219,6 +285,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                   value={offeringDraft.termId}
                   onChange={(e) => setOfferingDraft(c => ({ ...c, termId: e.target.value }))}
                   options={terms.map(t => ({ value: t.id, label: `${t.academicYear} ${t.season}` }))}
+                  placeholder="Select a term..."
                   required
                 />
                 <Select
@@ -227,10 +294,12 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                   onChange={(e) => setOfferingDraft(c => ({ ...c, publicationStatus: e.target.value as any }))}
                   options={[{ value: 'Draft', label: 'Draft' }, { value: 'Published', label: 'Published' }]}
                 />
-                <CustomInput
-                  label="Eligible Majors (comma separated)"
-                  value={offeringDraft.eligibleMajors.join(', ')}
-                  onChange={(e) => setOfferingDraft(c => ({ ...c, eligibleMajors: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
+                <CheckboxGroup
+                  legend="Eligible majors"
+                  options={COURSE_MAJORS}
+                  value={offeringDraft.eligibleMajors}
+                  onChange={(value) => setOfferingDraft(c => ({ ...c, eligibleMajors: value }))}
+                  hint="Leave both unchecked to allow every major."
                 />
               </div>
 
@@ -285,10 +354,13 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                           value={slot.maxCapacity}
                           onChange={(e) => updateSlot(slot.id, { maxCapacity: Number(e.target.value) })}
                         />
-                        <CustomInput
-                          label="Instructor ID"
+                        <Select
+                          label="Instructor"
                           value={slot.instructorId}
                           onChange={(e) => updateSlot(slot.id, { instructorId: e.target.value })}
+                          options={instructorOptions(slot.instructorId)}
+                          placeholder="Select an instructor..."
+                          required
                         />
                         <CustomInput
                           label="Group #"
