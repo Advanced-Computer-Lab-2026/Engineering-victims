@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const jwt = require('jsonwebtoken');
 const { notifyByEmail } = require('../services/notificationService');
+const { sendPasswordResetCode, sendPasswordChanged } = require('../services/mailService');
 
 exports.login = async (req, res) => {
   try {
@@ -29,11 +30,21 @@ exports.forgotPassword = async (req, res) => {
     user.resetPasswordToken = otp;
     user.resetPasswordExpires = expires;
     await user.save();
-    console.log('\n' + '='.repeat(40));
-    console.log('📧 [EMAIL SERVICE] SIMULATED EMAIL');
-    console.log(`To: ${user.email}`);
-    console.log(`Message: Your password reset code is: ${otp}`);
-    console.log('='.repeat(40) + '\n');
+
+    const mail = await sendPasswordResetCode(user.email, otp);
+
+    // The code has to reach the student even when SMTP is unavailable, so the
+    // console fallback stays: without it forgot-password is a dead end in dev.
+    if (!mail.ok) {
+      console.log('\n' + '='.repeat(40));
+      console.log('[EMAIL SERVICE] FALLBACK — SMTP did not accept the message');
+      console.log(`To: ${user.email}`);
+      console.log(`Message: Your password reset code is: ${otp}`);
+      console.log('='.repeat(40) + '\n');
+    }
+
+    // Same response either way: reporting failure would let an attacker probe
+    // which GUC emails have accounts.
     res.status(200).json({ message: 'Password reset code sent to email!' });
   } catch (error) {
     res.status(500).json({ message: 'Internal server error' });
@@ -59,6 +70,9 @@ exports.resetPassword = async (req, res) => {
         'The password for your GUC account was updated. If this was not you, contact your coordinator immediately.',
       link: '/notifications',
     });
+
+    // The same security event, delivered to the inbox as well as the app.
+    await sendPasswordChanged(user.email);
 
     res.status(200).json({ message: 'Password updated successfully!' });
   } catch (error) {

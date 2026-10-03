@@ -1,9 +1,10 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Bell, BookOpen, CalendarDays, CalendarRange, Contact, GraduationCap, LayoutDashboard, Layers, LogOut, ScrollText, SlidersHorizontal, Users, UserCog, Wallet, X } from 'lucide-react';
+import { LogOut, X } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import CustomButton from './ui/CustomButton';
+import { navLabel, visibleNavItems } from '../lib/navigation';
 import type { Role, StudentType } from '../lib/types';
 
 interface SidebarProps {
@@ -13,59 +14,6 @@ interface SidebarProps {
   open: boolean;
   onClose: () => void;
 }
-
-interface NavItem {
-  to: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-  /** Roles allowed to see the item. Omit to show it to everyone. */
-  roles?: Role[];
-  /** Further limits a student item to these student types, e.g. the wallet. */
-  studentTypes?: StudentType[];
-  /** Per-role overrides for `label`, e.g. "Students" is "My Students" for an Advisor. */
-  labels?: Partial<Record<Role, string>>;
-  /**
-   * Marks a destination that is not built yet. It stays visible but inert, so
-   * the nav does not grow dead links that bounce the user to the login page.
-   */
-  unavailable?: boolean;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/coordinator/queue', label: 'Approval Queue', icon: Bell, roles: ['Coordinator', 'Administrator'] },
-  {
-    to: '/students',
-    label: 'Students',
-    // An Advisor is shown their own assigned students, not the whole school.
-    labels: { Advisor: 'My Students' },
-    icon: Users,
-    roles: ['Coordinator', 'Administrator', 'Advisor'],
-  },
-  { to: '/schedule-templates', label: 'Schedule Groups', icon: CalendarRange, roles: ['Coordinator', 'Administrator'] },
-  // Req 50: the school-wide list, next to the Advisor's own roster above.
-  { to: '/advising-students', label: 'All Advising Students', icon: GraduationCap, roles: ['Advisor'] },
-  // Matches the /advisors route guard, so the item is not hidden from a role
-  // that is allowed to open the page.
-  { to: '/advisors', label: 'Advisors', icon: UserCog, roles: ['Coordinator', 'Administrator'] },
-  { to: '/terms', label: 'Academic Terms', icon: CalendarDays, roles: ['Administrator'] },
-  { to: '/courses', label: 'Course Catalogue', icon: BookOpen, roles: ['Administrator'] },
-  // The route existed with no nav entry, so the offerings seeded for each term
-  // were only reachable by typing the URL.
-  { to: '/offerings', label: 'Course Offerings', icon: Layers, roles: ['Administrator'] },
-  // Req 89: Normal Students have no wallet, so the item is hidden from them.
-  { to: '/wallet', label: 'My Wallet', icon: Wallet, roles: ['Student'], studentTypes: ['Advising Student'] },
-  // Req 32: both student types see their own registered courses and credits.
-  { to: '/my-courses', label: 'My Registered Courses', icon: BookOpen, roles: ['Student'] },
-  // Req 54: staff reach a student's history from the student lists instead.
-  { to: '/academic-history', label: 'Academic History', icon: ScrollText, roles: ['Student'], studentTypes: ['Advising Student'] },
-  // Req 57: only Advising Students have their schedule built by an Advisor.
-  { to: '/preferences', label: 'Scheduling Preferences', icon: SlidersHorizontal, roles: ['Student'], studentTypes: ['Advising Student'] },
-  { to: '/notifications', label: 'Notifications', icon: Bell },
-  // Req 31: staff open a student's schedule from the student lists instead.
-  { to: '/schedule', label: 'My Schedule', icon: CalendarDays, roles: ['Student'] },
-  { to: '/profile', label: 'My Profile', icon: Contact },
-];
 
 const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClose }) => {
   const navigate = useNavigate();
@@ -114,13 +62,9 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
         </div>
 
         <nav className="flex-1 space-y-1 overflow-y-auto px-4 pb-4">
-          {NAV_ITEMS.filter(
-            (item) =>
-              (!item.roles || (role && item.roles.includes(role))) &&
-              (!item.studentTypes || (studentType && item.studentTypes.includes(studentType)))
-          ).map((item) => {
+          {visibleNavItems(role, studentType).map((item) => {
             const Icon = item.icon;
-            const label = (role && item.labels?.[role]) || item.label;
+            const label = navLabel(item, role);
             const baseClasses =
               'flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all';
 

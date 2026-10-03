@@ -1,4 +1,4 @@
-<h1 align="center">🎓 University Schedule Management System</h1>
+<h1 align="center">University Schedule Management System</h1>
 
 <p align="center">
   <em>A full-stack MERN platform for managing university schedules, advising workflows, course offerings, and academic finances.</em>
@@ -19,7 +19,7 @@
 
 ---
 
-## 📖 Table of Contents
+## Table of Contents
 
 - [Overview](#-overview)
 - [Motivation](#-motivation)
@@ -40,7 +40,7 @@
 
 ---
 
-## 🌍 Overview
+## Overview
 
 The **University Schedule Management System** is a full-stack web application that centralizes how universities handle course registration, academic advising, schedule building, and student finances.
 
@@ -50,14 +50,14 @@ It replaces the fragmented mix of spreadsheets, email threads, and manual adviso
 
 | Role | What they get |
 |---|---|
-| 🎓 **Student** | Weekly schedule, course swaps, slot-change requests, wallet, payments |
-| 🧑‍🏫 **Advisor** | Assigned-student roster ("My Students"), draft schedule builder, validation engine, graduation planning |
-| 🗂️ **Coordinator** | Review queues, approval workflows, financial oversight |
-| 🛡️ **Administrator** | Course catalogue, offerings, terms, user management |
+| **Student** | Weekly schedule, course swaps, slot-change requests, wallet, payments |
+| **Advisor** | Assigned-student roster ("My Students"), draft schedule builder, validation engine, graduation planning |
+| **Coordinator** | Review queues, approval workflows, financial oversight |
+| **Administrator** | Course catalogue, offerings, terms, user management |
 
 ---
 
-## 🎯 Motivation
+## Motivation
 
 Universities manage thousands of students across multiple faculties, majors, and semesters. Registration, advising, and scheduling are typically spread across disconnected tools — causing mistakes, delays, and endless back-and-forth between students and advisors.
 
@@ -73,7 +73,7 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 | Login | Weekly Schedule |
 |---|---|
@@ -87,11 +87,11 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 |---|
 | ![Dashboard](./docs/screenshots/dashboard.png) |
 
-> 📹 A short screen recording of the full flow is available at [`./docs/demo.mp4`](./docs/demo.mp4).
+> A short screen recording of the full flow is available at [`./docs/demo.mp4`](./docs/demo.mp4).
 
 ---
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 <p align="left">
   <a href="https://skillicons.dev">
@@ -100,42 +100,42 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 </p>
 
 ### Frontend
-- ⚛️ **React** — component-based UI
-- ⚡ **Vite** — fast dev server & bundler
-- 🟦 **TypeScript** — type safety across the client
-- 🎨 **Tailwind CSS** — utility-first styling
-- 🅱️ **Bootstrap** — grid & responsive helpers
-- 💅 **styled-components** — scoped component styling
-- 🌐 **HTML5 + CSS3** — semantic markup, custom theming
+- **React** — component-based UI
+- **Vite** — fast dev server & bundler
+- **TypeScript** — type safety across the client
+- **Tailwind CSS** — utility-first styling
+- **Bootstrap** — grid & responsive helpers
+- **styled-components** — scoped component styling
+- **HTML5 + CSS3** — semantic markup, custom theming
 
 ### Backend
-- 🟢 **Node.js** — runtime
-- 🚂 **Express.js** — REST API
-- 🔐 **JWT + bcrypt** — authentication & password hashing
-- ✅ **Zod / express-validator** — request validation
+- **Node.js** — runtime
+- **Express.js** — REST API
+- **JWT + bcrypt** — authentication & password hashing
+- **Zod / express-validator** — request validation
 
 ### Database
-- 🍃 **MongoDB** — document store
-- 🧭 **Mongoose** — ODM, schemas, transactions
+- **MongoDB** — document store
+- **Mongoose** — ODM, schemas, transactions
 
 ### Tooling
-- 🐙 **Git + GitHub** — version control, PRs, protected `main`
-- 🧪 **Postman** — API testing collection
-- 🧪 **Jest + Supertest** — unit & integration tests
-- 💻 **VS Code** — editor
+- **Git + GitHub** — version control, PRs, protected `main`
+- **Postman** — API testing collection
+- **Jest + Supertest** — unit & integration tests
+- **VS Code** — editor
 
 ---
 
-## ✨ Features
+## Features
 
-### 🔐 Authentication & Users
+### Authentication & Users
 - GUC email + password login (no sign-up)
 - Role-based access control (Student, Advisor, Coordinator, Administrator)
 - One-time password reset via email
 - Role-scoped profile views
 - In-app notifications with mark-as-read
 
-### 🗂️ Academic Administration
+### Academic Administration
 - Course catalogue CRUD (code, name, credits, type, faculty/major, prerequisites)
 - CSV bulk import with row-level validation and atomic rollback
 - Academic term creation with registration/advising deadlines
@@ -144,7 +144,7 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Publish/unpublish offerings
 - Standard schedule template creation per major/semester/group
 
-### 🗓️ Scheduling
+### Scheduling
 - Weekly calendar view (course code, name, slots, rooms, instructors)
 - Registered courses with credit hours
 - Slot details per course
@@ -153,7 +153,7 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Swap request submission, completion, withdrawal, expiry
 - Slot-change requests with advisor/coordinator approval
 
-### 🧑‍🏫 Advising Workflow
+### Advising Workflow
 - Advisor assignment and reassignment
 - Draft schedule creation with preferences
 - Mandatory course selection & removal requests
@@ -162,20 +162,20 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Graduation plan builder with prerequisite ordering
 - Exit exam request flow
 
-### 💸 Financial
+### Financial
 - Wallet balance and transaction history
 - Extra-hours request → approval → settlement
 - Pay now (wallet or sandbox gateway) or defer to installment
 - Refund and cancellation flow
 - Financial records list, search, filter, export
 
-### 📊 Reporting & Audit
+### Reporting & Audit
 - Coordinator pending-work dashboard
 - Schedule activity history (auto-recorded)
 - Search, filter, export audit logs
 - Notifications for every workflow event
 
-### 👥 Student Directory (Coordinator / Administrator / Advisor)
+### Student Directory (Coordinator / Administrator / Advisor)
 - Every GUC student with their workflow status, blocking step and last update
 - Search by student ID, full name or GUC email
 - Filter by type, advisor, major, semester, standing, status, blocking step, account
@@ -188,13 +188,13 @@ The result is faster advising, fewer errors, and complete visibility for everyon
   directory statistics and the advisor dropdown stay Coordinator/Administrator
   only.
 
-### 📅 Integrations
+### Integrations
 - Third-party calendar sync via OAuth (Google / Outlook)
-- Email notifications
+- Email notifications over Gmail SMTP (reset codes, password changes, advisor add/remove)
 
 ---
 
-## 🗂️ Project Structure
+## Project Structure
 
 ```text
 university-schedule-management/
@@ -227,7 +227,7 @@ university-schedule-management/
 └── README.md
 ```
 
-## 🚀 Installation
+## Installation
 
 ```bash
 # 1. Install dependencies for the frontend and the backend
@@ -242,7 +242,7 @@ npm run setup
 `npm run setup` never overwrites existing files. To point at MongoDB Atlas instead
 of a local database, edit `MONGODB_URI` in `server/.env`.
 
-## ▶️ Running the app
+## Running the app
 
 The client and server are two separate processes:
 
@@ -363,7 +363,7 @@ server is proxying to an API it cannot route to. This is the same WSL-to-Windows
 networking gap as above. Set `VITE_API_URL` in `.env` to the API's absolute URL so
 the browser calls it directly instead of through the proxy.
 
-## 🔐 Environment Variables
+## Environment Variables
 
 `server/.env`
 
@@ -373,6 +373,8 @@ the browser calls it directly instead of through the proxy.
 | `MONGODB_URI` | `mongodb://127.0.0.1:27017/university_schedule` | Local DB or Atlas `mongodb+srv://` URI |
 | `JWT_SECRET` | generated | Secret used to sign session tokens |
 | `NODE_ENV` | `development` | Runtime mode |
+| `MAIL_USER` | `engineeringvictims1@gmail.com` | Gmail address that sends outbound email |
+| `MAIL_PASS` | — | 16-char Gmail **App Password** (not the account password). Blank disables email |
 
 `.env` (client)
 

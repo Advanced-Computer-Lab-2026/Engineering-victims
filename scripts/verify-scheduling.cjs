@@ -212,11 +212,11 @@ async function run() {
   await mongoose.disconnect();
 
   if (problems.length) {
-    console.error(`\n❌ ${problems.length} problem(s):`);
+    console.error(`\n${problems.length} problem(s):`);
     for (const p of problems) console.error(`  - ${p}`);
     process.exit(1);
   }
-  console.log('\n✅ all scheduling checks passed');
+  console.log('\nall scheduling checks passed');
 }
 
 run().catch((err) => {

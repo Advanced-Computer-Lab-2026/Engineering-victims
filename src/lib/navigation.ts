@@ -1,0 +1,191 @@
+import type { ComponentType } from 'react';
+import {
+  Bell,
+  BookOpen,
+  CalendarDays,
+  CalendarRange,
+  Contact,
+  GraduationCap,
+  LayoutDashboard,
+  Layers,
+  ScrollText,
+  SlidersHorizontal,
+  UserCog,
+  Users,
+  Wallet,
+} from 'lucide-react';
+import type { Role, StudentType } from './types';
+
+/**
+ * The single source of truth for navigation.
+ *
+ * The sidebar and the dashboard "Getting started" grid both read this list, so
+ * a page added here appears in both for exactly the same roles — the dashboard
+ * cannot fall behind the sidebar the way it did when it carried its own copy.
+ *
+ * Rendering stays in the components: this module only describes destinations
+ * and who may see them.
+ */
+export interface NavItem {
+  to: string;
+  label: string;
+  icon: ComponentType<{ className?: string }>;
+  /** One-line explanation shown on the dashboard tile. The sidebar ignores it. */
+  description?: string;
+  /** Roles allowed to see the item. Omit to show it to everyone. */
+  roles?: Role[];
+  /** Further limits a student item to these student types, e.g. the wallet. */
+  studentTypes?: StudentType[];
+  /** Per-role overrides for `label`, e.g. "Students" is "My Students" for an Advisor. */
+  labels?: Partial<Record<Role, string>>;
+  /**
+   * Marks a destination that is not built yet. It stays visible but inert, so
+   * the nav does not grow dead links that bounce the user to the login page.
+   */
+  unavailable?: boolean;
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  {
+    to: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    description: 'Overview and shortcuts for everything your role can reach.',
+  },
+  {
+    to: '/coordinator/queue',
+    label: 'Approval Queue',
+    icon: Bell,
+    roles: ['Coordinator', 'Administrator'],
+    description: 'Work waiting on your decision — reviews, swaps and slot changes.',
+  },
+  {
+    to: '/students',
+    label: 'Students',
+    icon: Users,
+    // An Advisor is shown their own assigned students, not the whole school.
+    labels: { Advisor: 'My Students' },
+    roles: ['Coordinator', 'Administrator', 'Advisor'],
+    description: 'Search, filter and review the scheduling workflow for every student.',
+  },
+  {
+    to: '/schedule-templates',
+    label: 'Schedule Groups',
+    icon: CalendarRange,
+    roles: ['Coordinator', 'Administrator'],
+    description: 'Standard schedule templates per major, semester and group.',
+  },
+  // Req 50: the school-wide list, next to the Advisor's own roster above.
+  {
+    to: '/advising-students',
+    label: 'All Advising Students',
+    icon: GraduationCap,
+    roles: ['Advisor'],
+    description: 'Every advising student in the school, not only the ones assigned to you.',
+  },
+  // Matches the /advisors route guard, so the item is not hidden from a role
+  // that is allowed to open the page.
+  {
+    to: '/advisors',
+    label: 'Advisors',
+    icon: UserCog,
+    roles: ['Coordinator', 'Administrator'],
+    description: 'Add advisors to the advising system or remove them.',
+  },
+  {
+    to: '/terms',
+    label: 'Academic Terms',
+    icon: CalendarDays,
+    roles: ['Administrator'],
+    description: 'Create terms and set registration and advising deadlines.',
+  },
+  {
+    to: '/courses',
+    label: 'Course Catalogue',
+    icon: BookOpen,
+    roles: ['Administrator'],
+    description: 'Course codes, credit hours, types and prerequisites.',
+  },
+  // The route existed with no nav entry, so the offerings seeded for each term
+  // were only reachable by typing the URL.
+  {
+    to: '/offerings',
+    label: 'Course Offerings',
+    icon: Layers,
+    roles: ['Administrator'],
+    description: 'Publish offerings and their lecture, tutorial and lab slots.',
+  },
+  // Req 89: Normal Students have no wallet, so the item is hidden from them.
+  {
+    to: '/wallet',
+    label: 'My Wallet',
+    icon: Wallet,
+    roles: ['Student'],
+    studentTypes: ['Advising Student'],
+    description: 'Balance, transactions and extra-hours requests.',
+  },
+  // Req 32: both student types see their own registered courses and credits.
+  {
+    to: '/my-courses',
+    label: 'My Registered Courses',
+    icon: BookOpen,
+    roles: ['Student'],
+    description: 'Your registered courses and the credit hours behind each one.',
+  },
+  // Req 54: staff reach a student's history from the student lists instead.
+  {
+    to: '/academic-history',
+    label: 'Academic History',
+    icon: ScrollText,
+    roles: ['Student'],
+    studentTypes: ['Advising Student'],
+    description: 'Grades, credit hours and standing, term by term.',
+  },
+  // Req 57: only Advising Students have their schedule built by an Advisor.
+  {
+    to: '/preferences',
+    label: 'Scheduling Preferences',
+    icon: SlidersHorizontal,
+    roles: ['Student'],
+    studentTypes: ['Advising Student'],
+    description: 'Rank the slots your advisor should build your draft around.',
+  },
+  {
+    to: '/notifications',
+    label: 'Notifications',
+    icon: Bell,
+    description: 'Updates from every workflow, ready to mark as read.',
+  },
+  // Req 31: staff open a student's schedule from the student lists instead.
+  {
+    to: '/schedule',
+    label: 'My Schedule',
+    icon: CalendarDays,
+    roles: ['Student'],
+    description: 'Your weekly timetable for the current term.',
+  },
+  {
+    to: '/profile',
+    label: 'My Profile',
+    icon: Contact,
+    description: 'Your account details, role and directory record.',
+  },
+];
+
+/**
+ * The items one account may see, in list order.
+ *
+ * Shared by the sidebar and the dashboard so both stay in step. `role` may be
+ * null while the session is still loading, which hides the role-gated items
+ * rather than briefly flashing them.
+ */
+export const visibleNavItems = (role: Role | null, studentType: StudentType | null = null): NavItem[] =>
+  NAV_ITEMS.filter(
+    (item) =>
+      (!item.roles || (role !== null && item.roles.includes(role))) &&
+      (!item.studentTypes || (studentType !== null && item.studentTypes.includes(studentType)))
+  );
+
+/** The label a given role reads, honouring per-role overrides. */
+export const navLabel = (item: NavItem, role: Role | null): string =>
+  (role !== null && item.labels?.[role]) || item.label;

@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, CalendarDays, Contact, UserX, Users } from 'lucide-react';
+import { Bell, Contact, UserX, Users } from 'lucide-react';
 import { ApiError, apiFetch } from '../lib/api';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
+import { navLabel, visibleNavItems } from '../lib/navigation';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 
@@ -95,95 +96,62 @@ const DashboardPage: React.FC = () => {
       <Card tone="raised" className="mt-6 p-6" sheen>
         <h2 className="text-lg font-bold text-white">Getting started</h2>
         <p className="mt-1 text-sm text-slate-400">
-          Pick a destination from the sidebar. Your access depends on your role.
+          Every page in the sidebar is listed here too. Your access depends on your role.
         </p>
+        {/* Same source as the sidebar, filtered by the same rules, so the two can
+            never disagree about which pages a role may open. The dashboard itself
+            is dropped — you are already standing on it. */}
         <ul className="mt-4 grid gap-3 sm:grid-cols-2">
-          {canManageStudents && (
-            <li>
-              <button
-                type="button"
-                onClick={() => navigate('/students')}
-                className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-indigo-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <Users className="h-4 w-4 text-indigo-400" aria-hidden />
-                  Students
-                </span>
-                <span className="mt-1 block text-xs text-slate-400">
-                  Search, filter and review the scheduling workflow for every student.
-                </span>
-              </button>
-            </li>
-          )}
-          <li>
-            <button
-              type="button"
-              onClick={() => navigate('/profile')}
-              className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-emerald-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400"
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Contact className="h-4 w-4 text-emerald-400" aria-hidden />
-                My Profile
-              </span>
-              <span className="mt-1 block text-xs text-slate-400">
-                Review your student ID, major, standing and assigned advisor.
-              </span>
-            </button>
-          </li>
-          <li>
-            <button
-              type="button"
-              onClick={() => navigate('/notifications')}
-              className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-sky-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-            >
-              <span className="flex items-center gap-2 text-sm font-semibold text-white">
-                <Bell className="h-4 w-4 text-sky-400" aria-hidden />
-                Notifications
-                {!!unreadCount && (
-                  <span className="ml-auto rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-                    {unreadCount > 99 ? '99+' : unreadCount}
-                  </span>
-                )}
-              </span>
-              <span className="mt-1 block text-xs text-slate-400">
-                {unreadCount
-                  ? `${unreadCount} unread — open it to mark them as read.`
-                  : 'Review updates and mark them as read.'}
-              </span>
-            </button>
-          </li>
-          <li>
-            {/* Req 31 now serves /schedule, so students get a live shortcut;
-                staff open a student's schedule from the student lists. */}
-            {user?.role === 'Student' ? (
-              <button
-                type="button"
-                onClick={() => navigate('/schedule')}
-                className="w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:border-sky-500 hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-400"
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold text-white">
-                  <CalendarDays className="h-4 w-4 text-sky-400" aria-hidden />
-                  My Schedule
-                </span>
-                <span className="mt-1 block text-xs text-slate-400">
-                  View your weekly timetable for the current term.
-                </span>
-              </button>
-            ) : (
-              <div
-                aria-disabled="true"
-                className="w-full cursor-not-allowed rounded-xl border border-slate-800/80 bg-slate-900/30 p-4"
-              >
-                <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-                  <CalendarDays className="h-4 w-4" aria-hidden />
-                  My Schedule
-                </span>
-                <span className="mt-1 block text-xs text-slate-600">
-                  Staff open a student's schedule from the Students list.
-                </span>
-              </div>
-            )}
-          </li>
+          {visibleNavItems(user?.role ?? null, user?.studentType ?? null)
+            .filter((item) => item.to !== '/dashboard')
+            .map((item, index) => {
+              const Icon = item.icon;
+              const tone = TONES[index % TONES.length];
+
+              if (item.unavailable) {
+                return (
+                  <li key={item.to}>
+                    <div
+                      aria-disabled="true"
+                      className="w-full cursor-not-allowed rounded-xl border border-slate-800/80 bg-slate-900/30 p-4"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+                        <Icon className="h-4 w-4" aria-hidden />
+                        {navLabel(item, user?.role ?? null)}
+                      </span>
+                      <span className="mt-1 block text-xs text-slate-600">
+                        Not built yet. It stays listed so the navigation does not lie about what exists.
+                      </span>
+                    </div>
+                  </li>
+                );
+              }
+
+              return (
+                <li key={item.to}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(item.to)}
+                    className={`w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 ${tone.ring}`}
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <Icon className={`h-4 w-4 ${tone.icon}`} aria-hidden />
+                      {navLabel(item, user?.role ?? null)}
+                      {item.to === '/notifications' && !!unreadCount && (
+                        <span className="ml-auto rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                          {unreadCount > 99 ? '99+' : unreadCount}
+                        </span>
+                      )}
+                    </span>
+                    <span className="mt-1 block text-xs text-slate-400">
+                      {item.to === '/notifications' && unreadCount
+                        ? `${unreadCount} unread — open it to mark them as read.`
+                        : item.description}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
         </ul>
       </Card>
     </>
@@ -198,6 +166,18 @@ interface StatCardProps {
   tone: 'indigo' | 'sky' | 'amber' | 'rose';
   onClick?: () => void;
 }
+
+/**
+ * Hover accents for the dashboard tiles, cycled by position rather than carried
+ * per nav item — the destination list is shared with the sidebar, which has no
+ * colour of its own.
+ */
+const TONES = [
+  { icon: 'text-indigo-400', ring: 'hover:border-indigo-500 focus-visible:ring-indigo-400' },
+  { icon: 'text-sky-400', ring: 'hover:border-sky-500 focus-visible:ring-sky-400' },
+  { icon: 'text-emerald-400', ring: 'hover:border-emerald-500 focus-visible:ring-emerald-400' },
+  { icon: 'text-amber-400', ring: 'hover:border-amber-500 focus-visible:ring-amber-400' },
+];
 
 const TONE_CLASSES: Record<StatCardProps['tone'], string> = {
   indigo: 'bg-indigo-500/15 text-indigo-400',
