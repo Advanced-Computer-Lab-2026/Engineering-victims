@@ -22,11 +22,21 @@ import {
 import AlertBanner from './ui/AlertBanner';
 import Badge from './ui/Badge';
 import CheckboxGroup from './ui/CheckboxGroup';
+import ConfirmDialog from './ui/ConfirmDialog';
 import CustomButton from './ui/CustomButton';
 import CustomInput from './ui/CustomInput';
 import Select from './ui/Select';
 
 export type OfferingDrawerMode = 'view' | 'edit' | 'create';
+
+/** A destructive action held back until the drawer's own dialog is confirmed. */
+interface ConfirmRequest {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone: 'warning' | 'danger';
+  action: () => Promise<void>;
+}
 
 interface OfferingDrawerProps {
   mode: OfferingDrawerMode | null;
@@ -78,6 +88,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   // Instructors are advisors; the slot form picks one instead of asking for a
   // User ObjectId nobody can look up.
@@ -164,19 +175,13 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
     return options;
   };
 
-  const handleTogglePublication = async () => {
-    if (!offering) return;
-    const isUnpublishing = offering.publicationStatus === 'Published';
-    if (isUnpublishing && !window.confirm(
-      'Unpublish this offering? It will no longer be available for scheduling, graduation planning, or slot-change requests.'
-    )) return;
-
+  /** Runs an action behind the shared saving flag. Failures land in the drawer's
+   *  error banner instead of a browser alert. */
+  const runAction = async (action: () => Promise<void>) => {
     setError(null);
     setIsSaving(true);
     try {
-      const result = await courseOfferingService.togglePublishStatus(offering.id);
-      onPublicationChanged(result.offering.publicationStatus);
-      onSaved(refId(offering.termId), result.message);
+      await action();
     } catch (err) {
       setError((err as ApiError).message);
     } finally {
@@ -184,44 +189,73 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
     }
   };
 
-  const handleDeleteOffering = async () => {
+  /** Keeps the dialog open (and spinning) while its action runs, then closes it
+   *  so the outcome — a banner, or the drawer closing — shows underneath. */
+  const confirmAndRun = async () => {
+    if (!confirmRequest) return;
+    const { action } = confirmRequest;
+    await runAction(action);
+    setConfirmRequest(null);
+  };
+
+  const togglePublication = async () => {
+    if (!offering) return;
+    const result = await courseOfferingService.togglePublishStatus(offering.id);
+    onPublicationChanged(result.offering.publicationStatus);
+    onSaved(refId(offering.termId), result.message);
+  };
+
+  const handleTogglePublication = async () => {
+    if (!offering) return;
+    if (offering.publicationStatus === 'Published') {
+      setConfirmRequest({
+        title: 'Unpublish this offering?',
+        message:
+          'It will no longer be available for scheduling, graduation planning, or slot-change requests.',
+        confirmLabel: 'Unpublish',
+        tone: 'warning',
+        action: togglePublication,
+      });
+      return;
+    }
+    await runAction(togglePublication);
+  };
+
+  const deleteOffering = async () => {
+    if (!offering) return;
+    const result = await courseOfferingService.deleteOffering(offering.id);
+    onSaved(refId(offering.termId), result.message);
+    onClose();
+  };
+
+  const handleDeleteOffering = () => {
     if (!offering) return;
     const courseLabel = offering.courseId && typeof offering.courseId === 'object'
       ? `${offering.courseId.code} ${offering.courseId.name}`
       : 'this offering';
-    if (!window.confirm(
-      `Delete ${courseLabel} and all of its slots? This is only allowed when no students are assigned.`
-    )) return;
-
-    setError(null);
-    setIsSaving(true);
-    try {
-      const result = await courseOfferingService.deleteOffering(offering.id);
-      onSaved(refId(offering.termId), result.message);
-      onClose();
-    } catch (err) {
-      setError((err as ApiError).message);
-    } finally {
-      setIsSaving(false);
-    }
+    setConfirmRequest({
+      title: `Delete ${courseLabel}?`,
+      message: 'All of its slots go with it. This is only allowed when no students are assigned.',
+      confirmLabel: 'Delete Offering',
+      tone: 'danger',
+      action: deleteOffering,
+    });
   };
 
-  const handleDeleteSlot = async (slot: CourseSlot) => {
-    if (!window.confirm(
-      `Delete this ${slot.slotType.toLowerCase()} group ${slot.groupNumber}? This is only allowed when no students are assigned.`
-    )) return;
+  const deleteSlot = async (slot: CourseSlot) => {
+    const result = await courseOfferingService.deleteSlot(slot.id);
+    onSlotDeleted(slot.id);
+    onSaved(refId(offering?.termId), result.message);
+  };
 
-    setError(null);
-    setIsSaving(true);
-    try {
-      const result = await courseOfferingService.deleteSlot(slot.id);
-      onSlotDeleted(slot.id);
-      onSaved(refId(offering?.termId), result.message);
-    } catch (err) {
-      setError((err as ApiError).message);
-    } finally {
-      setIsSaving(false);
-    }
+  const handleDeleteSlot = (slot: CourseSlot) => {
+    setConfirmRequest({
+      title: `Delete this ${slot.slotType.toLowerCase()} group ${slot.groupNumber}?`,
+      message: 'This is only allowed when no students are assigned.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+      action: () => deleteSlot(slot),
+    });
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -493,6 +527,17 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
           </form>
         )}
       </aside>
+
+      <ConfirmDialog
+        open={confirmRequest !== null}
+        title={confirmRequest?.title ?? ''}
+        message={confirmRequest?.message ?? ''}
+        confirmLabel={confirmRequest?.confirmLabel ?? 'Confirm'}
+        tone={confirmRequest?.tone ?? 'danger'}
+        isLoading={isSaving}
+        onConfirm={confirmAndRun}
+        onCancel={() => setConfirmRequest(null)}
+      />
     </div>
   );
 };
