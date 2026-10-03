@@ -420,6 +420,139 @@ exports.getMyCourses = async (req, res) => {
   }
 };
 
+/**
+ * Req 33: select a registered course and view its assigned lecture, tutorial
+ * and lab details. Shows the specific slots (day, time, room, instructor) for
+ * each component type the student is enrolled in for that course.
+ */
+exports.getMyCourseDetails = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    if (!mongoose.isValidObjectId(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID.' });
+    }
+
+    // Resolved from the token, never from a URL parameter
+    const user = await User.findById(req.user.userId).select('email').lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const student = await Student.findOne({ email: user.email }).select('_id').lean();
+    if (!student) {
+      return res.status(404).json({ message: 'No student record is linked to this account.' });
+    }
+
+    // Find the course details first
+    const course = await Course.findById(courseId).select('code name creditHours courseType').lean();
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found.' });
+    }
+
+    // Only show active/processed registrations (same visibility as req 32)
+    const registered = { status: { $in: ['Active', 'Processed'] } };
+
+    // Get the current term from the latest registration
+    const latest = await StudentSchedule.findOne({ studentId: student._id, ...registered })
+      .sort({ createdAt: -1 })
+      .select('termId')
+      .lean();
+
+    if (!latest) {
+      return res.status(404).json({ message: 'You are not registered for any courses this term.' });
+    }
+
+    // Find all schedule entries for this student in the current term
+    const entries = await StudentSchedule.find({ studentId: student._id, termId: latest.termId, ...registered })
+      .select('slotId')
+      .lean();
+
+    // Get all slots for these entries
+    const slots = await CourseSlot.find({ _id: { $in: entries.map((entry) => entry.slotId) } })
+      .populate('instructorId', 'fullName email')
+      .lean();
+
+    // Find offerings that match this course
+    const slotOfferingIds = slots.map((slot) => slot.offeringId);
+    const offerings = await CourseOffering.find({
+      _id: { $in: slotOfferingIds },
+      courseId: courseId,
+    })
+      .select('_id')
+      .lean();
+
+    if (offerings.length === 0) {
+      return res.status(404).json({ message: 'You are not registered for this course this term.' });
+    }
+
+    const offeringIds = offerings.map((offering) => offering._id.toString());
+
+    // Filter slots to only those belonging to offerings of this course
+    const courseSlots = slots.filter((slot) => offeringIds.includes(slot.offeringId.toString()));
+
+    if (courseSlots.length === 0) {
+      return res.status(404).json({ message: 'No slots found for this course in your schedule.' });
+    }
+
+    // Group slots by type and format the response
+    const slotsByType = {
+      Lecture: [],
+      Tutorial: [],
+      Lab: [],
+    };
+
+    courseSlots.forEach((slot) => {
+      const slotData = {
+        id: String(slot._id),
+        slotType: slot.slotType,
+        groupNumber: slot.groupNumber,
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        room: slot.roomId,
+        instructor: slot.instructorId
+          ? {
+              id: String(slot.instructorId._id),
+              fullName: slot.instructorId.fullName,
+              email: slot.instructorId.email,
+            }
+          : null,
+      };
+
+      if (slotsByType[slot.slotType]) {
+        slotsByType[slot.slotType].push(slotData);
+      }
+    });
+
+    // Sort each type by day and time
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    Object.keys(slotsByType).forEach((type) => {
+      slotsByType[type].sort((a, b) => {
+        const dayDiff = dayOrder.indexOf(a.dayOfWeek) - dayOrder.indexOf(b.dayOfWeek);
+        if (dayDiff !== 0) return dayDiff;
+        return a.startTime.localeCompare(b.startTime);
+      });
+    });
+
+    res.status(200).json({
+      course: {
+        id: String(course._id),
+        code: course.code,
+        name: course.name,
+        creditHours: course.creditHours,
+        courseType: course.courseType,
+      },
+      slots: {
+        lectures: slotsByType.Lecture,
+        tutorials: slotsByType.Tutorial,
+        labs: slotsByType.Lab,
+      },
+      totalSlots: courseSlots.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load course details.', error: error.message });
+  }
+};
+
 // Shared with the Advisor's all-advising-students list (req 50), so both lists
 // describe a student with the same fields.
 exports.serialize = serialize;

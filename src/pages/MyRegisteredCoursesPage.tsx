@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { BookOpen, CreditCard, Loader2 } from 'lucide-react';
+import { BookOpen, CreditCard, Loader2, Eye } from 'lucide-react';
 import { ApiError, apiFetch } from '../lib/api';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 import AlertBanner from '../components/ui/AlertBanner';
 import EmptyState from '../components/ui/EmptyState';
+import CustomButton from '../components/ui/CustomButton';
+import CourseDetailDrawer from '../components/CourseDetailDrawer';
 import { Course } from '../lib/types';
 
 interface RegisteredCourse extends Course {
@@ -27,6 +29,8 @@ const MyRegisteredCoursesPage: React.FC = () => {
   const [term, setTerm] = useState<{ academicYear: string; season: string } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
+  const [selectedCourseName, setSelectedCourseName] = useState<string>('');
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -101,6 +105,7 @@ const MyRegisteredCoursesPage: React.FC = () => {
                     <th scope="col" className="px-4 py-3 font-semibold">Course Code</th>
                     <th scope="col" className="px-4 py-3 font-semibold">Course Name</th>
                     <th scope="col" className="px-4 py-3 text-right font-semibold">Credit Hours</th>
+                    <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -109,6 +114,19 @@ const MyRegisteredCoursesPage: React.FC = () => {
                       <td className="px-4 py-3 font-mono font-semibold text-indigo-300">{course.code}</td>
                       <td className="px-4 py-3 text-slate-200">{course.name}</td>
                       <td className="px-4 py-3 text-right text-slate-300">{course.creditHours}</td>
+                      <td className="px-4 py-3 text-right">
+                        <CustomButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedCourseId(course.id);
+                            setSelectedCourseName(`${course.code} - ${course.name}`);
+                          }}
+                          icon={<Eye className="h-4 w-4" />}
+                        >
+                          View Details
+                        </CustomButton>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -116,6 +134,18 @@ const MyRegisteredCoursesPage: React.FC = () => {
             </div>
           </Card>
         </div>
+      )}
+
+      {/* Req 33: Course Detail Drawer */}
+      {selectedCourseId && (
+        <CourseDetailDrawer
+          courseId={selectedCourseId}
+          courseName={selectedCourseName}
+          onClose={() => {
+            setSelectedCourseId(null);
+            setSelectedCourseName('');
+          }}
+        />
       )}
     </>
   );
