@@ -416,3 +416,20 @@ export interface CourseDetailsResponse {
   totalSlots: number;
 }
 
+/** Req 34 — eligible groups for whole-schedule swap. */
+export interface EligibleSwapGroup {
+  studyGroup: string;
+  major: string;
+  semester: number;
+  courseCodes: string[];
+  slotCount: number;
+}
+
+export interface EligibleSwapGroupsResponse {
+  myGroup: string;
+  myCourses: string[];
+  eligibleGroups: EligibleSwapGroup[];
+  term: { id: string; academicYear: string; season: string } | null;
+  message: string;
+}
+

@@ -17,6 +17,8 @@
     "axios": "^1.6.8",
     "bcryptjs": "^3.0.3",
     "clsx": "^2.1.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "lucide-react": "^0.363.0",
     "morgan": "^1.12.1",
     "nodemailer": "^10.0.14",

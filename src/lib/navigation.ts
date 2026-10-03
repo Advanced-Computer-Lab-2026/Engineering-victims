@@ -13,6 +13,7 @@ import {
   UserCog,
   Users,
   Wallet,
+  ArrowRightLeft,
 } from 'lucide-react';
 import type { Role, StudentType } from './types';
 
@@ -131,6 +132,15 @@ export const NAV_ITEMS: NavItem[] = [
     icon: BookOpen,
     roles: ['Student'],
     description: 'Your registered courses and the credit hours behind each one.',
+  },
+  // Req 34: Normal Students can view eligible groups for whole-schedule swap.
+  {
+    to: '/eligible-swap-groups',
+    label: 'Eligible Swap Groups',
+    icon: ArrowRightLeft,
+    roles: ['Student'],
+    studentTypes: ['Normal Student'],
+    description: 'View other groups with the same courses for schedule swapping.',
   },
   // Req 54: staff reach a student's history from the student lists instead.
   {

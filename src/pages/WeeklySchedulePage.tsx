@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, Clock, Coffee, Eye, Loader2, MapPin, RotateCcw, UserRound } from 'lucide-react';
+import { ArrowLeft, CalendarDays, Clock, Coffee, Download, Eye, FileText, Loader2, MapPin, Printer, RotateCcw, UserRound } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
@@ -90,6 +92,381 @@ const WeeklySchedulePage: React.FC = () => {
   const student = data?.student;
   const stage = data?.stage ? STAGE_INFO[data.stage] : null;
 
+  /**
+   * Req 49: Print the schedule using browser print dialog.
+   * Uses CSS media queries to optimize for printing.
+   */
+  const handlePrint = () => {
+    window.print();
+  };
+
+  /**
+   * Req 49: Download the schedule as a professional PDF.
+   * Uses jsPDF to create a well-formatted, paginated PDF document.
+   */
+  const handleDownloadPDF = () => {
+    if (!data || !student) return;
+
+    const doc = new jsPDF({
+      orientation: 'portrait',
+      unit: 'mm',
+      format: 'a4',
+    });
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 15;
+    let yPosition = margin;
+
+    // Helper to add new page if needed
+    const checkPageBreak = (neededSpace: number) => {
+      if (yPosition + neededSpace > pageHeight - margin) {
+        doc.addPage();
+        yPosition = margin;
+        return true;
+      }
+      return false;
+    };
+
+    // === HEADER ===
+    doc.setFillColor(79, 70, 229); // Indigo
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.text('WEEKLY SCHEDULE', pageWidth / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text('GUC University Schedule Management System', pageWidth / 2, 25, { align: 'center' });
+    
+    if (data.term) {
+      doc.text(`${data.term.label}`, pageWidth / 2, 32, { align: 'center' });
+    }
+
+    yPosition = 50;
+
+    // === STUDENT INFO BOX ===
+    doc.setTextColor(0, 0, 0);
+    doc.setFillColor(243, 244, 246); // Light gray
+    doc.roundedRect(margin, yPosition, pageWidth - 2 * margin, 30, 3, 3, 'F');
+    
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(student.fullName, margin + 5, yPosition + 8);
+    
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Student ID: ${student.studentId}`, margin + 5, yPosition + 15);
+    doc.text(`Major: ${student.major}`, margin + 5, yPosition + 21);
+    doc.text(`Semester: ${student.currentSemester}`, margin + 70, yPosition + 21);
+    if (student.studyGroup) {
+      doc.text(`Group: ${student.studyGroup}`, margin + 120, yPosition + 21);
+    }
+
+    yPosition += 40;
+
+    if (data.sessions.length === 0) {
+      checkPageBreak(20);
+      doc.setFontSize(11);
+      doc.text('No sessions scheduled for this term.', margin, yPosition);
+      doc.save(`schedule_${student.studentId}_${data.term?.label.replace(/\s+/g, '_') || 'current'}.pdf`);
+      return;
+    }
+
+    // === SCHEDULE BY DAY ===
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Weekly Schedule', margin, yPosition);
+    yPosition += 8;
+
+    data.days.forEach((day) => {
+      const daySessions = data.sessions.filter((s) => s.dayOfWeek === day);
+      const isDayOff = data.daysOff.includes(day);
+
+      checkPageBreak(15);
+
+      // Day header
+      doc.setFillColor(99, 102, 241); // Indigo
+      doc.rect(margin, yPosition, pageWidth - 2 * margin, 8, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${day}${isDayOff ? ' (Day Off)' : ''}`, margin + 3, yPosition + 5.5);
+      yPosition += 10;
+
+      doc.setTextColor(0, 0, 0);
+
+      if (daySessions.length === 0) {
+        checkPageBreak(8);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'italic');
+        doc.text('No classes', margin + 5, yPosition + 4);
+        yPosition += 8;
+      } else {
+        // Sort sessions by time
+        const sortedSessions = daySessions.sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+        sortedSessions.forEach((session) => {
+          checkPageBreak(18);
+
+          // Session box
+          doc.setDrawColor(200, 200, 200);
+          doc.setLineWidth(0.3);
+          doc.rect(margin + 5, yPosition, pageWidth - 2 * margin - 10, 16);
+
+          // Time and type badge
+          doc.setFontSize(9);
+          doc.setFont('helvetica', 'bold');
+          doc.text(`${session.startTime} - ${session.endTime}`, margin + 8, yPosition + 5);
+          
+          // Type badge
+          const badgeColors: Record<string, [number, number, number]> = {
+            Lecture: [99, 102, 241],    // Indigo
+            Tutorial: [14, 165, 233],   // Sky
+            Lab: [16, 185, 129],        // Emerald
+          };
+          const [r, g, b] = badgeColors[session.slotType] || [100, 100, 100];
+          doc.setFillColor(r, g, b);
+          doc.roundedRect(margin + 55, yPosition + 1.5, 20, 5, 1, 1, 'F');
+          doc.setTextColor(255, 255, 255);
+          doc.setFontSize(7);
+          doc.text(session.slotType, margin + 65, yPosition + 4.5, { align: 'center' });
+
+          // Course info
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text(session.courseCode, margin + 8, yPosition + 10);
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          const courseName = session.courseName.length > 45 ? session.courseName.substring(0, 45) + '...' : session.courseName;
+          doc.text(courseName, margin + 35, yPosition + 10);
+
+          // Details
+          doc.setFontSize(8);
+          doc.setTextColor(80, 80, 80);
+          doc.text(`Room: ${session.room}`, margin + 8, yPosition + 14);
+          doc.text(`Group ${session.groupNumber}`, margin + 40, yPosition + 14);
+          if (session.instructor) {
+            const instructor = session.instructor.length > 30 ? session.instructor.substring(0, 30) + '...' : session.instructor;
+            doc.text(`Instructor: ${instructor}`, margin + 65, yPosition + 14);
+          }
+
+          yPosition += 18;
+        });
+      }
+
+      yPosition += 3;
+    });
+
+    // === SUMMARY TABLE ===
+    checkPageBreak(40);
+    yPosition += 5;
+
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('All Sessions Summary', margin, yPosition);
+    yPosition += 8;
+
+    // Prepare table data
+    const tableData = data.sessions
+      .sort((a, b) => {
+        const dayDiff = data.days.indexOf(a.dayOfWeek) - data.days.indexOf(b.dayOfWeek);
+        if (dayDiff !== 0) return dayDiff;
+        return a.startTime.localeCompare(b.startTime);
+      })
+      .map((session) => [
+        session.courseCode,
+        session.courseName.substring(0, 30),
+        session.slotType,
+        session.dayOfWeek.substring(0, 3),
+        `${session.startTime}-${session.endTime}`,
+        session.room,
+        `G${session.groupNumber}`,
+      ]);
+
+    autoTable(doc, {
+      startY: yPosition,
+      head: [['Code', 'Course', 'Type', 'Day', 'Time', 'Room', 'Group']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [99, 102, 241],
+        textColor: 255,
+        fontSize: 9,
+        fontStyle: 'bold',
+      },
+      bodyStyles: {
+        fontSize: 8,
+        textColor: 50,
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+      columnStyles: {
+        0: { cellWidth: 22 },  // Code
+        1: { cellWidth: 45 },  // Course
+        2: { cellWidth: 20 },  // Type
+        3: { cellWidth: 18 },  // Day
+        4: { cellWidth: 28 },  // Time
+        5: { cellWidth: 22 },  // Room
+        6: { cellWidth: 15 },  // Group
+      },
+      margin: { left: margin, right: margin },
+    });
+
+    // === FOOTER ON LAST PAGE ===
+    const finalY = (doc as any).lastAutoTable.finalY || yPosition;
+    if (finalY < pageHeight - 30) {
+      yPosition = finalY + 10;
+    } else {
+      doc.addPage();
+      yPosition = margin;
+    }
+
+    // Statistics
+    const uniqueCourses = new Set(data.sessions.map((s) => s.courseCode));
+    checkPageBreak(25);
+    
+    doc.setFillColor(243, 244, 246);
+    doc.roundedRect(margin, yPosition, pageWidth - 2 * margin, 20, 3, 3, 'F');
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Statistics', margin + 5, yPosition + 6);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.text(`Total Courses: ${uniqueCourses.size}`, margin + 5, yPosition + 12);
+    doc.text(`Total Sessions: ${data.sessions.length}`, margin + 60, yPosition + 12);
+    if (data.daysOff.length > 0) {
+      doc.text(`Days Off: ${data.daysOff.join(', ')}`, margin + 5, yPosition + 17);
+    }
+
+    yPosition += 25;
+
+    // Generation info
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, margin, yPosition);
+
+    // Save PDF
+    doc.save(`schedule_${student.studentId}_${data.term?.label.replace(/\s+/g, '_') || 'current'}.pdf`);
+  };
+
+  /**
+   * Download as plain text (legacy option)
+   */
+  const handleDownloadText = () => {
+    if (!data || !student) return;
+
+    const lines: string[] = [];
+    
+    // Header
+    lines.push('═'.repeat(80));
+    lines.push(`WEEKLY SCHEDULE - ${student.fullName}`);
+    lines.push('═'.repeat(80));
+    lines.push(`Student ID: ${student.studentId}`);
+    lines.push(`Major: ${student.major} | Semester: ${student.currentSemester}`);
+    if (student.studyGroup) {
+      lines.push(`Study Group: ${student.studyGroup}`);
+    }
+    if (data.term) {
+      lines.push(`Term: ${data.term.label}`);
+      lines.push(`Period: ${new Date(data.term.termStartDate).toLocaleDateString()} - ${new Date(data.term.termEndDate).toLocaleDateString()}`);
+    }
+    lines.push('═'.repeat(80));
+    lines.push('');
+
+    if (data.sessions.length === 0) {
+      lines.push('No sessions scheduled for this term.');
+    } else {
+      // Group by day
+      data.days.forEach((day) => {
+        const daySessions = data.sessions.filter((s) => s.dayOfWeek === day);
+        
+        if (daySessions.length > 0 || data.daysOff.includes(day)) {
+          lines.push('─'.repeat(80));
+          lines.push(`${day.toUpperCase()}${data.daysOff.includes(day) ? ' (Day Off)' : ''}`);
+          lines.push('─'.repeat(80));
+          
+          if (daySessions.length === 0) {
+            lines.push('  No classes');
+          } else {
+            // Sort by time
+            daySessions.sort((a, b) => a.startTime.localeCompare(b.startTime));
+            
+            daySessions.forEach((session) => {
+              lines.push('');
+              lines.push(`  ${session.startTime} - ${session.endTime}`);
+              lines.push(`  ${session.courseCode} - ${session.courseName}`);
+              lines.push(`  ${session.slotType} (Group ${session.groupNumber})`);
+              lines.push(`  Room: ${session.room}`);
+              if (session.instructor) {
+                lines.push(`  Instructor: ${session.instructor}`);
+              }
+            });
+          }
+          lines.push('');
+        }
+      });
+
+      // Summary
+      lines.push('═'.repeat(80));
+      lines.push('SUMMARY');
+      lines.push('═'.repeat(80));
+      
+      // Count unique courses
+      const uniqueCourses = new Set(data.sessions.map((s) => s.courseCode));
+      lines.push(`Total Courses: ${uniqueCourses.size}`);
+      lines.push(`Total Sessions: ${data.sessions.length}`);
+      
+      if (data.daysOff.length > 0) {
+        lines.push(`Days Off: ${data.daysOff.join(', ')}`);
+      }
+      
+      lines.push('');
+      lines.push('─'.repeat(80));
+      lines.push('All Sessions:');
+      lines.push('─'.repeat(80));
+      
+      // List all sessions in a table format
+      const sortedSessions = [...data.sessions].sort((a, b) => {
+        const dayDiff = data.days.indexOf(a.dayOfWeek) - data.days.indexOf(b.dayOfWeek);
+        if (dayDiff !== 0) return dayDiff;
+        return a.startTime.localeCompare(b.startTime);
+      });
+      
+      sortedSessions.forEach((session) => {
+        lines.push(
+          `${session.courseCode.padEnd(12)} | ${session.slotType.padEnd(8)} | ` +
+          `${session.dayOfWeek.padEnd(10)} | ${session.startTime}-${session.endTime} | ` +
+          `${session.room.padEnd(10)} | G${session.groupNumber}`
+        );
+      });
+    }
+
+    lines.push('');
+    lines.push('═'.repeat(80));
+    lines.push(`Generated: ${new Date().toLocaleString()}`);
+    lines.push('GUC University Schedule Management System');
+    lines.push('═'.repeat(80));
+
+    // Create and download file
+    const content = lines.join('\n');
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `schedule_${student.studentId}_${data.term?.label.replace(/\s+/g, '_') || 'current'}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <PageHeader
@@ -111,6 +488,38 @@ const WeeklySchedulePage: React.FC = () => {
               >
                 Back to students
               </CustomButton>
+            )}
+            {/* Req 49: Download and print buttons for processed schedules */}
+            {data?.visible && data.sessions.length > 0 && (
+              <>
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDownloadPDF}
+                  icon={<Download className="h-4 w-4" aria-hidden />}
+                  title="Download schedule as PDF"
+                >
+                  PDF
+                </CustomButton>
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={handleDownloadText}
+                  icon={<FileText className="h-4 w-4" aria-hidden />}
+                  title="Download schedule as text file"
+                >
+                  Text
+                </CustomButton>
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={handlePrint}
+                  icon={<Printer className="h-4 w-4" aria-hidden />}
+                  title="Print schedule"
+                >
+                  Print
+                </CustomButton>
+              </>
             )}
             <CustomButton
               variant="secondary"
