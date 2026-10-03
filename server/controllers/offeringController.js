@@ -133,6 +133,18 @@ const errorStatus = (error) => {
   return error.name === 'ValidationError' || error.name === 'CastError' ? 400 : 500;
 };
 
+const hasActiveOrProcessedSchedules = async (offeringId) => {
+  const slots = await CourseSlot.find({ offeringId }).select('_id');
+  return StudentSchedule.exists({
+    slotId: { $in: slots.map((slot) => slot._id) },
+    status: { $in: ['Active', 'Processed'] },
+  });
+};
+
+const hasAssignedStudents = async (slotIds) => {
+  return Boolean(await StudentSchedule.exists({ slotId: { $in: slotIds } }));
+};
+
 exports.createOffering = async (req, res) => {
   try {
     const { courseId, termId, publicationStatus, eligibleMajors, eligibleSemesters, slots } = req.body;
@@ -218,7 +230,21 @@ exports.getOfferingDetails = async (req, res) => {
       .populate('instructorId', 'fullName email')
       .lean();
 
-    res.status(200).json({ offering: withId(offering), slots: slots.map(withId) });
+    const scheduleCounts = await StudentSchedule.aggregate([
+      { $match: { slotId: { $in: slots.map((slot) => slot._id) } } },
+      { $group: { _id: '$slotId', assignedCount: { $sum: 1 } } },
+    ]);
+    const assignedCountBySlot = new Map(
+      scheduleCounts.map(({ _id, assignedCount }) => [String(_id), assignedCount])
+    );
+
+    res.status(200).json({
+      offering: withId(offering),
+      slots: slots.map((slot) => withId({
+        ...slot,
+        assignedCount: assignedCountBySlot.get(String(slot._id)) ?? 0,
+      })),
+    });
   } catch (error) {
     res.status(500).json({ message: 'Could not load offering details', error: error.message });
   }
@@ -228,6 +254,21 @@ exports.updateOffering = async (req, res) => {
   try {
     const refProblem = await checkReferences(req.body);
     if (refProblem) return res.status(400).json({ message: refProblem });
+
+    const currentOffering = await CourseOffering.findById(req.params.id);
+    if (!currentOffering) {
+      return res.status(404).json({ message: 'Offering not found' });
+    }
+
+    if (
+      req.body.publicationStatus === 'Draft' &&
+      currentOffering.publicationStatus === 'Published' &&
+      await hasActiveOrProcessedSchedules(currentOffering._id)
+    ) {
+      return res.status(400).json({
+        message: 'Cannot unpublish offering: One or more students have an active or processed schedule that depends on this offering.',
+      });
+    }
 
     const offering = await CourseOffering.findByIdAndUpdate(
       req.params.id,
@@ -309,16 +350,7 @@ exports.togglePublishStatus = async (req, res) => {
     const newStatus = offering.publicationStatus === 'Published' ? 'Draft' : 'Published';
 
     if (newStatus === 'Draft') {
-      // Block unpublishing if any student has an Active or Processed schedule using slots from this offering
-      const slots = await CourseSlot.find({ offeringId }).select('_id');
-      const slotIds = slots.map((s) => s._id);
-
-      const activeSchedules = await StudentSchedule.findOne({
-        slotId: { $in: slotIds },
-        status: { $in: ['Active', 'Processed'] },
-      });
-
-      if (activeSchedules) {
+      if (await hasActiveOrProcessedSchedules(offeringId)) {
         return res.status(400).json({
           message: 'Cannot unpublish offering: One or more students have an active or processed schedule that depends on this offering.',
         });
@@ -340,14 +372,14 @@ exports.togglePublishStatus = async (req, res) => {
 exports.deleteOffering = async (req, res) => {
   try {
     const offeringId = req.params.id;
+    const offering = await CourseOffering.findById(offeringId);
+    if (!offering) {
+      return res.status(404).json({ message: 'Offering not found' });
+    }
 
-    // Check if any slot in this offering has assigned students
-    const slotsWithStudents = await CourseSlot.findOne({
-      offeringId,
-      assignedCount: { $gt: 0 },
-    });
-
-    if (slotsWithStudents) {
+    const slots = await CourseSlot.find({ offeringId }).select('_id');
+    const slotIds = slots.map((slot) => slot._id);
+    if (await hasAssignedStudents(slotIds)) {
       return res.status(400).json({
         message: 'Cannot delete offering: One or more slots have assigned students. Please move or remove students first.',
       });
@@ -357,11 +389,7 @@ exports.deleteOffering = async (req, res) => {
     await CourseSlot.deleteMany({ offeringId });
 
     // Delete the offering itself
-    const deletedOffering = await CourseOffering.findByIdAndDelete(offeringId);
-
-    if (!deletedOffering) {
-      return res.status(404).json({ message: 'Offering not found' });
-    }
+    await CourseOffering.findByIdAndDelete(offeringId);
 
     res.status(200).json({
       message: 'Course offering and all associated slots deleted successfully.',
@@ -380,8 +408,8 @@ exports.deleteSlot = async (req, res) => {
       return res.status(404).json({ message: 'Slot not found' });
     }
 
-    // Block deletion if students are assigned
-    if (slot.assignedCount > 0) {
+    // The schedule records are authoritative; assignedCount can be stale.
+    if (await hasAssignedStudents([slot._id])) {
       return res.status(400).json({
         message: 'Cannot delete slot: Students are currently assigned to this slot. Please move or remove them first.',
       });

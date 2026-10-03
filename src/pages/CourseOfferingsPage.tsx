@@ -98,6 +98,14 @@ const CourseOfferingsPage: React.FC = () => {
     loadOfferings(true);
   };
 
+  const handleSlotDeleted = (slotId: string) => {
+    setSelectedSlots((current) => current.filter((slot) => slot.id !== slotId));
+  };
+
+  const handlePublicationChanged = (publicationStatus: CourseOffering['publicationStatus']) => {
+    setSelectedOffering((current) => current ? { ...current, publicationStatus } : current);
+  };
+
   return (
     <>
       <PageHeader
@@ -238,6 +246,8 @@ const CourseOfferingsPage: React.FC = () => {
         terms={terms}
         onClose={() => setDrawerMode(null)}
         onModeChange={setDrawerMode}
+        onSlotDeleted={handleSlotDeleted}
+        onPublicationChanged={handlePublicationChanged}
         onSaved={handleSaved}
       />
     </>
