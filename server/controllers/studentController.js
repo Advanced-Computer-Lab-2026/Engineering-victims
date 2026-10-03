@@ -317,6 +317,20 @@ exports.assignToGroup = async (req, res) => {
       });
     }
 
+    const templateSlots = await CourseSlot.find({ _id: { $in: template.slots } })
+      .populate('offeringId', 'publicationStatus termId')
+      .select('offeringId');
+    const hasUnavailableOffering = templateSlots.length !== template.slots.length || templateSlots.some((slot) =>
+      !slot.offeringId ||
+      String(slot.offeringId.termId) !== String(termId) ||
+      slot.offeringId.publicationStatus !== 'Published'
+    );
+    if (hasUnavailableOffering) {
+      return res.status(400).json({
+        message: 'This schedule template includes slots from an unpublished or unavailable offering. Update and republish the template first.',
+      });
+    }
+
     // 2. Clear existing schedules for this student in this term to avoid overlaps
     await StudentSchedule.deleteMany({ studentId: student._id, termId });
 

@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Eye,
+  EyeOff,
   Pencil,
   Plus,
   Save,
@@ -20,11 +22,21 @@ import {
 import AlertBanner from './ui/AlertBanner';
 import Badge from './ui/Badge';
 import CheckboxGroup from './ui/CheckboxGroup';
+import ConfirmDialog from './ui/ConfirmDialog';
 import CustomButton from './ui/CustomButton';
 import CustomInput from './ui/CustomInput';
 import Select from './ui/Select';
 
 export type OfferingDrawerMode = 'view' | 'edit' | 'create';
+
+/** A destructive action held back until the drawer's own dialog is confirmed. */
+interface ConfirmRequest {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone: 'warning' | 'danger';
+  action: () => Promise<void>;
+}
 
 interface OfferingDrawerProps {
   mode: OfferingDrawerMode | null;
@@ -34,6 +46,8 @@ interface OfferingDrawerProps {
   terms: AcademicTerm[];
   onClose: () => void;
   onModeChange: (mode: OfferingDrawerMode) => void;
+  onSlotDeleted: (slotId: string) => void;
+  onPublicationChanged: (status: CourseOffering['publicationStatus']) => void;
   /** Reloads the list; `termId` lands the filter on the offering's term and
    *  `message` is shown by the page once the drawer is gone. */
   onSaved: (termId?: string, message?: string) => void;
@@ -64,6 +78,8 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   terms,
   onClose,
   onModeChange,
+  onSlotDeleted,
+  onPublicationChanged,
   onSaved,
 }) => {
   const [offeringDraft, setOfferingDraft] = useState(emptyOfferingDraft());
@@ -72,6 +88,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   // Instructors are advisors; the slot form picks one instead of asking for a
   // User ObjectId nobody can look up.
@@ -158,6 +175,89 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
     return options;
   };
 
+  /** Runs an action behind the shared saving flag. Failures land in the drawer's
+   *  error banner instead of a browser alert. */
+  const runAction = async (action: () => Promise<void>) => {
+    setError(null);
+    setIsSaving(true);
+    try {
+      await action();
+    } catch (err) {
+      setError((err as ApiError).message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  /** Keeps the dialog open (and spinning) while its action runs, then closes it
+   *  so the outcome — a banner, or the drawer closing — shows underneath. */
+  const confirmAndRun = async () => {
+    if (!confirmRequest) return;
+    const { action } = confirmRequest;
+    await runAction(action);
+    setConfirmRequest(null);
+  };
+
+  const togglePublication = async () => {
+    if (!offering) return;
+    const result = await courseOfferingService.togglePublishStatus(offering.id);
+    onPublicationChanged(result.offering.publicationStatus);
+    onSaved(refId(offering.termId), result.message);
+  };
+
+  const handleTogglePublication = async () => {
+    if (!offering) return;
+    if (offering.publicationStatus === 'Published') {
+      setConfirmRequest({
+        title: 'Unpublish this offering?',
+        message:
+          'It will no longer be available for scheduling, graduation planning, or slot-change requests.',
+        confirmLabel: 'Unpublish',
+        tone: 'warning',
+        action: togglePublication,
+      });
+      return;
+    }
+    await runAction(togglePublication);
+  };
+
+  const deleteOffering = async () => {
+    if (!offering) return;
+    const result = await courseOfferingService.deleteOffering(offering.id);
+    onSaved(refId(offering.termId), result.message);
+    onClose();
+  };
+
+  const handleDeleteOffering = () => {
+    if (!offering) return;
+    const courseLabel = offering.courseId && typeof offering.courseId === 'object'
+      ? `${offering.courseId.code} ${offering.courseId.name}`
+      : 'this offering';
+    setConfirmRequest({
+      title: `Delete ${courseLabel}?`,
+      message: 'All of its slots go with it. This is only allowed when no students are assigned.',
+      confirmLabel: 'Delete Offering',
+      tone: 'danger',
+      action: deleteOffering,
+    });
+  };
+
+  const deleteSlot = async (slot: CourseSlot) => {
+    const result = await courseOfferingService.deleteSlot(slot.id);
+    onSlotDeleted(slot.id);
+    onSaved(refId(offering?.termId), result.message);
+  };
+
+  const handleDeleteSlot = (slot: CourseSlot) => {
+    setConfirmRequest({
+      title: `Delete this ${slot.slotType.toLowerCase()} group ${slot.groupNumber}?`,
+      message: 'This is only allowed when no students are assigned.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+      action: () => deleteSlot(slot),
+    });
+  };
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -225,6 +325,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
 
         {!isForm && offering && (
           <div className="flex-1 space-y-6 overflow-y-auto p-6">
+            {error && <AlertBanner tone="error" onDismiss={() => setError(null)}>{error}</AlertBanner>}
             {notice && <AlertBanner tone="success" onDismiss={() => setNotice(null)}>{notice}</AlertBanner>}
 
             <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
@@ -245,21 +346,52 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
               <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Slots</h3>
               <div className="space-y-3">
                 {slots.map((slot) => (
-                  <div key={slot.id} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm">
-                    <div className="flex gap-4">
-                      <Badge tone="indigo">{slot.slotType}</Badge>
-                      <span className="text-slate-200 font-mono">{slot.dayOfWeek} {slot.startTime}-{slot.endTime}</span>
-                      <span className="text-slate-400">{slot.roomId}</span>
+                  <div key={slot.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Badge tone="indigo">{slot.slotType} {slot.groupNumber}</Badge>
+                        <span className="text-slate-200 font-mono">{slot.dayOfWeek} {slot.startTime}-{slot.endTime}</span>
+                        <span className="text-slate-400">{slot.roomId}</span>
+                      </div>
+                      <p className="text-xs text-slate-500">{slot.assignedCount} assigned · {slot.maxCapacity} capacity</p>
                     </div>
-                    <span className="text-xs text-slate-500">Cap: {slot.maxCapacity}</span>
+                    <CustomButton
+                      variant="danger"
+                      size="sm"
+                      disabled={isSaving}
+                      onClick={() => handleDeleteSlot(slot)}
+                      icon={<Trash2 className="h-4 w-4" aria-hidden />}
+                      aria-label={`Delete ${slot.slotType.toLowerCase()} group ${slot.groupNumber}`}
+                    >
+                      Delete
+                    </CustomButton>
                   </div>
                 ))}
                 {slots.length === 0 && <p className="text-sm text-slate-500">No slots defined.</p>}
               </div>
             </section>
 
-            <div className="flex justify-end border-t border-slate-800 pt-4">
-              <CustomButton onClick={() => onModeChange('edit')} icon={<Pencil className="h-4 w-4" />}>
+            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-4">
+              <CustomButton
+                variant="danger"
+                disabled={isSaving}
+                onClick={handleDeleteOffering}
+                icon={<Trash2 className="h-4 w-4" aria-hidden />}
+              >
+                Delete Offering
+              </CustomButton>
+              <CustomButton
+                variant="secondary"
+                disabled={isSaving}
+                isLoading={isSaving}
+                onClick={handleTogglePublication}
+                icon={offering.publicationStatus === 'Published'
+                  ? <EyeOff className="h-4 w-4" aria-hidden />
+                  : <Eye className="h-4 w-4" aria-hidden />}
+              >
+                {offering.publicationStatus === 'Published' ? 'Unpublish' : 'Publish'}
+              </CustomButton>
+              <CustomButton disabled={isSaving} onClick={() => onModeChange('edit')} icon={<Pencil className="h-4 w-4" />}>
                 Edit Offering
               </CustomButton>
             </div>
@@ -314,9 +446,13 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                     <div key={slot.id} className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
                       <div className="flex items-center justify-between border-b border-slate-800 pb-2">
                         <span className="text-xs font-bold uppercase text-slate-500">Slot #{index + 1}</span>
-                        <button type="button" onClick={() => removeSlot(slot.id)} className="text-rose-400 hover:text-rose-300">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {slot.id === 'new' ? (
+                          <button type="button" onClick={() => removeSlot(slot.id)} className="text-rose-400 hover:text-rose-300" aria-label="Remove new slot">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-slate-500">Delete saved slots from offering details</span>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                         <Select
@@ -391,6 +527,17 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
           </form>
         )}
       </aside>
+
+      <ConfirmDialog
+        open={confirmRequest !== null}
+        title={confirmRequest?.title ?? ''}
+        message={confirmRequest?.message ?? ''}
+        confirmLabel={confirmRequest?.confirmLabel ?? 'Confirm'}
+        tone={confirmRequest?.tone ?? 'danger'}
+        isLoading={isSaving}
+        onConfirm={confirmAndRun}
+        onCancel={() => setConfirmRequest(null)}
+      />
     </div>
   );
 };

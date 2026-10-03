@@ -75,14 +75,26 @@ exports.getTemplates = async (req, res) => {
     if (semester) filter.semester = Number(semester);
 
     const templates = await ScheduleTemplate.find(filter)
-      .populate('slots')
+      .populate({
+        path: 'slots',
+        populate: { path: 'offeringId', select: 'publicationStatus termId' },
+      })
       .lean();
 
     res.status(200).json({
-      templates: templates.map((template) => ({
-        ...template,
-        publicationStatus: template.publicationStatus ?? 'Published',
-      })),
+      templates: templates.map((template) => {
+        const slotsArePublished = template.slots.every((slot) =>
+          slot?.offeringId &&
+          String(slot.offeringId.termId) === String(template.termId) &&
+          slot.offeringId.publicationStatus === 'Published'
+        );
+        return {
+          ...template,
+          publicationStatus: template.publicationStatus === 'Draft' || !slotsArePublished
+            ? 'Draft'
+            : 'Published',
+        };
+      }),
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not load schedule templates', error: error.message });

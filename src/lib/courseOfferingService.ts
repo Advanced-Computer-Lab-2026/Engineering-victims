@@ -24,6 +24,16 @@ export const courseOfferingService = {
     });
   },
 
+  async togglePublishStatus(id: string): Promise<{ message: string; offering: CourseOffering }> {
+    return apiFetch<{ message: string; offering: CourseOffering }>(`/api/offerings/${id}/publish`, {
+      method: 'PATCH',
+    });
+  },
+
+  async deleteOffering(id: string): Promise<{ message: string }> {
+    return apiFetch<{ message: string }>(`/api/offerings/${id}`, { method: 'DELETE' });
+  },
+
   async updateSlot(id: string, data: Partial<CourseSlot>): Promise<{ message: string; slot: CourseSlot }> {
     // The server mounts this under /api/offerings/slots/:id; calling /api/slots
     // never matched a route, so every slot edit 404'd.
@@ -31,5 +41,9 @@ export const courseOfferingService = {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+  },
+
+  async deleteSlot(id: string): Promise<{ message: string }> {
+    return apiFetch<{ message: string }>(`/api/offerings/slots/${id}`, { method: 'DELETE' });
   },
 };
