@@ -50,7 +50,7 @@ const PORT = process.env.PORT || 5000;
 const MONGODB_URI = process.env.MONGODB_URI || DEFAULT_MONGO_URI;
 
 if (!process.env.JWT_SECRET) {
-  console.warn('⚠️  JWT_SECRET is not set. Sessions will not survive a restart.');
+  console.warn('Warning: JWT_SECRET is not set. Sessions will not survive a restart.');
 }
 
 async function startServer() {
@@ -59,9 +59,9 @@ async function startServer() {
     console.log('Connected to MongoDB');
 
     const { users, students, courses, offerings, slots, groups, schedules, notifications } = await seed();
-    console.log(`✅ Seeded ${users} users, ${students} students, ${courses} courses and ${notifications} notifications`);
+    console.log(`Seeded ${users} users, ${students} students, ${courses} courses and ${notifications} notifications`);
     console.log(
-      `✅ Scheduling: ${offerings} offerings, ${slots} slots, ${groups} schedule groups, ${schedules} processed student schedules`
+      `Scheduling: ${offerings} offerings, ${slots} slots, ${groups} schedule groups, ${schedules} processed student schedules`
     );
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

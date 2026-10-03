@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Student = require('../models/Student');
 const { notifyByEmail } = require('../services/notificationService');
+const { sendAdvisorChange } = require('../services/mailService');
 
 /**
  * FR 11.0: Add an advisor using the advisor's GUC email
@@ -44,11 +45,13 @@ const addAdvisor = async (req, res) => {
         await existingUser.save();
 
         // Send notification email (FR 13.0)
-        await notifyByEmail(existingUser.email, {
+        const addedNotice = {
           type: 'info',
           title: 'Added to Advising System',
           message: 'You have been added as an Advisor in the University Schedule Management System.'
-        });
+        };
+        await notifyByEmail(existingUser.email, addedNotice);
+        await sendAdvisorChange(existingUser.email, { added: true, name: existingUser.fullName });
 
         return res.status(200).json({
           message: 'User role updated to Advisor successfully',
@@ -119,11 +122,13 @@ const removeAdvisor = async (req, res) => {
     await advisor.save();
 
     // Send notification email (FR 13.0)
-    await notifyByEmail(advisor.email, {
+    const removedNotice = {
       type: 'warning',
       title: 'Removed from Advising System',
       message: 'You have been removed as an Advisor from the University Schedule Management System. Your previous actions remain in the system history.'
-    });
+    };
+    await notifyByEmail(advisor.email, removedNotice);
+    await sendAdvisorChange(advisor.email, { added: false, name: advisor.fullName });
 
     res.status(200).json({
       message: 'Advisor removed successfully from the advising system',

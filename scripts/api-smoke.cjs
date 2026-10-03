@@ -10,10 +10,10 @@ const BASE = process.env.BASE_URL || 'http://localhost:5000';
 
 const failures = [];
 const report = (okFlag, label, detail = '') => {
-  if (okFlag) console.log(`  ✅ ${label}${detail ? ` — ${detail}` : ''}`);
+  if (okFlag) console.log(`  PASS ${label}${detail ? ` — ${detail}` : ''}`);
   else {
     failures.push(`${label}${detail ? ` — ${detail}` : ''}`);
-    console.log(`  ❌ ${label}${detail ? ` — ${detail}` : ''}`);
+    console.log(`  FAIL ${label}${detail ? ` — ${detail}` : ''}`);
   }
 };
 
@@ -189,11 +189,11 @@ async function main() {
 
   console.log('');
   if (failures.length) {
-    console.error(`❌ ${failures.length} API check(s) failed:`);
+    console.error(`${failures.length} API check(s) failed:`);
     for (const f of failures) console.error(`  - ${f}`);
     process.exit(1);
   }
-  console.log('✅ all API checks passed');
+  console.log('all API checks passed');
 }
 
 main().catch((err) => {

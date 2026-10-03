@@ -50,7 +50,7 @@ export default function AdvisorsPage() {
     try {
       setAddLoading(true);
       const response = await addAdvisor(addEmail.trim());
-      setSuccessMessage(`✅ ${response.message}: ${response.advisor.fullName}`);
+      setSuccessMessage(`${response.message}: ${response.advisor.fullName}`);
       setAddEmail('');
       fetchAdvisors(); // Refresh list
     } catch (error: any) {
@@ -78,7 +78,7 @@ export default function AdvisorsPage() {
     try {
       setRemoveLoading(true);
       const response = await removeAdvisor(removeEmail.trim());
-      setSuccessMessage(`✅ ${response.message}`);
+      setSuccessMessage(`${response.message}`);
       setRemoveEmail('');
       fetchAdvisors(); // Refresh list
     } catch (error: any) {
@@ -162,7 +162,7 @@ export default function AdvisorsPage() {
                   icon={<Mail className="w-4 h-4" />}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  ⚠️ Cannot remove advisors with assigned students
+                  Cannot remove advisors with assigned students
                 </p>
               </div>
               <CustomButton

@@ -21,8 +21,13 @@ const readValue = (contents, key) => {
   return match ? match[1].trim() : undefined;
 };
 
-const envPath = path.join(__dirname, '.env');
-const examplePath = path.join(__dirname, '.env.example');
+// dotenv reads `<cwd>/.env`, and the server runs with cwd = server/. — so the
+// live file is server/.env. This module lives in server/config/, so joining on
+// __dirname alone would write server/config/.env instead: a second file with a
+// different MongoDB URI that nothing ever loads. Climb out of config/ to match
+// the file the rest of the app actually reads.
+const envPath = path.join(__dirname, '..', '.env');
+const examplePath = path.join(__dirname, '..', '.env.example');
 
 function ensureEnvFile() {
   if (fs.existsSync(envPath)) return false;

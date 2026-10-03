@@ -28,7 +28,7 @@ async function run() {
 
   const result = await seed();
   console.log(
-    `✅ Seeded ${result.users} users, ${result.students} students and ${result.notifications} notifications`,
+    `Seeded ${result.users} users, ${result.students} students and ${result.notifications} notifications`,
   );
   console.log(`   Advisors: ${result.advisors}, terms: ${result.terms}`);
   console.log(
