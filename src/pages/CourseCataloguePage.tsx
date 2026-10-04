@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BookOpen, ChevronRight, ListFilter, Loader2, Plus, Search, Trash2, X } from 'lucide-react';
+import { BookOpen, ChevronRight, ListFilter, Loader2, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import CourseDrawer, { COURSE_TYPE_TONE, type CourseDrawerMode } from '../components/CourseDrawer';
+import CourseImportDialog from '../components/CourseImportDialog';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
@@ -10,7 +11,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 import { ApiError } from '../lib/api';
 import { fetchCourses, deleteCourse } from '../lib/coursesService';
-import { COURSE_MAJORS, COURSE_SEASONS, COURSE_TYPES, type Course } from '../lib/types';
+import { COURSE_MAJORS, COURSE_SEASONS, COURSE_TYPES, type Course, type CourseImportResult } from '../lib/types';
 
 interface CourseFilters {
   courseType: string;
@@ -42,6 +43,8 @@ const CourseCataloguePage: React.FC = () => {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drawerMode, setDrawerMode] = useState<CourseDrawerMode | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
 
   const loadCourses = useCallback(async () => {
     setIsLoading(true);
@@ -109,6 +112,14 @@ const CourseCataloguePage: React.FC = () => {
   };
 
   const closeDrawer = useCallback(() => setDrawerMode(null), []);
+  const closeImport = useCallback(() => setImportOpen(false), []);
+
+  // Req 128: show the counts and reload, since an import can touch many rows at once.
+  const handleImported = async (result: CourseImportResult) => {
+    setImportOpen(false);
+    setImportNotice(result.message);
+    await loadCourses();
+  };
 
   // Req 21: delete a course from the catalogue (the server flags it inactive).
   const handleDelete = async (course: Course, event: React.MouseEvent) => {
@@ -156,11 +167,28 @@ const CourseCataloguePage: React.FC = () => {
         description="Every course students can be scheduled into. Select a course to see its details or edit it."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
-          <CustomButton onClick={openCreate} icon={<Plus className="h-4 w-4" aria-hidden />}>
-            New course
-          </CustomButton>
+          <div className="flex flex-wrap gap-2">
+            <CustomButton
+              variant="secondary"
+              onClick={() => setImportOpen(true)}
+              icon={<Upload className="h-4 w-4" aria-hidden />}
+            >
+              Import CSV
+            </CustomButton>
+            <CustomButton onClick={openCreate} icon={<Plus className="h-4 w-4" aria-hidden />}>
+              New course
+            </CustomButton>
+          </div>
         }
       />
+
+      {importNotice && (
+        <div className="mb-4">
+          <AlertBanner tone="success" title="Import complete" onDismiss={() => setImportNotice(null)}>
+            {importNotice}
+          </AlertBanner>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4">
@@ -352,6 +380,8 @@ const CourseCataloguePage: React.FC = () => {
         onModeChange={setDrawerMode}
         onSaved={handleSaved}
       />
+
+      <CourseImportDialog open={importOpen} onClose={closeImport} onImported={handleImported} />
     </>
   );
 };
