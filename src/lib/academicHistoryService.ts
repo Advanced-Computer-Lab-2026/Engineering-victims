@@ -1,4 +1,4 @@
-import { apiFetch } from './api';
+import { apiFetch, apiUrl, authHeaders, ApiError } from './api';
 import type { AcademicHistoryResponse } from './types';
 
 /** Req 54, Advising Student: their own history, resolved from the token. */
@@ -8,3 +8,38 @@ export const fetchMyAcademicHistory = async (): Promise<AcademicHistoryResponse>
 /** Req 54, Advisor / Coordinator: any Advising Student by directory id. */
 export const fetchStudentAcademicHistory = async (studentId: string): Promise<AcademicHistoryResponse> =>
   apiFetch<AcademicHistoryResponse>(`/api/academic-history/${encodeURIComponent(studentId)}`);
+
+/**
+ * Req 56: downloads the academic history as a PDF and saves it as `fileName`.
+ *
+ * apiFetch parses JSON, so the file is fetched directly, with the same token
+ * and the same ApiError messages. Without a studentId it is the signed-in
+ * Advising Student's own record.
+ */
+export const downloadAcademicHistoryPdf = async (fileName: string, studentId?: string): Promise<void> => {
+  const path = studentId
+    ? `/api/academic-history/${encodeURIComponent(studentId)}/pdf`
+    : '/api/academic-history/me/pdf';
+
+  let response: Response;
+  try {
+    response = await fetch(apiUrl(path), { headers: authHeaders() });
+  } catch {
+    throw new ApiError('Could not reach the server. Check your connection and try again.', 0);
+  }
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => ({}))) as { message?: string };
+    throw new ApiError(payload.message || `Request failed with status ${response.status}`, response.status);
+  }
+
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoked on the next tick so the browser has started the download first.
+  setTimeout(() => URL.revokeObjectURL(url), 0);
+};

@@ -7,6 +7,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock,
+  Download,
   GraduationCap,
   ListTodo,
   Loader2,
@@ -21,7 +22,11 @@ import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import { useSession } from '../hooks/useSession';
 import { ApiError } from '../lib/api';
-import { fetchMyAcademicHistory, fetchStudentAcademicHistory } from '../lib/academicHistoryService';
+import {
+  downloadAcademicHistoryPdf,
+  fetchMyAcademicHistory,
+  fetchStudentAcademicHistory,
+} from '../lib/academicHistoryService';
 import type { AcademicHistoryResponse, CompletedCourse, RemainingCourse } from '../lib/types';
 
 /** GUC scale: 0.7 is the best grade, 5.0 a fail, so the tone follows the letter. */
@@ -61,6 +66,8 @@ const AcademicHistoryPage: React.FC = () => {
   const [data, setData] = useState<AcademicHistoryResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<ApiError | null>(null);
 
   const isOwn = !studentId;
 
@@ -94,6 +101,20 @@ const AcademicHistoryPage: React.FC = () => {
 
   const student = data?.student;
 
+  // Req 56: the displayed history as a PDF, under the same access rules.
+  const handleDownload = async () => {
+    if (!student) return;
+    setIsDownloading(true);
+    setDownloadError(null);
+    try {
+      await downloadAcademicHistoryPdf(`academic-history-${student.studentId}.pdf`, studentId);
+    } catch (err) {
+      setDownloadError(err as ApiError);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -101,15 +122,29 @@ const AcademicHistoryPage: React.FC = () => {
         description="Completed courses with grades, current courses and the courses still remaining."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
-          !isOwn && (
-            <CustomButton
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(backTo)}
-              icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
-            >
-              Back to students
-            </CustomButton>
+          (!isOwn || student) && (
+            <div className="flex flex-wrap gap-2">
+              {!isOwn && (
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(backTo)}
+                  icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
+                >
+                  Back to students
+                </CustomButton>
+              )}
+              {student && (
+                <CustomButton
+                  size="sm"
+                  onClick={handleDownload}
+                  isLoading={isDownloading}
+                  icon={<Download className="h-4 w-4" aria-hidden />}
+                >
+                  Download PDF
+                </CustomButton>
+              )}
+            </div>
           )
         }
       />
@@ -121,6 +156,14 @@ const AcademicHistoryPage: React.FC = () => {
             title={error.status === 403 ? 'No academic history on this account' : 'Could not load the academic history'}
           >
             {error.message}
+          </AlertBanner>
+        </div>
+      )}
+
+      {downloadError && (
+        <div className="mb-4">
+          <AlertBanner tone="error" title="Could not download the PDF" onDismiss={() => setDownloadError(null)}>
+            {downloadError.message}
           </AlertBanner>
         </div>
       )}
