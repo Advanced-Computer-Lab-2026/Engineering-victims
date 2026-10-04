@@ -101,7 +101,8 @@ export interface AdvisingStudentRow extends StudentSummary {
 
 export interface AdvisingStudentsResponse {
   students: AdvisingStudentRow[];
-  summary: { total: number; mine: number; unassigned: number };
+  /** total, mine and unassigned cover every advising student; matched counts the search results. */
+  summary: { total: number; mine: number; unassigned: number; matched: number };
 }
 
 export interface StudentDetailResponse {
