@@ -1,29 +1,57 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, GraduationCap, Loader2, RotateCcw, ScrollText, Search, UserCheck, UserX, Users } from 'lucide-react';
+import {
+  CalendarDays,
+  GraduationCap,
+  ListFilter,
+  Loader2,
+  RotateCcw,
+  ScrollText,
+  Search,
+  UserCheck,
+  UserX,
+  Users,
+  X,
+} from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import AdvisingStudentDetailDrawer from '../components/AdvisingStudentDetailDrawer';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
+import Select from '../components/ui/Select';
 import StatusPill from '../components/ui/StatusPill';
 import { ApiError } from '../lib/api';
 import { fetchAdvisingStudents } from '../lib/advisingStudentsService';
 import { formatDate, formatRelative } from '../lib/studentsService';
-import type { AdvisingStudentRow, AdvisingStudentsResponse } from '../lib/types';
+import {
+  EMPTY_ADVISING_FILTERS,
+  hasActiveAdvisingFilters,
+  type AdvisingFilterOptions,
+  type AdvisingStudentFilters,
+  type AdvisingStudentRow,
+  type AdvisingStudentsResponse,
+} from '../lib/types';
 
 /** Debounce so typing in the search box does not fire a request per keystroke. */
 const SEARCH_DEBOUNCE_MS = 300;
 
+/** Straight value -> label pairs, for filter sets the server lists as strings. */
+const toOptions = (values: string[] | undefined) => (values ?? []).map((value) => ({ value, label: value }));
+
 /**
  * Req 50: every Advising Student, for an Advisor.
  * Req 51: searchable by student ID, full name or GUC email.
+ * Req 52: filterable by Advisor, major, advising reason, schedule status and
+ *         pending-request type — combined with AND, and all clearable at once.
+ * Req 53: select a row to open that student's advising details.
  *
  * "My Students" (req 6-9) stays the Advisor's own roster; this page is the
  * school-wide view the workbook asks for, so students assigned to other
  * Advisors appear too, and search covers all of them. The Advisor's own rows
- * are marked "You".
+ * are marked "You", and the Advisor filter carries a "My assigned students"
+ * choice that narrows the list back down to them.
  */
 const AdvisingStudentsPage: React.FC = () => {
   const [data, setData] = useState<AdvisingStudentsResponse | null>(null);
@@ -31,18 +59,32 @@ const AdvisingStudentsPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const [filters, setFilters] = useState<AdvisingStudentFilters>(EMPTY_ADVISING_FILTERS);
+  /**
+   * Held separately from `data` so a failed refresh cannot take the filter
+   * panel away with it — the options still describe the whole directory, and
+   * they are what the user needs to narrow the query and try again.
+   */
+  const [filterOptions, setFilterOptions] = useState<AdvisingFilterOptions | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const isFirstLoad = useRef(true);
   /**
-   * Id of the newest request. Searches can overlap, so a response only lands
-   * when its id still matches; otherwise a slow "lai" could overwrite a later
-   * "laila", or clear the loading flags while the newer request is running.
+   * Id of the newest request. Searches and filter changes can overlap, so a
+   * response only lands when its id still matches; otherwise a slow "lai" could
+   * overwrite a later "laila", or clear the loading flags while the newer
+   * request is running.
    */
   const latestRequest = useRef(0);
 
   useEffect(() => {
-    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    const timer = setTimeout(() => {
+      const next = searchInput.trim();
+      // Returning the same object when the value has not changed keeps the
+      // debounce from re-triggering the load on mount with an identical query.
+      setFilters((current) => (current.search === next ? current : { ...current, search: next }));
+    }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [searchInput]);
 
@@ -54,8 +96,11 @@ const AdvisingStudentsPage: React.FC = () => {
       setError(null);
 
       try {
-        const response = await fetchAdvisingStudents(search);
-        if (requestId === latestRequest.current) setData(response);
+        const response = await fetchAdvisingStudents(filters);
+        if (requestId === latestRequest.current) {
+          setData(response);
+          setFilterOptions(response.filterOptions);
+        }
       } catch (err) {
         if (requestId === latestRequest.current) {
           // The old rows answer a different query, so they must not stay on
@@ -71,12 +116,12 @@ const AdvisingStudentsPage: React.FC = () => {
         }
       }
     },
-    [search]
+    [filters]
   );
 
   // After the first load, a new search refreshes in place instead of
   // blanking the table behind a spinner on every keystroke. The cleanup
-  // retires the in-flight request when the search changes or the page
+  // retires the in-flight request when the query changes or the page
   // unmounts, so a late response never sets state.
   useEffect(() => {
     load(isFirstLoad.current === false);
@@ -85,13 +130,22 @@ const AdvisingStudentsPage: React.FC = () => {
     };
   }, [load]);
 
-  const clearSearch = () => {
+  const updateFilter = (key: keyof AdvisingStudentFilters, value: string) =>
+    setFilters((current) => ({ ...current, [key]: value }));
+
+  const clearFilters = () => {
+    setFilters(EMPTY_ADVISING_FILTERS);
     setSearchInput('');
-    setSearch('');
   };
 
   const students = data?.students ?? [];
-  const isSearching = search !== '';
+  const filtersActive = hasActiveAdvisingFilters(filters) || searchInput.trim() !== '';
+  const activeFilterCount = Object.entries(filters).filter(([key, value]) => key !== 'search' && value !== '').length;
+
+  const majorOptions = useMemo(() => toOptions(filterOptions?.majors), [filterOptions]);
+  const reasonOptions = useMemo(() => toOptions(filterOptions?.advisingReasons), [filterOptions]);
+  const statusOptions = useMemo(() => toOptions(filterOptions?.workflowStatuses), [filterOptions]);
+  const requestOptions = useMemo(() => toOptions(filterOptions?.pendingRequestTypes), [filterOptions]);
 
   return (
     <>
@@ -129,22 +183,90 @@ const AdvisingStudentsPage: React.FC = () => {
       )}
 
       <Card tone="flat" className="mb-4 p-4">
-        <div className="relative">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
-            aria-hidden
-          />
-          <input
-            type="search"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            placeholder="Search by student ID (64-12345), name or GUC email"
-            aria-label="Search advising students"
-            className="w-full rounded-lg border border-slate-700 bg-slate-900/70 py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 transition-colors hover:border-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
-          />
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+              aria-hidden
+            />
+            <input
+              type="search"
+              value={searchInput}
+              onChange={(event) => setSearchInput(event.target.value)}
+              placeholder="Search by student ID (64-12345), name or GUC email"
+              aria-label="Search advising students"
+              className="w-full rounded-lg border border-slate-700 bg-slate-900/70 py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 transition-colors hover:border-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <CustomButton
+              variant={showFilters ? 'primary' : 'secondary'}
+              size="md"
+              onClick={() => setShowFilters((current) => !current)}
+              icon={<ListFilter className="h-4 w-4" aria-hidden />}
+              aria-expanded={showFilters}
+            >
+              Filters
+              {filtersActive && (
+                <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px] font-semibold">
+                  {activeFilterCount + (searchInput.trim() !== '' ? 1 : 0)}
+                </span>
+              )}
+            </CustomButton>
+            {filtersActive && (
+              <CustomButton variant="ghost" size="md" onClick={clearFilters} icon={<X className="h-4 w-4" aria-hidden />}>
+                Clear
+              </CustomButton>
+            )}
+          </div>
         </div>
-        {data && isSearching && (
-          <p className="mt-2 text-xs text-slate-400" aria-live="polite">
+
+        {/* Req 52: the five filters, combinable in any order and clearable together. */}
+        {showFilters && filterOptions && (
+          <div className="mt-4 grid gap-3 border-t border-slate-800/70 pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            <Select
+              label="Advisor"
+              placeholder="All advisors"
+              value={filters.assignedAdvisor}
+              onChange={(event) => updateFilter('assignedAdvisor', event.target.value)}
+              options={filterOptions.advisors}
+            />
+            <Select
+              label="Major"
+              placeholder="All majors"
+              value={filters.major}
+              onChange={(event) => updateFilter('major', event.target.value)}
+              options={majorOptions}
+            />
+            <Select
+              label="Advising reason"
+              placeholder="All reasons"
+              value={filters.advisingReason}
+              onChange={(event) => updateFilter('advisingReason', event.target.value)}
+              options={[{ value: 'none', label: 'No advising reason' }, ...reasonOptions]}
+            />
+            <Select
+              label="Schedule status"
+              placeholder="All statuses"
+              value={filters.workflowStatus}
+              onChange={(event) => updateFilter('workflowStatus', event.target.value)}
+              options={statusOptions}
+            />
+            <Select
+              label="Pending request type"
+              placeholder="All request types"
+              value={filters.pendingRequestType}
+              onChange={(event) => updateFilter('pendingRequestType', event.target.value)}
+              options={requestOptions}
+            />
+          </div>
+        )}
+
+        {/* Refers to the query actually in flight, so the count never claims to
+            describe a search term the request has not picked up yet. */}
+        {data && (hasActiveAdvisingFilters(filters) || filters.search !== '') && (
+          <p className="mt-3 text-xs text-slate-400" aria-live="polite">
             Showing {data.summary.matched} of {data.summary.total} advising students
           </p>
         )}
@@ -168,12 +290,12 @@ const AdvisingStudentsPage: React.FC = () => {
         )
       ) : students.length === 0 ? (
         !error &&
-        (isSearching ? (
+        (filtersActive ? (
           <EmptyState
             icon={<Search className="h-5 w-5" />}
-            title={`No advising students match "${search}"`}
-            description="Search by a full student ID such as 64-12345, part of a name, or a GUC email."
-            action={{ label: 'Clear search', onClick: clearSearch }}
+            title="No advising students match these criteria"
+            description="Combine fewer filters, change the search term, or clear everything to see the whole list."
+            action={{ label: 'Clear all filters', onClick: clearFilters }}
           />
         ) : (
           <EmptyState
@@ -185,9 +307,10 @@ const AdvisingStudentsPage: React.FC = () => {
       ) : (
         <Card tone="raised" className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[60rem] text-left text-sm">
+            <table className="w-full min-w-[82rem] text-left text-sm">
               <caption className="sr-only">
-                All advising students with their assigned advisor, workflow status, blocking step and last update
+                All advising students with their assigned advisor, advising reason, workflow status,
+                pending request, blocking step and last update
               </caption>
               <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
                 <tr>
@@ -196,7 +319,9 @@ const AdvisingStudentsPage: React.FC = () => {
                   <th scope="col" className="px-4 py-3 font-semibold">Major</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Sem.</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Assigned advisor</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Advising reason</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Workflow status</th>
+                  <th scope="col" className="px-4 py-3 font-semibold">Pending request</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Blocking step</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Last update</th>
                   <th scope="col" className="px-4 py-3 text-right font-semibold">
@@ -206,13 +331,20 @@ const AdvisingStudentsPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {students.map((student) => (
-                  <AdvisingStudentTableRow key={student.id} student={student} />
+                  <AdvisingStudentTableRow
+                    key={student.id}
+                    student={student}
+                    onOpen={() => setSelectedId(student.id)}
+                  />
                 ))}
               </tbody>
             </table>
           </div>
         </Card>
       )}
+
+      {/* Req 53: the advising details of the selected student, over the list. */}
+      <AdvisingStudentDetailDrawer studentId={selectedId} onClose={() => setSelectedId(null)} />
     </>
   );
 };
@@ -227,13 +359,25 @@ const CountTile: React.FC<{ label: string; value: number; icon: React.ReactNode 
   </Card>
 );
 
-const AdvisingStudentTableRow: React.FC<{ student: AdvisingStudentRow }> = ({ student }) => {
+interface RowProps {
+  student: AdvisingStudentRow;
+  onOpen: () => void;
+}
+
+const AdvisingStudentTableRow: React.FC<RowProps> = ({ student, onOpen }) => {
   const navigate = useNavigate();
 
   return (
-    <tr className={`transition-colors hover:bg-slate-800/40 ${student.isMine ? 'bg-indigo-500/5' : ''}`}>
+    <tr className={`group transition-colors hover:bg-slate-800/40 ${student.isMine ? 'bg-indigo-500/5' : ''}`}>
       <td className="px-4 py-3">
-        <span className="block font-medium text-slate-100">{student.fullName}</span>
+        {/* Req 53: selecting the student opens their advising details. */}
+        <button
+          type="button"
+          onClick={onOpen}
+          className="text-left font-medium text-slate-100 underline-offset-4 hover:text-indigo-300 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        >
+          {student.fullName}
+        </button>
         <span className="mt-0.5 flex items-center gap-1 text-xs text-slate-500">
           <GraduationCap className="h-3 w-3" aria-hidden />
           {student.email}
@@ -252,8 +396,18 @@ const AdvisingStudentTableRow: React.FC<{ student: AdvisingStudentRow }> = ({ st
           <span className="text-slate-500">Unassigned</span>
         )}
       </td>
+      <td className="px-4 py-3 text-xs text-slate-400">
+        {student.advisingReason ?? <span className="text-slate-600">None recorded</span>}
+      </td>
       <td className="px-4 py-3">
         <StatusPill state={student.isActive ? 'active' : 'inactive'} workflowStatus={student.workflowStatus} />
+      </td>
+      <td className="px-4 py-3">
+        {student.pendingRequest === 'None' ? (
+          <span className="text-xs text-slate-500">None</span>
+        ) : (
+          <Badge tone="amber">{student.pendingRequest}</Badge>
+        )}
       </td>
       <td className="px-4 py-3 text-xs text-slate-400">
         {student.blockingStep ?? <span className="text-slate-600">None</span>}
@@ -262,6 +416,9 @@ const AdvisingStudentTableRow: React.FC<{ student: AdvisingStudentRow }> = ({ st
         {formatRelative(student.lastUpdateAt)}
       </td>
       <td className="whitespace-nowrap px-4 py-3 text-right">
+        <CustomButton variant="ghost" size="sm" onClick={onOpen}>
+          View
+        </CustomButton>
         {/* Req 54: Advisors may open any advising student's academic history. */}
         <CustomButton
           variant="ghost"

@@ -25,6 +25,19 @@ const ADVISING_STATUSES = [
   'Reopened',
 ];
 
+/**
+ * Req 59 names the five reasons a student is on advising in the first place.
+ * They are stored rather than derived: only probation and an undeclared major
+ * can be read off other fields, and "transfer" cannot be inferred at all.
+ */
+const ADVISING_REASONS = [
+  'Probation',
+  'More than 2 failed courses in a season',
+  'Unattended courses',
+  'Undeclared CS or DMET major',
+  'Transfer from another major or university',
+];
+
 const studentSchema = new mongoose.Schema(
   {
     fullName: { type: String, required: true, trim: true },
@@ -56,6 +69,19 @@ const studentSchema = new mongoose.Schema(
       type: String,
       enum: ['Good Standing', 'Probation', 'Dismissed'],
       default: 'Good Standing',
+    },
+    /**
+     * Why this student is on advising (req 59). Null for Normal Students and
+     * for an Advising Student nobody has profiled yet, so the "no advising
+     * reason" filter option has a real target.
+     */
+    advisingReason: {
+      type: String,
+      default: null,
+      validate: {
+        validator: (value) => value == null || ADVISING_REASONS.includes(value),
+        message: `advisingReason must be one of: ${ADVISING_REASONS.join(', ')}`,
+      },
     },
     assignedAdvisor: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     workflowStatus: { type: String, default: 'Not Started' },
@@ -90,3 +116,4 @@ studentSchema.pre('validate', function validate(next) {
 module.exports = mongoose.model('Student', studentSchema);
 module.exports.NORMAL_STATUSES = NORMAL_STATUSES;
 module.exports.ADVISING_STATUSES = ADVISING_STATUSES;
+module.exports.ADVISING_REASONS = ADVISING_REASONS;

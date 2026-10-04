@@ -1,4 +1,6 @@
+const mongoose = require('mongoose');
 const Student = require('../models/Student');
+const { statusesForPendingRequest } = require('./pendingRequestService');
 
 /**
  * Builds the Mongo filter for the students list, search and filter requirements.
@@ -7,6 +9,8 @@ const Student = require('../models/Student');
  * Filters (req 8) cover student type, assigned advisor, major, current
  * semester, academic standing, workflow status, blocking step and account
  * status, and combine with AND.
+ * Req 52 adds advising reason and pending-request type to the same builder, so
+ * every list in the app resolves filters the same way.
  */
 const buildStudentQuery = (query = {}) => {
   const {
@@ -19,6 +23,8 @@ const buildStudentQuery = (query = {}) => {
     workflowStatus,
     blockingStep,
     isActive,
+    advisingReason,
+    pendingRequestType,
   } = query;
 
   const filter = {};
@@ -43,16 +49,43 @@ const buildStudentQuery = (query = {}) => {
   if (studentType) filter.studentType = studentType;
   if (assignedAdvisor) {
     // An empty string means "unassigned", which a plain truthy check would miss.
-    filter.assignedAdvisor =
-      assignedAdvisor === 'none' ? null : new Student.base.Types.ObjectId(String(assignedAdvisor));
+    // "mine" is resolved to an id by the caller, which is the only place the
+    // signed-in user is known.
+    if (assignedAdvisor === 'none') {
+      filter.assignedAdvisor = null;
+    } else if (mongoose.isValidObjectId(String(assignedAdvisor))) {
+      filter.assignedAdvisor = new Student.base.Types.ObjectId(String(assignedAdvisor));
+    } else {
+      // A hand-edited id must not throw a 500 out of the ObjectId cast; it
+      // simply matches no student, which is the honest answer.
+      filter.assignedAdvisor = { $in: [] };
+    }
   }
   if (major) filter.major = major;
   if (currentSemester) filter.currentSemester = Number(currentSemester);
   if (academicStanding) filter.academicStanding = academicStanding;
-  if (workflowStatus) filter.workflowStatus = workflowStatus;
   if (blockingStep) filter.blockingStep = blockingStep;
   if (isActive === 'true' || isActive === true) filter.isActive = true;
   if (isActive === 'false' || isActive === false) filter.isActive = false;
+
+  // Req 52: "no advising reason" is a real choice, so it becomes null rather
+  // than being dropped by a truthy check.
+  if (advisingReason) filter.advisingReason = advisingReason === 'none' ? null : advisingReason;
+
+  // Workflow status and pending-request type both constrain the same field,
+  // because the request type is derived from the status. They are intersected
+  // rather than overwriting each other, so combining them stays an AND: pick
+  // "Draft" plus "Slot-change request" and nothing matches, which is what
+  // "both of these must hold" means.
+  if (workflowStatus || pendingRequestType) {
+    let statuses = workflowStatus ? [workflowStatus] : null;
+    if (pendingRequestType) {
+      const derived = statusesForPendingRequest(pendingRequestType);
+      statuses = statuses === null ? derived : statuses.filter((status) => derived.includes(status));
+    }
+    // An empty list matches no documents, which is the correct AND result.
+    filter.workflowStatus = { $in: statuses };
+  }
 
   return filter;
 };
