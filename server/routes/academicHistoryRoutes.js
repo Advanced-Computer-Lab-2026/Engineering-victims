@@ -21,5 +21,13 @@ router.get(
   requireRole('Advisor', 'Coordinator'),
   academicHistoryController.downloadStudentHistoryPdf
 );
+// Req 61: failed and unattended courses as mandatory-course candidates. Staff
+// only; there is no /me variant, so Advising Students cannot read it.
+router.get(
+  '/:studentId/mandatory-candidates',
+  authenticate,
+  requireRole('Advisor', 'Coordinator'),
+  academicHistoryController.getMandatoryCandidates
+);
 
 module.exports = router;

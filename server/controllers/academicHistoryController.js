@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const { buildAcademicHistory } = require('../services/academicHistoryService');
 const { renderAcademicHistoryPdf } = require('../services/academicHistoryPdfService');
+const { buildMandatoryCandidates } = require('../services/mandatoryCourseService');
 
 const serializeStudent = (student) => ({
   id: student._id,
@@ -41,6 +42,14 @@ const respondWithHistoryPdf = async (res, student) => {
       'Content-Length': pdf.length,
     })
     .send(pdf);
+};
+
+/** Req 61: the student's failed and unattended courses as mandatory-course candidates. */
+const respondWithMandatoryCandidates = async (res, student) => {
+  res.status(200).json({
+    student: serializeStudent(student),
+    candidates: await buildMandatoryCandidates(student),
+  });
 };
 
 /**
@@ -102,4 +111,11 @@ exports.downloadStudentHistoryPdf = handle(
   findStudentById,
   respondWithHistoryPdf,
   'Could not create the academic history PDF'
+);
+// Req 61: same Advisor / Coordinator lookup as the history page, so the
+// candidates are never open to anyone who could not already see the history.
+exports.getMandatoryCandidates = handle(
+  findStudentById,
+  respondWithMandatoryCandidates,
+  'Could not load the mandatory-course candidates'
 );

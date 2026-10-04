@@ -12,6 +12,18 @@ const courseSummary = (course) => ({
 });
 
 /**
+ * The courses a student's major requires: active, listed for the major and not
+ * elective. Electives are left out because a student picks a few of them, not
+ * all of them. Shared with the req 61 mandatory-course candidates so both read
+ * the curriculum the same way.
+ */
+const requiredCourseFilter = (student) => ({
+  isActive: true,
+  majors: student.major,
+  courseType: { $ne: 'Elective' },
+});
+
+/**
  * Req 54: builds a student's academic history from their course records and
  * the catalogue.
  *
@@ -49,11 +61,7 @@ const buildAcademicHistory = async (student) => {
     .reduce((sum, row) => sum + row.course.creditHours, 0);
   const currentHours = currentRows.reduce((sum, row) => sum + row.course.creditHours, 0);
 
-  const catalogue = await Course.find({
-    isActive: true,
-    majors: student.major,
-    courseType: { $ne: 'Elective' },
-  })
+  const catalogue = await Course.find(requiredCourseFilter(student))
     .populate('prerequisites', 'code name')
     .sort({ recommendedSemester: 1, code: 1 })
     .lean();
@@ -105,4 +113,4 @@ const buildAcademicHistory = async (student) => {
   };
 };
 
-module.exports = { buildAcademicHistory };
+module.exports = { buildAcademicHistory, requiredCourseFilter, FAIL };

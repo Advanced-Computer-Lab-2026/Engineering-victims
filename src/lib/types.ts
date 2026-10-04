@@ -327,6 +327,28 @@ export interface RemainingCourse extends HistoryCourse {
   isRetake: boolean;
 }
 
+/** Req 61: why a course is owed. */
+export type MandatoryCandidateReason = 'Failed' | 'Unattended';
+
+/** Req 61: a failed or unattended course, mandatory unless an approved removal applies. */
+export interface MandatoryCandidate {
+  course: HistoryCourse;
+  reason: MandatoryCandidateReason;
+  /** The semester of the latest failed attempt, or the curriculum semester of an unattended course. */
+  semester: number;
+  /** The term of the latest failed attempt; null for a course never taken. */
+  term: string | null;
+  /** A failed course being retaken this term. */
+  inProgress: boolean;
+  /** Always true: a course with an approved removal is left out of the list. */
+  mandatory: true;
+}
+
+export interface MandatoryCandidatesResponse {
+  student: AcademicHistoryResponse['student'];
+  candidates: MandatoryCandidate[];
+}
+
 export interface AcademicHistoryResponse {
   student: {
     id: string;
