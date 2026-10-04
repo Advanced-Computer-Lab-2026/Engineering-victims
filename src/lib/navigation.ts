@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CalendarRange,
   Contact,
+  FileText,
   GraduationCap,
   LayoutDashboard,
   Layers,
@@ -150,6 +151,15 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Student'],
     studentTypes: ['Advising Student'],
     description: 'Grades, credit hours and standing, term by term.',
+  },
+  // Req 55: staff reach a student's transcript from their academic history.
+  {
+    to: '/transcript',
+    label: 'Transcript',
+    icon: FileText,
+    roles: ['Student'],
+    studentTypes: ['Advising Student'],
+    description: 'Pick an academic year to see its Winter, Spring, Summer and makeup results.',
   },
   // Req 57: only Advising Students have their schedule built by an Advisor.
   {
