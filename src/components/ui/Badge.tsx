@@ -8,6 +8,8 @@ interface BadgeProps {
   className?: string;
   /** Renders a leading dot, used for status pills that read at a glance. */
   dot?: boolean;
+  /** Renders a leading icon, used when a pill should read as a labelled glyph. */
+  icon?: React.ReactNode;
 }
 
 const TONES: Record<BadgeTone, string> = {
@@ -28,11 +30,12 @@ const DOTS: Record<BadgeTone, string> = {
   sky: 'bg-sky-400',
 };
 
-const Badge: React.FC<BadgeProps> = ({ tone = 'neutral', dot = false, className = '', children }) => (
+const Badge: React.FC<BadgeProps> = ({ tone = 'neutral', dot = false, icon = null, className = '', children }) => (
   <span
     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset whitespace-nowrap ${TONES[tone]} ${className}`}
   >
     {dot && <span className={`h-1.5 w-1.5 rounded-full ${DOTS[tone]}`} aria-hidden />}
+    {icon}
     {children}
   </span>
 );

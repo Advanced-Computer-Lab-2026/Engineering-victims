@@ -1,7 +1,7 @@
 import React from 'react';
-import { AlertCircle, CheckCircle2, Info, X } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Circle, Info, X } from 'lucide-react';
 
-type Tone = 'error' | 'success' | 'info';
+type Tone = 'error' | 'success' | 'info' | 'neutral';
 
 interface AlertBannerProps {
   tone?: Tone;
@@ -23,6 +23,10 @@ const TONES: Record<Tone, { wrap: string; icon: React.ReactNode }> = {
   info: {
     wrap: 'bg-slate-900/70 border-slate-700 text-slate-300',
     icon: <Info className="h-4 w-4 text-slate-400" aria-hidden />,
+  },
+  neutral: {
+    wrap: 'bg-slate-800/50 border-slate-700/80 text-slate-300',
+    icon: <Circle className="h-4 w-4 text-slate-400" aria-hidden />,
   },
 };
 

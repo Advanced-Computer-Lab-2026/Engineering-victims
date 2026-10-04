@@ -433,3 +433,21 @@ export interface EligibleSwapGroupsResponse {
   message: string;
 }
 
+/**
+ * Req 34 — one eligible group's complete weekly schedule, ready to render with
+ * the same day and session shape Req 31 uses.
+ */
+export interface SwapGroupScheduleResponse {
+  studyGroup: string;
+  major: string;
+  semester: number;
+  myGroup: string;
+  courseCodes: string[];
+  slotCount: number;
+  term: { id: string; academicYear: string; season: string } | null;
+  visible: boolean;
+  days: WeekDay[];
+  daysOff: WeekDay[];
+  sessions: ScheduleSession[];
+}
+

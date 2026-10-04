@@ -21,8 +21,24 @@ const CourseSlot = require('../models/CourseSlot');
  * rows the UI reads after a boot are ordinary data, not a special case.
  */
 
-/** The group label every seeded cohort gets; the UI reads it verbatim. */
-const GROUP_LABEL = 'G1';
+/**
+ * The labels a seeded cohort's groups get; the UI reads them verbatim.
+ *
+ * A cohort gets one published group per label, and every one of them carries
+ * the *same* slot list: seedOfferings builds exactly one slot per course and
+ * slot type for a term (and (courseId, termId) is unique), so there is no
+ * second time at which the same course runs. Sharing the slots is what makes
+ * the groups' registered course-code sets identical, which is the condition
+ * Req 34 matches on — a group that drifted to a different course set would
+ * never be offered as a swap destination.
+ *
+ * Students are spread across the labels, so a Normal Student always has at
+ * least one other group of their own cohort to look at.
+ */
+const GROUP_LABELS = ['G1', 'G2'];
+
+/** The label of the first group of a cohort. */
+const GROUP_LABEL = GROUP_LABELS[0];
 
 /**
  * A timetable never shows two sessions at once, and a Coordinator editing a
@@ -150,19 +166,29 @@ const seedScheduleGroups = async ({ terms, offerings, courses, students }) => {
       const slots = slotsForGroup(pool, major, semester);
       if (!slots.length) continue;
 
-      const template = await ScheduleTemplate.create({
-        major,
-        semester,
-        studyGroup: GROUP_LABEL,
-        termId: term._id,
-        publicationStatus: 'Published',
-        slots: slots.map((slot) => slot._id),
-      });
-
-      summary.groups += 1;
       const key = `${major}::${semester}`;
       const byCohort = created.get(String(term._id)) ?? new Map();
-      byCohort.set(key, { template, slots });
+      const slotIds = slots.map((slot) => slot._id);
+
+      // Every label of the cohort gets the very same slot list, so the groups
+      // hold the same courses at the same times and Req 34's exact course-set
+      // match holds between them.
+      const groups = [];
+      for (const studyGroup of GROUP_LABELS) {
+        const template = await ScheduleTemplate.create({
+          major,
+          semester,
+          studyGroup,
+          termId: term._id,
+          publicationStatus: 'Published',
+          slots: slotIds,
+        });
+
+        summary.groups += 1;
+        groups.push(template);
+      }
+
+      byCohort.set(key, { groups, slots });
       created.set(String(term._id), byCohort);
     }
   }
@@ -170,12 +196,18 @@ const seedScheduleGroups = async ({ terms, offerings, courses, students }) => {
   // Register the cohort in its own term: one processed schedule row per slot,
   // the group on the student's record, and the slots' occupancy counters
   // moved by exactly the number of students now sitting in them.
+  //
+  // Students are dealt round-robin over the cohort's groups. A cohort with one
+  // student still gets both published groups: the second one is an empty
+  // destination that runs the identical schedule, which is what keeps Req 34
+  // answerable for every Normal Student rather than only for shared cohorts.
   for (const { major, semester, students: cohort } of cohorts.values()) {
     const homeTerm = homeTermFor(semester, terms);
     const group = created.get(String(homeTerm._id))?.get(`${major}::${semester}`);
     if (!group) continue;
 
     const slotIds = group.slots.map((slot) => slot._id);
+    const labels = group.groups.map((template) => template.studyGroup);
 
     await StudentSchedule.deleteMany({
       studentId: { $in: cohort.map((student) => student._id) },
@@ -192,12 +224,12 @@ const seedScheduleGroups = async ({ terms, offerings, courses, students }) => {
       )
     );
 
-    for (const student of cohort) {
+    for (const [index, student] of cohort.entries()) {
       // Only the group membership is written here: seed() has already derived
       // each student's workflow status (all five Normal-Student statuses
       // already assume a schedule exists), and its deliberately staggered
       // lastUpdateAt drives the directory's sort order.
-      student.studyGroup = GROUP_LABEL;
+      student.studyGroup = labels[index % labels.length];
       await student.save();
     }
 
@@ -214,4 +246,4 @@ const seedScheduleGroups = async ({ terms, offerings, courses, students }) => {
   return summary;
 };
 
-module.exports = { seedScheduleGroups, GROUP_LABEL, MAX_SLOTS_PER_GROUP };
+module.exports = { seedScheduleGroups, GROUP_LABELS, GROUP_LABEL, MAX_SLOTS_PER_GROUP };
