@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarDays, GraduationCap, Loader2, RotateCcw, ScrollText, UserCheck, UserX, Users } from 'lucide-react';
+import { CalendarDays, GraduationCap, Loader2, RotateCcw, ScrollText, Search, UserCheck, UserX, Users } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
@@ -13,39 +13,85 @@ import { fetchAdvisingStudents } from '../lib/advisingStudentsService';
 import { formatDate, formatRelative } from '../lib/studentsService';
 import type { AdvisingStudentRow, AdvisingStudentsResponse } from '../lib/types';
 
+/** Debounce so typing in the search box does not fire a request per keystroke. */
+const SEARCH_DEBOUNCE_MS = 300;
+
 /**
  * Req 50: every Advising Student, for an Advisor.
+ * Req 51: searchable by student ID, full name or GUC email.
  *
  * "My Students" (req 6-9) stays the Advisor's own roster; this page is the
  * school-wide view the workbook asks for, so students assigned to other
- * Advisors appear too. The Advisor's own rows are marked "You".
+ * Advisors appear too, and search covers all of them. The Advisor's own rows
+ * are marked "You".
  */
 const AdvisingStudentsPage: React.FC = () => {
   const [data, setData] = useState<AdvisingStudentsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
-  const load = useCallback(async (isRefresh = false) => {
-    if (isRefresh) setIsRefreshing(true);
-    else setIsLoading(true);
-    setError(null);
-
-    try {
-      setData(await fetchAdvisingStudents());
-    } catch (err) {
-      setError((err as ApiError).message);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
+  const isFirstLoad = useRef(true);
+  /**
+   * Id of the newest request. Searches can overlap, so a response only lands
+   * when its id still matches; otherwise a slow "lai" could overwrite a later
+   * "laila", or clear the loading flags while the newer request is running.
+   */
+  const latestRequest = useRef(0);
 
   useEffect(() => {
-    load();
+    const timer = setTimeout(() => setSearch(searchInput.trim()), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  const load = useCallback(
+    async (isRefresh = false) => {
+      const requestId = ++latestRequest.current;
+      if (isRefresh) setIsRefreshing(true);
+      else setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetchAdvisingStudents(search);
+        if (requestId === latestRequest.current) setData(response);
+      } catch (err) {
+        if (requestId === latestRequest.current) {
+          // The old rows answer a different query, so they must not stay on
+          // screen looking like results for this one.
+          setData(null);
+          setError((err as ApiError).message);
+        }
+      } finally {
+        if (requestId === latestRequest.current) {
+          setIsLoading(false);
+          setIsRefreshing(false);
+          isFirstLoad.current = false;
+        }
+      }
+    },
+    [search]
+  );
+
+  // After the first load, a new search refreshes in place instead of
+  // blanking the table behind a spinner on every keystroke. The cleanup
+  // retires the in-flight request when the search changes or the page
+  // unmounts, so a late response never sets state.
+  useEffect(() => {
+    load(isFirstLoad.current === false);
+    return () => {
+      latestRequest.current += 1;
+    };
   }, [load]);
 
+  const clearSearch = () => {
+    setSearchInput('');
+    setSearch('');
+  };
+
   const students = data?.students ?? [];
+  const isSearching = search !== '';
 
   return (
     <>
@@ -82,19 +128,60 @@ const AdvisingStudentsPage: React.FC = () => {
         </div>
       )}
 
+      <Card tone="flat" className="mb-4 p-4">
+        <div className="relative">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder="Search by student ID (64-12345), name or GUC email"
+            aria-label="Search advising students"
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/70 py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 transition-colors hover:border-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+          />
+        </div>
+        {data && isSearching && (
+          <p className="mt-2 text-xs text-slate-400" aria-live="polite">
+            Showing {data.summary.matched} of {data.summary.total} advising students
+          </p>
+        )}
+      </Card>
+
       {isLoading ? (
         <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading advising students...
         </Card>
-      ) : students.length === 0 ? (
+      ) : !data ? (
+        // The last request failed. Once its banner is dismissed, say so rather
+        // than claiming there are no advising students.
         !error && (
+          <EmptyState
+            icon={<Users className="h-5 w-5" />}
+            title="Advising students could not be loaded"
+            description="The last request failed, so no results are shown."
+            action={{ label: 'Try again', onClick: () => load() }}
+          />
+        )
+      ) : students.length === 0 ? (
+        !error &&
+        (isSearching ? (
+          <EmptyState
+            icon={<Search className="h-5 w-5" />}
+            title={`No advising students match "${search}"`}
+            description="Search by a full student ID such as 64-12345, part of a name, or a GUC email."
+            action={{ label: 'Clear search', onClick: clearSearch }}
+          />
+        ) : (
           <EmptyState
             icon={<Users className="h-5 w-5" />}
             title="No advising students yet"
             description="Advising students appear here as soon as they exist in the directory."
           />
-        )
+        ))
       ) : (
         <Card tone="raised" className="overflow-hidden">
           <div className="overflow-x-auto">
