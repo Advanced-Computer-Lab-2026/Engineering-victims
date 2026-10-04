@@ -1,5 +1,6 @@
 const AcademicTerm = require('../models/AcademicTerm');
 const StudentSchedule = require('../models/StudentSchedule');
+const CourseSlot = require('../models/CourseSlot');
 
 /**
  * Req 31: a student's current weekly schedule.
@@ -163,4 +164,57 @@ const buildWeeklySchedule = async (student, { asStudent }) => {
   };
 };
 
-module.exports = { buildWeeklySchedule, stageFor, ADVISING_STAGE, TEACHING_DAYS };
+/**
+ * Req 34: the complete weekly schedule a standard schedule group runs.
+ *
+ * The group's ScheduleTemplate holds the slot ids directly rather than going
+ * through StudentSchedule rows, so this walks slot -> offering -> course the
+ * same way buildWeeklySchedule does and returns the sessions in the same day
+ * and time order. The viewer for a swap destination therefore renders this
+ * exactly like a student's own week, which is what Req 34 asks for.
+ */
+const buildTemplateSchedule = async (template) => {
+  const slots = await CourseSlot.find({ _id: { $in: template.slots } })
+    .populate([
+      { path: 'offeringId', populate: { path: 'courseId', select: 'code name creditHours' } },
+      { path: 'instructorId', select: 'fullName' },
+    ])
+    .lean();
+
+  const sessions = slots
+    .filter((slot) => slot.offeringId?.courseId)
+    .map((slot) => {
+      const course = slot.offeringId.courseId;
+      return {
+        id: String(slot._id),
+        courseCode: course.code,
+        courseName: course.name,
+        creditHours: course.creditHours,
+        slotType: slot.slotType,
+        groupNumber: slot.groupNumber,
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        room: slot.roomId,
+        instructor: slot.instructorId?.fullName ?? null,
+      };
+    })
+    .sort(
+      (a, b) =>
+        WEEK_ORDER.indexOf(a.dayOfWeek) - WEEK_ORDER.indexOf(b.dayOfWeek) ||
+        toMinutes(a.startTime) - toMinutes(b.startTime)
+    );
+
+  const usedDays = new Set(sessions.map((session) => session.dayOfWeek));
+  const days = WEEK_ORDER.filter((day) => TEACHING_DAYS.includes(day) || usedDays.has(day));
+
+  return {
+    visible: true,
+    days,
+    // A day off is a teaching day with nothing on it; Friday is the weekend.
+    daysOff: TEACHING_DAYS.filter((day) => !usedDays.has(day)),
+    sessions,
+  };
+};
+
+module.exports = { buildWeeklySchedule, buildTemplateSchedule, stageFor, ADVISING_STAGE, TEACHING_DAYS, WEEK_ORDER };

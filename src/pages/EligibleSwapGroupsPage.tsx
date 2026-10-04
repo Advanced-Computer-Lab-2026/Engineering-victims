@@ -1,14 +1,21 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Loader2, RefreshCcw, Calendar, BookOpen, Users, ArrowRightLeft, Eye } from 'lucide-react';
+import { Loader2, RefreshCcw, Calendar, BookOpen, Users, ArrowRightLeft, Eye, Clock, MapPin, UserRound, Coffee } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
-import { fetchStudentSchedule } from '../lib/weeklyScheduleService';
-import type { EligibleSwapGroupsResponse, WeeklyScheduleResponse } from '../lib/types';
+import { fetchSwapGroupSchedule } from '../lib/weeklyScheduleService';
+import type { EligibleSwapGroupsResponse, ScheduleSession, SwapGroupScheduleResponse } from '../lib/types';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
+import Badge, { type BadgeTone } from '../components/ui/Badge';
 import CustomButton from '../components/ui/CustomButton';
 import AlertBanner from '../components/ui/AlertBanner';
 import EmptyState from '../components/ui/EmptyState';
+
+/** Lecture, tutorial and lab read apart at a glance, matching Req 31's grid. */
+const TYPE_STYLE: Record<ScheduleSession['slotType'], { tone: BadgeTone; card: string }> = {
+  Lecture: { tone: 'indigo', card: 'border-indigo-500/40 bg-indigo-500/10' },
+  Tutorial: { tone: 'sky', card: 'border-sky-500/40 bg-sky-500/10' },
+  Lab: { tone: 'emerald', card: 'border-emerald-500/40 bg-emerald-500/10' },
+};
 
 /**
  * Req 34: Normal Student views eligible destination group numbers and their
@@ -21,8 +28,9 @@ const EligibleSwapGroupsPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
-  const [groupSchedule, setGroupSchedule] = useState<WeeklyScheduleResponse | null>(null);
+  const [groupSchedule, setGroupSchedule] = useState<SwapGroupScheduleResponse | null>(null);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+  const [scheduleError, setScheduleError] = useState<ApiError | null>(null);
 
   const load = useCallback(async (isRefresh = false) => {
     if (isRefresh) setIsRefreshing(true);
@@ -43,21 +51,32 @@ const EligibleSwapGroupsPage: React.FC = () => {
     load();
   }, [load]);
 
+  /**
+   * Opens the destination group's complete week. The API re-checks eligibility
+   * against this student's own course set, so a group that is no longer a valid
+   * destination comes back as an error banner instead of a schedule.
+   */
   const viewGroupSchedule = async (groupNumber: string) => {
+    if (selectedGroup === groupNumber && groupSchedule) return;
+
     setSelectedGroup(groupNumber);
     setIsLoadingSchedule(true);
+    setScheduleError(null);
     setGroupSchedule(null);
-    
+
     try {
-      // This is a temporary approach - in a real implementation, you'd need
-      // an endpoint to get a schedule by group number, not by student ID.
-      // For now, we'll show a message that viewing schedules requires backend support.
-      setGroupSchedule(null);
+      setGroupSchedule(await fetchSwapGroupSchedule(groupNumber));
     } catch (err) {
-      console.error('Could not load group schedule:', err);
+      setScheduleError(err as ApiError);
     } finally {
       setIsLoadingSchedule(false);
     }
+  };
+
+  const closeSchedule = () => {
+    setSelectedGroup(null);
+    setGroupSchedule(null);
+    setScheduleError(null);
   };
 
   return (
@@ -205,34 +224,136 @@ const EligibleSwapGroupsPage: React.FC = () => {
 
               {/* Note about submitting swap requests */}
               <AlertBanner tone="neutral" title="Next Steps">
-                To submit a swap request, you'll use the swap request feature (Requirement 35) which allows you to
-                select one or more desired groups. The request will be visible to students in those groups who can
-                then complete the swap.
+                Open <strong>View Schedule</strong> on any group above to see its complete lecture, tutorial and lab
+                timetable before you decide. Submitting the swap itself is handled by the swap request feature
+                (Requirement 35), which lets you select one or more of these eligible groups.
               </AlertBanner>
             </>
           )}
 
-          {/* Schedule Viewer Modal (placeholder) */}
+          {/* Schedule viewer: the destination group's complete week */}
           {selectedGroup && (
             <div className="fixed inset-0 z-50 flex items-center justify-center">
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedGroup(null)} />
-              <Card tone="raised" className="relative z-10 w-full max-w-4xl max-h-[90vh] overflow-y-auto m-4 p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-bold text-white">Group {selectedGroup} Schedule</h3>
-                  <CustomButton variant="ghost" size="sm" onClick={() => setSelectedGroup(null)}>
+              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeSchedule} />
+              <Card tone="raised" className="relative z-10 m-4 max-h-[90vh] w-full max-w-4xl overflow-y-auto p-6">
+                <div className="mb-4 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Group {selectedGroup} Schedule</h3>
+                    {groupSchedule && (
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {groupSchedule.major} · Semester {groupSchedule.semester}
+                        {groupSchedule.term && ` · ${groupSchedule.term.academicYear} ${groupSchedule.term.season}`}
+                        {' · '}
+                        {groupSchedule.sessions.length} sessions
+                      </p>
+                    )}
+                  </div>
+                  <CustomButton variant="ghost" size="sm" onClick={closeSchedule}>
                     Close
                   </CustomButton>
                 </div>
 
-                <AlertBanner tone="info" title="Schedule View">
-                  To view the complete weekly schedule for this group, you can use the schedule comparison feature in
-                  the swap request workflow. This will show a side-by-side comparison of your current schedule and the
-                  destination group's schedule.
-                </AlertBanner>
+                {scheduleError && (
+                  <div className="mb-4">
+                    <AlertBanner tone={scheduleError.status === 403 ? 'info' : 'error'} title="Could not load this schedule">
+                      {scheduleError.message}
+                    </AlertBanner>
+                  </div>
+                )}
 
-                <div className="mt-4 text-center text-sm text-slate-400">
-                  Full schedule viewer will be available in Requirement 35 (Submit Swap Request)
-                </div>
+                {isLoadingSchedule ? (
+                  <div className="flex items-center justify-center gap-2 p-12 text-sm text-slate-400">
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                    Loading Group {selectedGroup}'s schedule...
+                  </div>
+                ) : groupSchedule ? (
+                  groupSchedule.sessions.length === 0 ? (
+                    <EmptyState
+                      icon={<Calendar className="h-5 w-5" />}
+                      title="No sessions registered"
+                      description="This group has no lectures, tutorials or labs registered for the term."
+                    />
+                  ) : (
+                    <>
+                      <div className="mb-4 flex flex-wrap gap-1">
+                        {groupSchedule.courseCodes.map((code) => (
+                          <Badge key={code} tone="sky" className="text-[10px]">
+                            {code}
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <AlertBanner tone="info" title="Exact course set">
+                        This group runs exactly the same courses as your own schedule, which is what makes it a valid
+                        swap destination.
+                      </AlertBanner>
+
+                      <div className="mt-4 space-y-5">
+                        {groupSchedule.days.map((day) => {
+                          const daySessions = groupSchedule.sessions.filter(
+                            (session) => session.dayOfWeek === day
+                          );
+                          const isDayOff = groupSchedule.daysOff.includes(day);
+
+                          return (
+                            <div key={day}>
+                              <div className="mb-2 flex items-center gap-2">
+                                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">{day}</h4>
+                                {isDayOff && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-300">
+                                    <Coffee className="h-3 w-3" aria-hidden />
+                                    Day off
+                                  </span>
+                                )}
+                              </div>
+
+                              {daySessions.length === 0 ? (
+                                <p className="text-xs text-slate-500">No classes</p>
+                              ) : (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {daySessions.map((session) => (
+                                    <div
+                                      key={session.id}
+                                      className={`rounded-lg border p-3 ${TYPE_STYLE[session.slotType].card}`}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-mono text-sm font-semibold text-white">
+                                          {session.courseCode}
+                                        </span>
+                                        <Badge tone={TYPE_STYLE[session.slotType].tone}>
+                                          {session.slotType} · G{session.groupNumber}
+                                        </Badge>
+                                      </div>
+                                      <p className="mt-0.5 truncate text-xs text-slate-300" title={session.courseName}>
+                                        {session.courseName}
+                                      </p>
+                                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                                        <span className="flex items-center gap-1">
+                                          <Clock className="h-3 w-3" aria-hidden />
+                                          {session.startTime}–{session.endTime}
+                                        </span>
+                                        <span className="flex items-center gap-1">
+                                          <MapPin className="h-3 w-3" aria-hidden />
+                                          {session.room}
+                                        </span>
+                                        {session.instructor && (
+                                          <span className="flex items-center gap-1">
+                                            <UserRound className="h-3 w-3" aria-hidden />
+                                            {session.instructor}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )
+                ) : null}
               </Card>
             </div>
           )}

@@ -25,6 +25,14 @@ router.get('/my-courses', authenticate, requireRole('Student'), studentControlle
 router.get('/my-courses/:courseId', authenticate, requireRole('Student'), studentController.getMyCourseDetails);
 // Req 34: view eligible swap groups with exact same course set
 router.get('/eligible-swap-groups', authenticate, requireRole('Student'), studentController.getEligibleSwapGroups);
+// Req 34: the complete weekly schedule of one of those groups, re-checked
+// against the caller's own course set inside the controller.
+router.get(
+  '/eligible-swap-groups/:group',
+  authenticate,
+  requireRole('Student'),
+  studentController.getEligibleSwapGroupSchedule
+);
 router.patch(
   '/:id/advisor',
   ...staffOnly,
