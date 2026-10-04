@@ -434,6 +434,280 @@ exports.getMyCourses = async (req, res) => {
   }
 };
 
+/**
+ * Req 33: select a registered course and view its assigned lecture, tutorial
+ * and lab details. Shows the specific slots (day, time, room, instructor) for
+ * each component type the student is enrolled in for that course.
+ */
+exports.getMyCourseDetails = async (req, res) => {
+  try {
+    const { courseId } = req.params;
+
+    if (!mongoose.isValidObjectId(courseId)) {
+      return res.status(400).json({ message: 'Invalid course ID.' });
+    }
+
+    // Resolved from the token, never from a URL parameter
+    const user = await User.findById(req.user.userId).select('email').lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const student = await Student.findOne({ email: user.email }).select('_id').lean();
+    if (!student) {
+      return res.status(404).json({ message: 'No student record is linked to this account.' });
+    }
+
+    // Find the course details first
+    const course = await Course.findById(courseId).select('code name creditHours courseType').lean();
+    if (!course) {
+      return res.status(404).json({ message: 'Course not found.' });
+    }
+
+    // Only show active/processed registrations (same visibility as req 32)
+    const registered = { status: { $in: ['Active', 'Processed'] } };
+
+    // Get the current term from the latest registration
+    const latest = await StudentSchedule.findOne({ studentId: student._id, ...registered })
+      .sort({ createdAt: -1 })
+      .select('termId')
+      .lean();
+
+    if (!latest) {
+      return res.status(404).json({ message: 'You are not registered for any courses this term.' });
+    }
+
+    // Find all schedule entries for this student in the current term
+    const entries = await StudentSchedule.find({ studentId: student._id, termId: latest.termId, ...registered })
+      .select('slotId')
+      .lean();
+
+    // Get all slots for these entries
+    const slots = await CourseSlot.find({ _id: { $in: entries.map((entry) => entry.slotId) } })
+      .populate('instructorId', 'fullName email')
+      .lean();
+
+    // Find offerings that match this course
+    const slotOfferingIds = slots.map((slot) => slot.offeringId);
+    const offerings = await CourseOffering.find({
+      _id: { $in: slotOfferingIds },
+      courseId: courseId,
+    })
+      .select('_id')
+      .lean();
+
+    if (offerings.length === 0) {
+      return res.status(404).json({ message: 'You are not registered for this course this term.' });
+    }
+
+    const offeringIds = offerings.map((offering) => offering._id.toString());
+
+    // Filter slots to only those belonging to offerings of this course
+    const courseSlots = slots.filter((slot) => offeringIds.includes(slot.offeringId.toString()));
+
+    if (courseSlots.length === 0) {
+      return res.status(404).json({ message: 'No slots found for this course in your schedule.' });
+    }
+
+    // Group slots by type and format the response
+    const slotsByType = {
+      Lecture: [],
+      Tutorial: [],
+      Lab: [],
+    };
+
+    courseSlots.forEach((slot) => {
+      const slotData = {
+        id: String(slot._id),
+        slotType: slot.slotType,
+        groupNumber: slot.groupNumber,
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        room: slot.roomId,
+        instructor: slot.instructorId
+          ? {
+              id: String(slot.instructorId._id),
+              fullName: slot.instructorId.fullName,
+              email: slot.instructorId.email,
+            }
+          : null,
+      };
+
+      if (slotsByType[slot.slotType]) {
+        slotsByType[slot.slotType].push(slotData);
+      }
+    });
+
+    // Sort each type by day and time
+    const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    Object.keys(slotsByType).forEach((type) => {
+      slotsByType[type].sort((a, b) => {
+        const dayDiff = dayOrder.indexOf(a.dayOfWeek) - dayOrder.indexOf(b.dayOfWeek);
+        if (dayDiff !== 0) return dayDiff;
+        return a.startTime.localeCompare(b.startTime);
+      });
+    });
+
+    res.status(200).json({
+      course: {
+        id: String(course._id),
+        code: course.code,
+        name: course.name,
+        creditHours: course.creditHours,
+        courseType: course.courseType,
+      },
+      slots: {
+        lectures: slotsByType.Lecture,
+        tutorials: slotsByType.Tutorial,
+        labs: slotsByType.Lab,
+      },
+      totalSlots: courseSlots.length,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load course details.', error: error.message });
+  }
+};
+
+/**
+ * Req 34: view eligible destination groups for whole-schedule swap.
+ * Shows only groups in the same term with the exact same course-code set.
+ */
+exports.getEligibleSwapGroups = async (req, res) => {
+  try {
+    // Resolved from the token
+    const user = await User.findById(req.user.userId).select('email').lean();
+    if (!user) return res.status(404).json({ message: 'User not found' });
+
+    const student = await Student.findOne({ email: user.email });
+    if (!student) {
+      return res.status(404).json({ message: 'No student record is linked to this account.' });
+    }
+
+    if (student.studentType !== 'Normal Student') {
+      return res.status(403).json({ 
+        message: 'Only normal students can view swap-eligible groups. Advising students use the slot-change request flow.' 
+      });
+    }
+
+    if (!student.studyGroup) {
+      return res.status(400).json({ 
+        message: 'You must be assigned to a study group before you can view eligible swap groups.' 
+      });
+    }
+
+    // Get the current term from the latest processed schedule
+    const registered = { status: { $in: ['Active', 'Processed'] } };
+    const latest = await StudentSchedule.findOne({ studentId: student._id, ...registered })
+      .sort({ createdAt: -1 })
+      .select('termId')
+      .lean();
+
+    if (!latest) {
+      return res.status(404).json({ 
+        message: 'You must have a processed schedule before you can view eligible swap groups.' 
+      });
+    }
+
+    // Get all the student's registered course codes
+    const entries = await StudentSchedule.find({ studentId: student._id, termId: latest.termId, ...registered })
+      .select('slotId')
+      .lean();
+
+    const slots = await CourseSlot.find({ _id: { $in: entries.map((e) => e.slotId) } })
+      .select('offeringId')
+      .lean();
+
+    const offerings = await CourseOffering.find({
+      _id: { $in: [...new Set(slots.map((s) => s.offeringId))] },
+    })
+      .select('courseId')
+      .lean();
+
+    const courseIds = [...new Set(offerings.map((o) => o.courseId))];
+    const courses = await Course.find({ _id: { $in: courseIds } })
+      .select('code')
+      .sort({ code: 1 })
+      .lean();
+
+    const myCourseCodes = courses.map((c) => c.code).sort();
+
+    if (myCourseCodes.length === 0) {
+      return res.status(400).json({ message: 'You have no registered courses to match against.' });
+    }
+
+    // Find all published templates for this major/semester/term
+    const templates = await ScheduleTemplate.find({
+      major: student.major,
+      semester: student.currentSemester,
+      termId: latest.termId,
+      publicationStatus: 'Published',
+      studyGroup: { $ne: student.studyGroup }, // Exclude their own group
+    }).lean();
+
+    if (templates.length === 0) {
+      return res.status(200).json({ 
+        eligibleGroups: [], 
+        myGroup: student.studyGroup,
+        myCourses: myCourseCodes,
+        message: 'No other published groups found for your major and semester.' 
+      });
+    }
+
+    // For each template, check if it has the exact same course set
+    const eligibleGroups = [];
+
+    for (const template of templates) {
+      // Get all slots in this template
+      const templateSlots = await CourseSlot.find({ _id: { $in: template.slots } })
+        .select('offeringId')
+        .lean();
+
+      const templateOfferingIds = [...new Set(templateSlots.map((s) => s.offeringId))];
+      const templateOfferings = await CourseOffering.find({
+        _id: { $in: templateOfferingIds },
+      })
+        .select('courseId')
+        .lean();
+
+      const templateCourseIds = [...new Set(templateOfferings.map((o) => o.courseId))];
+      const templateCourses = await Course.find({ _id: { $in: templateCourseIds } })
+        .select('code')
+        .sort({ code: 1 })
+        .lean();
+
+      const templateCourseCodes = templateCourses.map((c) => c.code).sort();
+
+      // Check for exact match (same codes, same length, same order)
+      const isExactMatch =
+        myCourseCodes.length === templateCourseCodes.length &&
+        myCourseCodes.every((code, index) => code === templateCourseCodes[index]);
+
+      if (isExactMatch) {
+        eligibleGroups.push({
+          studyGroup: template.studyGroup,
+          major: template.major,
+          semester: template.semester,
+          courseCodes: templateCourseCodes,
+          slotCount: template.slots.length,
+        });
+      }
+    }
+
+    const term = await AcademicTerm.findById(latest.termId).select('academicYear season').lean();
+
+    res.status(200).json({
+      myGroup: student.studyGroup,
+      myCourses: myCourseCodes,
+      eligibleGroups: eligibleGroups.sort((a, b) => a.studyGroup.localeCompare(b.studyGroup)),
+      term: term ? { id: String(term._id), academicYear: term.academicYear, season: term.season } : null,
+      message: eligibleGroups.length === 0 
+        ? 'No eligible groups found with the exact same course set.' 
+        : `Found ${eligibleGroups.length} eligible group${eligibleGroups.length === 1 ? '' : 's'} for swap.`,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load eligible swap groups.', error: error.message });
+  }
+};
+
 // Shared with the Advisor's all-advising-students list (req 50), so both lists
 // describe a student with the same fields.
 exports.serialize = serialize;

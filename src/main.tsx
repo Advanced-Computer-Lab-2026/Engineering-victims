@@ -23,6 +23,7 @@ import AcademicHistoryPage from './pages/AcademicHistoryPage';
 import WeeklySchedulePage from './pages/WeeklySchedulePage';
 import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
+import EligibleSwapGroupsPage from './pages/EligibleSwapGroupsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -87,6 +88,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           {/* Req 32: registered courses, credits per course and the total —
               for every student, Normal and Advising alike. */}
           <Route path="/my-courses" element={<MyRegisteredCoursesPage />} />
+          {/* Req 34: Normal Students can view eligible swap groups with
+              exact same course set. */}
+          <Route path="/eligible-swap-groups" element={<EligibleSwapGroupsPage />} />
           {/* Req 31: a student's own weekly schedule. */}
           <Route path="/schedule" element={<WeeklySchedulePage />} />
           {/* Req 57: Advising Students' scheduling preferences. */}

@@ -21,6 +21,10 @@ router.get('/stats', ...staffOnly, studentController.getStats);
 // Req 32: a student's own registered courses. Declared before '/:id' so
 // "my-courses" is never read as an ObjectId.
 router.get('/my-courses', authenticate, requireRole('Student'), studentController.getMyCourses);
+// Req 33: view details of a specific registered course (lecture, tutorial, lab slots)
+router.get('/my-courses/:courseId', authenticate, requireRole('Student'), studentController.getMyCourseDetails);
+// Req 34: view eligible swap groups with exact same course set
+router.get('/eligible-swap-groups', authenticate, requireRole('Student'), studentController.getEligibleSwapGroups);
 router.patch(
   '/:id/advisor',
   ...staffOnly,

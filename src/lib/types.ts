@@ -383,3 +383,53 @@ export interface SchedulingPreferencesResponse {
   } | null;
   options?: { kinds: PreferenceKind[]; days: WeekDay[]; maxPreferences: number };
 }
+
+/** Req 33 — detailed view of a registered course's assigned slots. */
+export interface CourseSlotDetail {
+  id: string;
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  groupNumber: number;
+  dayOfWeek: WeekDay;
+  startTime: string;
+  endTime: string;
+  room: string;
+  instructor: {
+    id: string;
+    fullName: string;
+    email: string;
+  } | null;
+}
+
+export interface CourseDetailsResponse {
+  course: {
+    id: string;
+    code: string;
+    name: string;
+    creditHours: number;
+    courseType: CourseType;
+  };
+  slots: {
+    lectures: CourseSlotDetail[];
+    tutorials: CourseSlotDetail[];
+    labs: CourseSlotDetail[];
+  };
+  totalSlots: number;
+}
+
+/** Req 34 — eligible groups for whole-schedule swap. */
+export interface EligibleSwapGroup {
+  studyGroup: string;
+  major: string;
+  semester: number;
+  courseCodes: string[];
+  slotCount: number;
+}
+
+export interface EligibleSwapGroupsResponse {
+  myGroup: string;
+  myCourses: string[];
+  eligibleGroups: EligibleSwapGroup[];
+  term: { id: string; academicYear: string; season: string } | null;
+  message: string;
+}
+
