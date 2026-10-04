@@ -26,6 +26,8 @@ const serialize = (student) => ({
   currentSemester: student.currentSemester,
   studyGroup: student.studyGroup,
   academicStanding: student.academicStanding,
+  // Req 52 and 59: why this student is on advising. Normal Students have none.
+  advisingReason: student.advisingReason ?? null,
   assignedAdvisor: student.assignedAdvisor
     ? {
         id: student.assignedAdvisor._id,

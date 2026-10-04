@@ -25,6 +25,16 @@ router.get(
   advisingStudentsController.listAdvisingStudents
 );
 
+// Req 53: open the advising details of any student the list just displayed.
+// Kept separate from /api/students/:id, which only reaches an Advisor's own
+// roster, because req 53 lets any Advisor open any student from these results.
+router.get(
+  '/advising-students/:id',
+  authenticate,
+  requireRole('Advisor'),
+  advisingStudentsController.getAdvisingStudent
+);
+
 // Get list of all advisors (useful for UI)
 router.get('/', ...staffOnly, advisorController.listAdvisors);
 

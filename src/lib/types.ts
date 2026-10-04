@@ -69,6 +69,8 @@ export interface StudentSummary {
   currentSemester: number;
   studyGroup: string | null;
   academicStanding: string;
+  /** Req 52, 59 — why this student is on advising; null for Normal Students. */
+  advisingReason: string | null;
   assignedAdvisor: AdvisorSummary | null;
   workflowStatus: string;
   blockingStep: string | null;
@@ -97,12 +99,48 @@ export interface StudentsResponse {
 export interface AdvisingStudentRow extends StudentSummary {
   /** True when the signed-in Advisor is this student's assigned Advisor. */
   isMine: boolean;
+  /** Req 52 — derived from the workflow status; "None" when nothing is pending. */
+  pendingRequest: string;
 }
+
+/** Req 52 — the option set for each of the five advising-student filters. */
+export interface AdvisingFilterOptions {
+  /** Self is labelled "My assigned students"; "none" means unassigned. */
+  advisors: Array<{ value: string; label: string; email: string | null }>;
+  majors: string[];
+  advisingReasons: string[];
+  workflowStatuses: string[];
+  pendingRequestTypes: string[];
+}
+
+/** Req 52 — filters combine with AND and can all be cleared at once. */
+export interface AdvisingStudentFilters {
+  search: string;
+  assignedAdvisor: string;
+  major: string;
+  advisingReason: string;
+  workflowStatus: string;
+  pendingRequestType: string;
+}
+
+export const EMPTY_ADVISING_FILTERS: AdvisingStudentFilters = {
+  search: '',
+  assignedAdvisor: '',
+  major: '',
+  advisingReason: '',
+  workflowStatus: '',
+  pendingRequestType: '',
+};
+
+/** True when any filter other than the debounced search term is set. */
+export const hasActiveAdvisingFilters = (filters: AdvisingStudentFilters): boolean =>
+  Object.entries(filters).some(([key, value]) => key !== 'search' && value !== '');
 
 export interface AdvisingStudentsResponse {
   students: AdvisingStudentRow[];
   /** total, mine and unassigned cover every advising student; matched counts the search results. */
   summary: { total: number; mine: number; unassigned: number; matched: number };
+  filterOptions: AdvisingFilterOptions;
 }
 
 export interface StudentDetailResponse {
