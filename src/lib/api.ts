@@ -23,11 +23,14 @@ export const authHeaders = (): Record<string, string> => {
 
 export class ApiError extends Error {
   status: number;
+  /** The parsed error body, for endpoints that return more than a message. */
+  data?: unknown;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, data?: unknown) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -64,7 +67,7 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
 
   const data = payload as { message?: string };
   if (!response.ok) {
-    throw new ApiError(data.message || `Request failed with status ${response.status}`, response.status);
+    throw new ApiError(data.message || `Request failed with status ${response.status}`, response.status, payload);
   }
 
   return payload as T;

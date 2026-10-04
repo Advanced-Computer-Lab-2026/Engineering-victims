@@ -1,49 +1,12 @@
 const mongoose = require('mongoose');
 const Course = require('../models/Course');
-const { FIELD_LABELS } = Course;
-
-const FIELD_ORDER = Object.keys(FIELD_LABELS);
+const { formatCourseError, FIELD_ORDER } = require('../utils/courseErrors');
+const { importCoursesFromCsv, CourseImportError } = require('../services/courseImportService');
 
 const badRequest = (message) => {
   const err = new Error(message);
   err.status = 400;
   return err;
-};
-
-/**
- * Same idea as the academic term errors: plain sentences the form can show
- * as-is instead of `Path "creditHours" ...` or a raw E11000 dump.
- */
-const formatCourseError = (error, code) => {
-  if (!error) return 'Could not save the course.';
-
-  // The code index is case-insensitive, so error.keyValue holds a collation
-  // key rather than readable text; the caller passes the code it tried to save.
-  if (error.code === 11000) {
-    return code ? `A course with the code ${code} already exists.` : 'That course already exists.';
-  }
-
-  if (error.name === 'ValidationError') {
-    const positionOf = (path) => {
-      const index = FIELD_ORDER.indexOf(path.split('.')[0]);
-      return index === -1 ? FIELD_ORDER.length : index;
-    };
-
-    const messages = Object.values(error.errors ?? {})
-      .sort((a, b) => positionOf(a.path) - positionOf(b.path))
-      .map((detail) => {
-        if (detail.name !== 'CastError') return detail.message;
-        const label = FIELD_LABELS[detail.path.split('.')[0]] ?? 'One of the fields';
-        return `${label} has an invalid value.`;
-      })
-      .filter(Boolean);
-
-    if (messages.length > 0) return [...new Set(messages)].join(' ');
-    return error.message || 'Could not save the course.';
-  }
-
-  if (error.status) return error.message;
-  return 'Could not save the course.';
 };
 
 /** Shape sent to the client: `id` instead of `_id`, prerequisites as summaries. */
@@ -167,6 +130,23 @@ exports.createCourse = async (req, res) => {
   } catch (error) {
     const status = error.status || (error.code === 11000 ? 409 : 400);
     res.status(status).json({ message: formatCourseError(error, course?.code) });
+  }
+};
+
+// Req 128: import courses from a CSV file. The client sends the file's text as
+// { csv }; nothing is written unless every row is valid.
+exports.importCourses = async (req, res) => {
+  try {
+    const result = await importCoursesFromCsv(req.body?.csv, { userId: req.user?.userId ?? null });
+    res.status(200).json({
+      ...result,
+      message: `Imported ${result.created + result.updated} course${result.created + result.updated === 1 ? '' : 's'}: ${result.created} created, ${result.updated} updated.`,
+    });
+  } catch (error) {
+    if (error instanceof CourseImportError) {
+      return res.status(error.status).json({ message: error.message, errors: error.errors });
+    }
+    res.status(500).json({ message: 'Could not import the courses.', errors: [] });
   }
 };
 

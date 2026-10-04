@@ -236,6 +236,24 @@ export interface CoursesResponse {
   courses: Course[];
 }
 
+/** Req 128 — CSV import. `row` is the spreadsheet row (header = 1); null for file-level problems. */
+export interface CourseImportRowError {
+  row: number | null;
+  code: string | null;
+  messages: string[];
+}
+
+export interface CourseImportResult {
+  created: number;
+  updated: number;
+  message: string;
+}
+
+export interface CourseImportErrorResponse {
+  message: string;
+  errors: CourseImportRowError[];
+}
+
 /** Req 54 — a student's academic history. */
 export interface HistoryCourse {
   id: string;

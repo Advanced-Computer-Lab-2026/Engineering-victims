@@ -1,5 +1,5 @@
 import { apiFetch } from './api';
-import type { Course, CourseDraft, CoursesResponse } from './types';
+import type { Course, CourseDraft, CourseImportResult, CoursesResponse } from './types';
 
 /** Sends numbers as numbers; blanks go as empty strings so the server reports them. */
 const toPayload = (draft: CourseDraft) => {
@@ -30,6 +30,14 @@ export const updateCourse = async (id: string, draft: CourseDraft): Promise<{ co
   return apiFetch<{ course: Course }>(`/api/courses/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(toPayload(draft)),
+  });
+};
+
+// Req 128: the file's text goes as JSON; on a 422 the ApiError's `data` holds the row errors.
+export const importCourses = async (csv: string): Promise<CourseImportResult> => {
+  return apiFetch<CourseImportResult>('/api/courses/import', {
+    method: 'POST',
+    body: JSON.stringify({ csv }),
   });
 };
 
