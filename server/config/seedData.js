@@ -607,8 +607,12 @@ const seedOfferings = async ({ terms, courses, instructors }) => {
 };
 
 /**
- * Rebuilds the demo data from scratch. Called on every boot so the database is
- * always in a known state.
+ * Rebuilds the demo data from scratch — **destructive**. Every collection it
+ * touches is emptied first, so anything created at runtime is lost.
+ *
+ * This is the explicit reset: `node seed/seed.cjs` and an Administrator hitting
+ * `GET /api/auth/seed` both land here. The server does not call it on boot;
+ * `seedIfEmpty()` below decides that.
  *
  * CourseOffering and CourseSlot are wiped too: their ids are regenerated on
  * every run, so leaving them behind would strand offerings on courses and terms
@@ -761,4 +765,46 @@ const seed = async () => {
   };
 };
 
-module.exports = { seed, ADVISORS, STAFF, STUDENTS };
+/**
+ * Whether the database already holds the data a working app needs.
+ *
+ * All three collections have to be present, not just one. A seed that dies
+ * halfway (a dropped connection between creating users and creating students)
+ * leaves a database that looks initialized to a naive "are there any users?"
+ * check — and would then be frozen in a broken state forever. Requiring every
+ * core collection means a half-finished seed repairs itself on the next boot,
+ * while a healthy database is left strictly alone.
+ */
+const isSeeded = async () => {
+  const [users, students, courses] = await Promise.all([
+    User.countDocuments(),
+    Student.countDocuments(),
+    Course.countDocuments(),
+  ]);
+
+  return { seeded: users > 0 && students > 0 && courses > 0, users, students, courses };
+};
+
+/**
+ * The boot-time entry point: seed a database that has never been populated,
+ * skip one that already has.
+ *
+ * The skip is the whole point. Boot used to call seed() unconditionally, so
+ * every restart — including a nodemon restart triggered by saving a file —
+ * wiped the database mid-session. Now a restart is harmless, and
+ * `node seed/seed.cjs` remains the deliberate way to get a clean slate.
+ *
+ * Returns `{ skipped: true, users, students, courses }` when it did nothing,
+ * or the full seed() result when it ran.
+ */
+const seedIfEmpty = async () => {
+  const status = await isSeeded();
+
+  if (status.seeded) {
+    return { skipped: true, users: status.users, students: status.students, courses: status.courses };
+  }
+
+  return { skipped: false, ...(await seed()) };
+};
+
+module.exports = { seed, seedIfEmpty, isSeeded, ADVISORS, STAFF, STUDENTS };

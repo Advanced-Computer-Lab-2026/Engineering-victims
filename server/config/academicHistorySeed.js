@@ -15,7 +15,7 @@ const CourseRecord = require('../models/CourseRecord');
  *   failed course that shows up again under remaining courses.
  *
  * Grades are picked by a fixed hash of student ID and course code, so the data
- * is identical on every boot. Dina Mostafa (semester 1) has nothing graded
+ * is identical on every seed run. Dina Mostafa (semester 1) has nothing graded
  * yet, and the semester-8 students (bachelor project) have no current courses,
  * so both of those empty states have real accounts.
  */

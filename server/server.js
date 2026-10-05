@@ -17,7 +17,7 @@ const walletRoutes = require('./routes/walletRoutes');
 const academicHistoryRoutes = require('./routes/academicHistoryRoutes');
 const weeklyScheduleRoutes = require('./routes/weeklyScheduleRoutes');
 const schedulingPreferenceRoutes = require('./routes/schedulingPreferenceRoutes');
-const { seed } = require('./config/seedData');
+const { seedIfEmpty } = require('./config/seedData');
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
 if (ensureEnvFile()) {
@@ -58,11 +58,22 @@ async function startServer() {
     await mongoose.connect(MONGODB_URI);
     console.log('Connected to MongoDB');
 
-    const { users, students, courses, offerings, slots, groups, schedules, notifications } = await seed();
-    console.log(`Seeded ${users} users, ${students} students, ${courses} courses and ${notifications} notifications`);
-    console.log(
-      `Scheduling: ${offerings} offerings, ${slots} slots, ${groups} schedule groups, ${schedules} processed student schedules`
-    );
+    const result = await seedIfEmpty();
+
+    if (result.skipped) {
+      // Restarting must never cost anyone their work, so an initialized
+      // database is left exactly as it is.
+      console.log(
+        `Database already initialized (${result.users} users, ${result.students} students, ${result.courses} courses) — seed skipped.`
+      );
+      console.log('Run `node seed/seed.cjs` if you want a clean rebuild of the demo data.');
+    } else {
+      const { users, students, courses, offerings, slots, groups, schedules, notifications } = result;
+      console.log(`Seeded ${users} users, ${students} students, ${courses} courses and ${notifications} notifications`);
+      console.log(
+        `Scheduling: ${offerings} offerings, ${slots} slots, ${groups} schedule groups, ${schedules} processed student schedules`
+      );
+    }
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   } catch (err) {

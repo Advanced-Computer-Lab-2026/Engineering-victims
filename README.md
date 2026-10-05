@@ -274,7 +274,30 @@ talks to the API directly; the server already sends permissive CORS headers:
 VITE_API_URL=http://localhost:8000
 ```
 
-Seeded logins (the database is re-seeded on every server start):
+### Database seeding
+
+The server seeds **only when the database is empty**. A first run against a
+fresh database populates it; every run after that is left exactly as it is, so
+restarting the server — or saving a file, which makes `nodemon` restart it —
+never destroys data.
+
+To wipe and rebuild the demo data on purpose:
+
+```bash
+node seed/seed.cjs
+```
+
+The same rebuild is reachable by an Administrator at `GET /api/auth/seed`.
+
+To confirm both halves of that against a throwaway database — a fresh one gets
+seeded, a populated one is left alone, and the wipe route stays shut for
+everyone else — run:
+
+```bash
+node scripts/verify-seed-guard.cjs
+```
+
+Seeded logins:
 
 | Role | Email | Password | Why this account exists |
 | --- | --- | --- | --- |
