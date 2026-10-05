@@ -15,7 +15,8 @@ interface ProfileAdvisor {
 
 /**
  * The student fields come from the Student directory (req 6-10) rather than the
- * login user, so they stay correct across the seed that runs on every boot.
+ * login user, so they stay correct after a re-seed rebuilds every login record
+ * (`node seed/seed.cjs`).
  */
 interface ProfileUser {
   fullName: string;
