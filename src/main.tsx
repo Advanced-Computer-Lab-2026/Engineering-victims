@@ -20,6 +20,7 @@ import ScheduleTemplatesPage from './pages/ScheduleTemplatesPage';
 import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
+import TranscriptPage from './pages/TranscriptPage';
 import WeeklySchedulePage from './pages/WeeklySchedulePage';
 import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
@@ -85,6 +86,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/wallet" element={<WalletPage />} />
           {/* Req 54: an Advising Student's own history. */}
           <Route path="/academic-history" element={<AcademicHistoryPage />} />
+          {/* Req 55: an Advising Student's own transcript, one academic year at a time. */}
+          <Route path="/transcript" element={<TranscriptPage />} />
           {/* Req 32: registered courses, credits per course and the total —
               for every student, Normal and Advising alike. */}
           <Route path="/my-courses" element={<MyRegisteredCoursesPage />} />
@@ -118,6 +121,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/academic-history/:studentId" element={<AcademicHistoryPage />} />
+          {/* Req 55: same access as the history, so any advising student's transcript. */}
+          <Route path="/transcript/:studentId" element={<TranscriptPage />} />
         </Route>
 
         <Route

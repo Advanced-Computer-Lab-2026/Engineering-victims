@@ -9,6 +9,8 @@ const academicHistoryController = require('../controllers/academicHistoryControl
 router.get('/me', authenticate, requireRole('Student'), academicHistoryController.getMyHistory);
 // Req 56: the same history as a PDF, with exactly the access of the page.
 router.get('/me/pdf', authenticate, requireRole('Student'), academicHistoryController.downloadMyHistoryPdf);
+// Req 55: one attended academic year (?year=2025/2026), under the same rules.
+router.get('/me/transcript', authenticate, requireRole('Student'), academicHistoryController.getMyTranscript);
 router.get(
   '/:studentId',
   authenticate,
@@ -20,6 +22,12 @@ router.get(
   authenticate,
   requireRole('Advisor', 'Coordinator'),
   academicHistoryController.downloadStudentHistoryPdf
+);
+router.get(
+  '/:studentId/transcript',
+  authenticate,
+  requireRole('Advisor', 'Coordinator'),
+  academicHistoryController.getStudentTranscript
 );
 
 module.exports = router;

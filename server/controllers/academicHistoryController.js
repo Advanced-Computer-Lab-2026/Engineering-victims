@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const User = require('../models/User');
 const Student = require('../models/Student');
-const { buildAcademicHistory } = require('../services/academicHistoryService');
+const { buildAcademicHistory, buildTranscript, parseAcademicYear } = require('../services/academicHistoryService');
 const { renderAcademicHistoryPdf } = require('../services/academicHistoryPdfService');
 
 const serializeStudent = (student) => ({
@@ -44,6 +44,27 @@ const respondWithHistoryPdf = async (res, student) => {
 };
 
 /**
+ * Req 55: one attended academic year, chosen with ?year=2025/2026. Without it
+ * the newest attended year is shown.
+ */
+const respondWithTranscript = async (res, student, req) => {
+  const { year } = req.query;
+  let academicYear;
+  if (year !== undefined && year !== '') {
+    academicYear = parseAcademicYear(year);
+    if (!academicYear) {
+      return res.status(400).json({ message: 'Academic year should look like 2025/2026.' });
+    }
+  }
+
+  const transcript = await buildTranscript(student, academicYear);
+  if (!transcript) {
+    return res.status(404).json({ message: `The student did not attend the ${academicYear} academic year.` });
+  }
+  res.status(200).json({ student: serializeStudent(student), ...transcript });
+};
+
+/**
  * Req 54, Advising Student: their own history only.
  *
  * The student is resolved from the token, not the URL, so this route has no
@@ -82,14 +103,14 @@ const findStudentById = async (req) => {
 };
 
 /**
- * Viewing (req 54) and downloading (req 56) share one lookup, so the PDF is
- * never open to anyone who could not already see the page.
+ * Viewing (req 54), the transcript (req 55) and downloading (req 56) share one
+ * lookup, so none of them is open to anyone who could not already see the page.
  */
 const handle = (findStudent, respond, failureMessage) => async (req, res) => {
   try {
     const { student, status, message } = await findStudent(req);
     if (!student) return res.status(status).json({ message });
-    await respond(res, student);
+    await respond(res, student, req);
   } catch (error) {
     res.status(500).json({ message: failureMessage, error: error.message });
   }
@@ -97,6 +118,8 @@ const handle = (findStudent, respond, failureMessage) => async (req, res) => {
 
 exports.getMyHistory = handle(findOwnStudent, respondWithHistory, 'Could not load your academic history');
 exports.getStudentHistory = handle(findStudentById, respondWithHistory, 'Could not load the academic history');
+exports.getMyTranscript = handle(findOwnStudent, respondWithTranscript, 'Could not load your transcript');
+exports.getStudentTranscript = handle(findStudentById, respondWithTranscript, 'Could not load the transcript');
 exports.downloadMyHistoryPdf = handle(findOwnStudent, respondWithHistoryPdf, 'Could not create your academic history PDF');
 exports.downloadStudentHistoryPdf = handle(
   findStudentById,
