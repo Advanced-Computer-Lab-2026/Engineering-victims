@@ -441,6 +441,13 @@ export interface SchedulingPreferencesResponse {
   options?: { kinds: PreferenceKind[]; days: WeekDay[]; maxPreferences: number };
 }
 
+/** Req 58 — an Advising Student's latest preferences, as staff see them. */
+export interface StudentPreferencesResponse {
+  student: { id: string; fullName: string; studentId: string };
+  term: SchedulingPreferencesResponse['term'];
+  preference: SchedulingPreferencesResponse['preference'];
+}
+
 /** Req 33 — detailed view of a registered course's assigned slots. */
 export interface CourseSlotDetail {
   id: string;

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const SchedulingPreference = require('../models/SchedulingPreference');
@@ -120,5 +121,43 @@ exports.saveMyPreferences = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not save your preferences', error: error.message });
+  }
+};
+
+/**
+ * Req 58: an Advisor or Coordinator views an advising student's latest
+ * submitted preferences while creating or updating the draft schedule.
+ *
+ * Read-only. "Latest" is the most recently updated submission, so it is the
+ * advising term's list once the student has saved one, and their previous one
+ * before that. Stored order is the priority and is passed through untouched.
+ * A student with no preferences gets preference: null rather than an error:
+ * they may still receive a schedule.
+ */
+exports.getStudentPreferences = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.studentId)) {
+      return res.status(400).json({ message: 'That student link is not valid.' });
+    }
+
+    const student = await Student.findById(req.params.studentId).lean();
+    if (!student) return res.status(404).json({ message: 'Student not found' });
+    if (student.studentType !== 'Advising Student') {
+      return res.status(404).json({ message: 'That student is not an advising student.' });
+    }
+
+    const latest = await SchedulingPreference.findOne({ student: student._id })
+      .sort({ updatedAt: -1 })
+      .populate('term')
+      .lean();
+    const term = latest?.term ?? null;
+
+    res.status(200).json({
+      student: { id: student._id, fullName: student.fullName, studentId: student.studentId },
+      term: serializeTerm(term, Boolean(term) && deadlineEnd(term) >= new Date()),
+      preference: serializePreference(latest),
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Could not load the student's preferences", error: error.message });
   }
 };

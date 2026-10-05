@@ -4,6 +4,7 @@ import { ArrowLeft, CalendarDays, Clock, Coffee, Download, Eye, FileText, Loader
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PageHeader from '../components/PageHeader';
+import StudentPreferencesPanel from '../components/StudentPreferencesPanel';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -91,6 +92,10 @@ const WeeklySchedulePage: React.FC = () => {
   const backTo = user?.role === 'Advisor' ? '/advising-students' : '/students';
   const student = data?.student;
   const stage = data?.stage ? STAGE_INFO[data.stage] : null;
+  const canViewPreferences =
+    !isOwn &&
+    (user?.role === 'Advisor' || user?.role === 'Coordinator') &&
+    student?.studentType === 'Advising Student';
 
   /**
    * Req 49: Print the schedule using browser print dialog.
@@ -578,6 +583,9 @@ const WeeklySchedulePage: React.FC = () => {
               </p>
             )}
           </Card>
+
+          {/* Req 58: the student's preferences beside the draft, for Advisors and Coordinators. */}
+          {canViewPreferences && studentId && <StudentPreferencesPanel studentId={studentId} />}
 
           {!data.visible ? (
             <EmptyState
