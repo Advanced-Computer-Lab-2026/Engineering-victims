@@ -344,6 +344,36 @@ export interface AcademicHistoryResponse {
   remaining: RemainingCourse[];
 }
 
+/** Req 55 — one attended academic year of a student's transcript. */
+export type TranscriptSessionName = 'Winter' | 'Spring' | 'Summer' | 'First Makeup' | 'Second Makeup';
+
+export interface TranscriptCourse {
+  id: string;
+  course: HistoryCourse;
+  status: 'Completed' | 'In Progress';
+  /** null while the course is still in progress. */
+  grade: string | null;
+  gradePoints: number | null;
+  passed: boolean | null;
+  semester: number;
+}
+
+export interface TranscriptSession {
+  session: TranscriptSessionName;
+  /** e.g. "2025/2026 First Makeup". */
+  term: string;
+  courses: TranscriptCourse[];
+}
+
+export interface TranscriptResponse {
+  student: AcademicHistoryResponse['student'];
+  /** Attended academic years, newest first. Empty when nothing is recorded. */
+  years: string[];
+  academicYear: string | null;
+  /** Only sessions that hold records, in Winter → Second Makeup order. */
+  sessions: TranscriptSession[];
+}
+
 /** Req 89 — Advising Student wallet. */
 export type WalletTransactionType = 'Refund' | 'Payment';
 

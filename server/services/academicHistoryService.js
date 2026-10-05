@@ -105,4 +105,82 @@ const buildAcademicHistory = async (student) => {
   };
 };
 
-module.exports = { buildAcademicHistory };
+/**
+ * Req 55: the sessions of an academic year, in transcript order. Course records
+ * carry them in their term label, e.g. "2025/2026 First Makeup".
+ */
+const SESSIONS = ['Winter', 'Spring', 'Summer', 'First Makeup', 'Second Makeup'];
+
+const YEAR_PATTERN = /^(\d{4})[/-](\d{4})$/;
+const TERM_PATTERN = new RegExp(`^(\\d{4}[/-]\\d{4})\\s+(${SESSIONS.join('|')})$`);
+
+/**
+ * "2025/2026" or "2025-2026" → "2025/2026". null unless the second year is the
+ * first plus one, so "2025/2027" and free text are both rejected.
+ */
+const parseAcademicYear = (value) => {
+  const match = YEAR_PATTERN.exec(String(value ?? '').trim());
+  if (!match || Number(match[2]) !== Number(match[1]) + 1) return null;
+  return `${match[1]}/${match[2]}`;
+};
+
+/** "2025/2026 Second Makeup" → { academicYear: "2025/2026", session: "Second Makeup" }, or null. */
+const parseTerm = (term) => {
+  const match = TERM_PATTERN.exec(String(term ?? '').trim());
+  if (!match) return null;
+  const academicYear = parseAcademicYear(match[1]);
+  return academicYear ? { academicYear, session: match[2] } : null;
+};
+
+/**
+ * Req 55: one academic year of a student's course records, grouped by session.
+ *
+ * The attended years are the ones any of the student's records falls in, newest
+ * first. Without `academicYear` the newest is shown. Sessions with no records
+ * are left out, and in-progress courses are listed without a grade. Records
+ * whose term label cannot be parsed are skipped rather than guessed at.
+ *
+ * Returns null when `academicYear` is given but the student did not attend it.
+ */
+const buildTranscript = async (student, academicYear) => {
+  const records = await CourseRecord.find({ student: student._id })
+    .populate('course', 'code name creditHours')
+    .sort({ semester: 1, createdAt: 1 })
+    .lean();
+
+  const rows = records
+    .filter((row) => row.course)
+    .map((row) => ({ row, parsed: parseTerm(row.term) }))
+    .filter(({ parsed }) => parsed);
+
+  const years = [...new Set(rows.map(({ parsed }) => parsed.academicYear))].sort((a, b) => b.localeCompare(a));
+
+  if (academicYear && !years.includes(academicYear)) return null;
+  const selected = academicYear ?? years[0] ?? null;
+
+  const sessions = SESSIONS.map((session) => {
+    const inSession = rows.filter(
+      ({ parsed }) => parsed.academicYear === selected && parsed.session === session
+    );
+    return {
+      session,
+      term: `${selected} ${session}`,
+      courses: inSession.map(({ row }) => {
+        const graded = row.status === 'Completed';
+        return {
+          id: row._id,
+          course: courseSummary(row.course),
+          status: row.status,
+          grade: graded ? row.grade : null,
+          gradePoints: graded ? GRADE_POINTS[row.grade] : null,
+          passed: graded ? row.grade !== FAIL : null,
+          semester: row.semester,
+        };
+      }),
+    };
+  }).filter((session) => session.courses.length > 0);
+
+  return { years, academicYear: selected, sessions };
+};
+
+module.exports = { buildAcademicHistory, buildTranscript, parseAcademicYear, parseTerm, SESSIONS };

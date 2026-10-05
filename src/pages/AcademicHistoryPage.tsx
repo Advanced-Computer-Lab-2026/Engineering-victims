@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   Clock,
   Download,
+  FileText,
   GraduationCap,
   ListTodo,
   Loader2,
@@ -132,6 +133,17 @@ const AcademicHistoryPage: React.FC = () => {
                   icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
                 >
                   Back to students
+                </CustomButton>
+              )}
+              {/* Req 55: the same student's transcript, year by year. */}
+              {student && (
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(studentId ? `/transcript/${studentId}` : '/transcript')}
+                  icon={<FileText className="h-4 w-4" aria-hidden />}
+                >
+                  View transcript
                 </CustomButton>
               )}
               {student && (
