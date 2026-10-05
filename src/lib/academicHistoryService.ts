@@ -1,5 +1,5 @@
 import { apiFetch, apiUrl, authHeaders, ApiError } from './api';
-import type { AcademicHistoryResponse, TranscriptResponse } from './types';
+import type { AcademicHistoryResponse, MandatoryCandidatesResponse, TranscriptResponse } from './types';
 
 /** Req 54, Advising Student: their own history, resolved from the token. */
 export const fetchMyAcademicHistory = async (): Promise<AcademicHistoryResponse> =>
@@ -20,6 +20,10 @@ export const fetchStudentTranscript = async (studentId: string, year?: string): 
   apiFetch<TranscriptResponse>(
     `/api/academic-history/${encodeURIComponent(studentId)}/transcript${yearQuery(year)}`
   );
+
+/** Req 61, Advisor / Coordinator: failed and unattended courses as mandatory-course candidates. */
+export const fetchMandatoryCandidates = async (studentId: string): Promise<MandatoryCandidatesResponse> =>
+  apiFetch<MandatoryCandidatesResponse>(`/api/academic-history/${encodeURIComponent(studentId)}/mandatory-candidates`);
 
 /**
  * Req 56: downloads the academic history as a PDF and saves it as `fileName`.

@@ -12,6 +12,7 @@ import {
   GraduationCap,
   ListTodo,
   Loader2,
+  ShieldAlert,
   Sigma,
   UserRound,
 } from 'lucide-react';
@@ -25,10 +26,17 @@ import { useSession } from '../hooks/useSession';
 import { ApiError } from '../lib/api';
 import {
   downloadAcademicHistoryPdf,
+  fetchMandatoryCandidates,
   fetchMyAcademicHistory,
   fetchStudentAcademicHistory,
 } from '../lib/academicHistoryService';
-import type { AcademicHistoryResponse, CompletedCourse, RemainingCourse } from '../lib/types';
+import type {
+  AcademicHistoryResponse,
+  CompletedCourse,
+  MandatoryCandidate,
+  MandatoryCandidatesResponse,
+  RemainingCourse,
+} from '../lib/types';
 
 /** GUC scale: 0.7 is the best grade, 5.0 a fail, so the tone follows the letter. */
 const gradeTone = (grade: string): BadgeTone => {
@@ -69,6 +77,8 @@ const AcademicHistoryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<ApiError | null>(null);
+  const [candidates, setCandidates] = useState<MandatoryCandidatesResponse['candidates'] | null>(null);
+  const [candidatesError, setCandidatesError] = useState<ApiError | null>(null);
 
   const isOwn = !studentId;
 
@@ -87,6 +97,21 @@ const AcademicHistoryPage: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Req 61: staff only. Loaded on its own so a failure here never hides the
+  // history itself, and never requested on a student's own page.
+  useEffect(() => {
+    if (!studentId) return;
+    let cancelled = false;
+    setCandidates(null);
+    setCandidatesError(null);
+    fetchMandatoryCandidates(studentId)
+      .then((response) => !cancelled && setCandidates(response.candidates))
+      .catch((err) => !cancelled && setCandidatesError(err as ApiError));
+    return () => {
+      cancelled = true;
+    };
+  }, [studentId]);
 
   // An in-app way back to the list the staff member came from, so they never
   // depend on the browser's back button.
@@ -220,6 +245,54 @@ const AcademicHistoryPage: React.FC = () => {
               GPA uses the GUC scale, where 0.7 is the best grade and 5.0 is a fail.
             </p>
           </Card>
+
+          {!isOwn && (
+            <Section
+              icon={<ShieldAlert className="h-4 w-4 text-rose-400" aria-hidden />}
+              title="Mandatory-course candidates"
+              count={candidates?.length ?? 0}
+              note="Failed and unattended courses are mandatory unless an approved removal applies"
+            >
+              {candidatesError ? (
+                <AlertBanner tone="error" title="Could not load the mandatory-course candidates">
+                  {candidatesError.message}
+                </AlertBanner>
+              ) : !candidates ? (
+                <Card className="flex items-center justify-center gap-2 p-8 text-sm text-slate-400">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  Loading mandatory-course candidates...
+                </Card>
+              ) : candidates.length === 0 ? (
+                <EmptyState
+                  icon={<ShieldAlert className="h-5 w-5" />}
+                  title="No mandatory-course candidates"
+                  description="This student has no failed or unattended courses."
+                />
+              ) : (
+                <Card tone="raised" className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[40rem] text-left text-sm">
+                      <caption className="sr-only">Failed and unattended courses that are mandatory-course candidates</caption>
+                      <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+                        <tr>
+                          <th scope="col" className="px-4 py-3 font-semibold">Code</th>
+                          <th scope="col" className="px-4 py-3 font-semibold">Course</th>
+                          <th scope="col" className="px-4 py-3 font-semibold">Reason</th>
+                          <th scope="col" className="px-4 py-3 font-semibold">When</th>
+                          <th scope="col" className="px-4 py-3 text-right font-semibold">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {candidates.map((candidate) => (
+                          <CandidateRow key={candidate.course.id} candidate={candidate} />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              )}
+            </Section>
+          )}
 
           <Section
             icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden />}
@@ -386,6 +459,29 @@ const Section: React.FC<{
     </div>
     {children}
   </section>
+);
+
+const CandidateRow: React.FC<{ candidate: MandatoryCandidate }> = ({ candidate }) => (
+  <tr className="hover:bg-slate-800/40">
+    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">{candidate.course.code}</td>
+    <td className="px-4 py-3 text-slate-200">
+      <span className="flex flex-wrap items-center gap-2">
+        {candidate.course.name}
+        {candidate.inProgress && <Badge tone="sky">Retaking now</Badge>}
+      </span>
+    </td>
+    <td className="px-4 py-3">
+      <Badge tone={candidate.reason === 'Failed' ? 'rose' : 'amber'}>{candidate.reason}</Badge>
+    </td>
+    <td className="px-4 py-3 text-slate-400">
+      {candidate.term ? `${candidate.term} · Semester ${candidate.semester}` : `Semester ${candidate.semester} · not taken`}
+    </td>
+    <td className="px-4 py-3 text-right">
+      <Badge tone="rose" dot>
+        Mandatory
+      </Badge>
+    </td>
+  </tr>
 );
 
 const RemainingRow: React.FC<{ course: RemainingCourse }> = ({ course }) => (
