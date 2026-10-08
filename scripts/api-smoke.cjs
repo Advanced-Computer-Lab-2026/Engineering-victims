@@ -178,10 +178,14 @@ async function main() {
       method: 'PATCH',
       body: { studyGroup: 'G2', termId: defaultTerm._id },
     });
+    // On a seeded database the create above answers 409, so G2 is the group the
+    // seed built (11 slots here), not the six this script just asked for. The
+    // assignment has to reproduce whichever group actually exists.
+    const expectedSlots = (createdTemplate.slots ?? []).length || chosenSlots.length;
     report(
-      assigned.status === 200 && assigned.json.slotsCount === chosenSlots.length,
+      assigned.status === 200 && assigned.json.slotsCount === expectedSlots,
       `assign ${normal.fullName} to G2`,
-      `status ${assigned.status}, ${assigned.json.slotsCount ?? '?'} schedule rows: ${assigned.json.message ?? ''}${assigned.json.error ? ` (${assigned.json.error})` : ''}`
+      `status ${assigned.status}, ${assigned.json.slotsCount ?? '?'} of ${expectedSlots} schedule rows: ${assigned.json.message ?? ''}${assigned.json.error ? ` (${assigned.json.error})` : ''}`
     );
   } else {
     report(false, 'G2 is listed for the default term');
