@@ -273,7 +273,9 @@ exports.updateOffering = async (req, res) => {
     const offering = await CourseOffering.findByIdAndUpdate(
       req.params.id,
       req.body,
-      { new: true }
+      // Same reason as updateSlot: enums (publication status, majors) and
+      // numeric fields must be validated on the way in, not only on create.
+      { new: true, runValidators: true }
     );
 
     if (!offering) {
@@ -325,7 +327,10 @@ exports.updateSlot = async (req, res) => {
       );
     }
 
-    const updatedSlot = await CourseSlot.findByIdAndUpdate(slotId, updates, { new: true });
+    // runValidators, otherwise a hand-crafted payload stores times and days the
+    // schema rejects on create (`startTime: "25:99"` would be accepted by an
+    // update and then break every schedule that renders it).
+    const updatedSlot = await CourseSlot.findByIdAndUpdate(slotId, updates, { new: true, runValidators: true });
 
     res.status(200).json({
       message: 'Slot updated successfully.',
