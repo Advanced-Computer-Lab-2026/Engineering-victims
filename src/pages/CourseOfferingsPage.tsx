@@ -78,13 +78,22 @@ const CourseOfferingsPage: React.FC = () => {
 
   const handleOpenDetails = async (offering: CourseOffering) => {
     try {
-      setSelectedOffering(offering);
+      // Use the detail payload rather than the list row: it is the freshest
+      // copy of the offering and already has its course and term populated.
       const res = await courseOfferingService.getOfferingDetails(offering.id);
+      setSelectedOffering(res.offering);
       setSelectedSlots(res.slots);
       setDrawerMode('view');
     } catch (err) {
       setError((err as ApiError).message);
     }
+  };
+
+  /** Replaces the drawer's copy after a save so the view never shows the
+   *  pre-edit values. */
+  const handleDetailsRefreshed = (offering: CourseOffering, slots: CourseSlot[]) => {
+    setSelectedOffering(offering);
+    setSelectedSlots(slots);
   };
 
   const handleSaved = (termId?: string, message?: string) => {
@@ -248,6 +257,7 @@ const CourseOfferingsPage: React.FC = () => {
         onModeChange={setDrawerMode}
         onSlotDeleted={handleSlotDeleted}
         onPublicationChanged={handlePublicationChanged}
+        onDetailsRefreshed={handleDetailsRefreshed}
         onSaved={handleSaved}
       />
     </>

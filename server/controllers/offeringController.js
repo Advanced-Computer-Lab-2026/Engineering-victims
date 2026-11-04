@@ -145,6 +145,38 @@ const hasAssignedStudents = async (slotIds) => {
   return Boolean(await StudentSchedule.exists({ slotId: { $in: slotIds } }));
 };
 
+/** The schedule rows are the source of truth; CourseSlot.assignedCount is a
+ *  denormalised counter that older flows never updated. */
+const assignedCountForSlot = (slotId) => StudentSchedule.countDocuments({ slotId });
+
+const OFFERING_EDITABLE_FIELDS = [
+  'courseId',
+  'termId',
+  'publicationStatus',
+  'eligibleMajors',
+  'eligibleSemesters',
+];
+
+const SLOT_EDITABLE_FIELDS = [
+  'instructorId',
+  'slotType',
+  'groupNumber',
+  'dayOfWeek',
+  'startTime',
+  'endTime',
+  'roomId',
+  'maxCapacity',
+];
+
+/** Drops `_id`, timestamps and derived counters a client may echo back. */
+const pickFields = (body, fields) => {
+  const picked = {};
+  for (const field of fields) {
+    if (body[field] !== undefined) picked[field] = body[field];
+  }
+  return picked;
+};
+
 exports.createOffering = async (req, res) => {
   try {
     const { courseId, termId, publicationStatus, eligibleMajors, eligibleSemesters, slots } = req.body;
@@ -272,7 +304,7 @@ exports.updateOffering = async (req, res) => {
 
     const offering = await CourseOffering.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      pickFields(req.body, OFFERING_EDITABLE_FIELDS),
       // Same reason as updateSlot: enums (publication status, majors) and
       // numeric fields must be validated on the way in, not only on create.
       { new: true, runValidators: true }
@@ -296,7 +328,14 @@ exports.updateOffering = async (req, res) => {
 exports.updateSlot = async (req, res) => {
   try {
     const slotId = req.params.id;
-    const updates = req.body;
+    // Only the fields the form edits may be written. In particular, the
+    // assigned-student count is derived from StudentSchedule rows and must not
+    // be overwritten with whatever copy the client happened to load.
+    const updates = pickFields(req.body, SLOT_EDITABLE_FIELDS);
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ message: 'There are no slot changes to save.' });
+    }
 
     // Same staleness guard as create — checked before any lookup so a stale
     // instructor id answers 400 instead of reaching the database.
@@ -311,9 +350,11 @@ exports.updateSlot = async (req, res) => {
       return res.status(404).json({ message: 'Slot not found' });
     }
 
-    // Validate capacity if it's being changed
+    // Validate capacity if it's being changed. The offering details screen
+    // shows the count derived from schedules, so validate against that same
+    // number instead of the stale denormalised counter.
     if (updates.maxCapacity !== undefined) {
-      validateCapacity(updates.maxCapacity, slot.assignedCount);
+      validateCapacity(updates.maxCapacity, await assignedCountForSlot(slot._id));
     }
 
     // Validate conflicts if timing or resource changes

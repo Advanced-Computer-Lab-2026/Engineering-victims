@@ -48,6 +48,9 @@ interface OfferingDrawerProps {
   onModeChange: (mode: OfferingDrawerMode) => void;
   onSlotDeleted: (slotId: string) => void;
   onPublicationChanged: (status: CourseOffering['publicationStatus']) => void;
+  /** Hands the page the fresh offering and slots after an edit so its copy is
+   *  not left showing the values from before the save. */
+  onDetailsRefreshed: (offering: CourseOffering, slots: CourseSlot[]) => void;
   /** Reloads the list; `termId` lands the filter on the offering's term and
    *  `message` is shown by the page once the drawer is gone. */
   onSaved: (termId?: string, message?: string) => void;
@@ -70,6 +73,36 @@ const refId = (value: unknown): string => {
   return String(value ?? '');
 };
 
+const SLOT_EDITABLE_FIELDS = [
+  'slotType',
+  'groupNumber',
+  'dayOfWeek',
+  'startTime',
+  'endTime',
+  'roomId',
+  'maxCapacity',
+] as const;
+
+/** The update endpoint only accepts editable slot fields, never the derived
+ *  assigned count or the ids/timestamps that came back with the detail payload. */
+const slotPayload = (slot: CourseSlot) => ({
+  instructorId: refId(slot.instructorId),
+  slotType: slot.slotType,
+  groupNumber: slot.groupNumber,
+  dayOfWeek: slot.dayOfWeek,
+  startTime: slot.startTime,
+  endTime: slot.endTime,
+  roomId: slot.roomId,
+  maxCapacity: slot.maxCapacity,
+});
+
+/** True when the draft differs from the saved slot in a field the form edits. */
+const slotChanged = (draft: CourseSlot, saved: CourseSlot | undefined): boolean => {
+  if (!saved) return true;
+  if (refId(draft.instructorId) !== refId(saved.instructorId)) return true;
+  return SLOT_EDITABLE_FIELDS.some((field) => draft[field] !== saved[field]);
+};
+
 const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   mode,
   offering,
@@ -80,6 +113,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   onModeChange,
   onSlotDeleted,
   onPublicationChanged,
+  onDetailsRefreshed,
   onSaved,
 }) => {
   const [offeringDraft, setOfferingDraft] = useState(emptyOfferingDraft());
@@ -107,13 +141,25 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
     };
   }, [mode]);
 
+  // Opening a different offering starts with a clean banner. A save refreshes
+  // the same offering id, so its success notice survives that.
   useEffect(() => {
     setError(null);
     setNotice(null);
+  }, [offering?.id]);
+
+  useEffect(() => {
+    setError(null);
+    if (!mode) {
+      setNotice(null);
+      return;
+    }
     if (mode === 'create') {
+      setNotice(null);
       setOfferingDraft(emptyOfferingDraft());
       setSlotsDraft([]);
     } else if (mode === 'edit' && offering) {
+      setNotice(null);
       setOfferingDraft({
         courseId: refId(offering.courseId),
         termId: refId(offering.termId),
@@ -129,7 +175,9 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
         }))
       );
     }
-  }, [mode, offering, slots]);
+    // `slots` is read when entering edit; refreshing the saved copies while
+    // already in view must not reset the form or clear the save notice.
+  }, [mode, offering?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!mode) return null;
 
@@ -276,11 +324,25 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
     try {
       if (mode === 'edit' && offering) {
         await courseOfferingService.updateOffering(offering.id, offeringDraft);
+
+        // Only send slots the form actually changed, and only their editable
+        // fields. Echoing the whole detail payload used to overwrite the
+        // server's assigned count and re-check untouched slots.
+        const savedById = new Map(slots.map((slot) => [slot.id, slot]));
         for (const slot of slotsDraft) {
-          if (slot.id !== 'new') {
-            await courseOfferingService.updateSlot(slot.id, slot);
-          }
+          if (slot.id === 'new' || !slotChanged(slot, savedById.get(slot.id))) continue;
+          await courseOfferingService.updateSlot(slot.id, slotPayload(slot));
         }
+
+        // The table reloads below, but the open drawer needs its own fresh
+        // copy or it keeps rendering the pre-edit offering and slots.
+        try {
+          const details = await courseOfferingService.getOfferingDetails(offering.id);
+          onDetailsRefreshed(details.offering, details.slots);
+        } catch {
+          // The save itself succeeded; reopening the drawer will fetch again.
+        }
+
         setNotice('Offering and slots updated successfully.');
         onSaved(offeringDraft.termId);
         onModeChange('view');
@@ -438,7 +500,9 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-semibold text-slate-300">Course Slots</h3>
-                  <CustomButton size="sm" onClick={addSlot} icon={<Plus className="h-3 w-3" />}>Add Slot</CustomButton>
+                  {mode === 'create' && (
+                    <CustomButton size="sm" onClick={addSlot} icon={<Plus className="h-3 w-3" />}>Add Slot</CustomButton>
+                  )}
                 </div>
 
                 <div className="space-y-4">
@@ -509,7 +573,9 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                   ))}
                   {slotsDraft.length === 0 && (
                     <div className="text-center py-8 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 text-sm">
-                      No slots added yet. Click "Add Slot" to begin.
+                      {mode === 'create'
+                        ? 'No slots added yet. Click "Add Slot" to begin.'
+                        : 'This offering has no slots yet.'}
                     </div>
                   )}
                 </div>
