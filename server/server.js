@@ -21,6 +21,10 @@ const { seedIfEmpty } = require("./config/seedData");
 const Notification = require("./models/Notification");
 const NotificationEvent = require("./models/NotificationEvent");
 const { startNotificationWorker } = require("./services/notificationEventService");
+const calendarRoutes = require("./routes/calendarRoutes");
+const CalendarConnection = require("./models/CalendarConnection");
+const CalendarOAuthState = require("./models/CalendarOAuthState");
+const CalendarEvent = require("./models/CalendarEvent");
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
 if (ensureEnvFile()) {
@@ -47,6 +51,7 @@ app.use("/api/wallet", walletRoutes);
 app.use("/api/academic-history", academicHistoryRoutes);
 app.use("/api/schedules", weeklyScheduleRoutes);
 app.use("/api/preferences", schedulingPreferenceRoutes);
+app.use("/api/calendar", calendarRoutes);
 app.get("/", (req, res) => res.send("API running..."));
 
 const PORT = process.env.PORT || 5000;
@@ -94,7 +99,8 @@ async function startServer() {
     }
 
     // Duplicate prevention must be indexed before a worker can deliver events.
-    await Promise.all([Notification.init(), NotificationEvent.init()]);
+    await Promise.all([Notification.init(), NotificationEvent.init(),
+      CalendarConnection.init(), CalendarOAuthState.init(), CalendarEvent.init()]);
     const stopNotificationWorker = startNotificationWorker();
     const httpServer = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     httpServer.on('close', stopNotificationWorker);
