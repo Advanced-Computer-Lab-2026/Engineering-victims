@@ -18,6 +18,9 @@ const academicHistoryRoutes = require("./routes/academicHistoryRoutes");
 const weeklyScheduleRoutes = require("./routes/weeklyScheduleRoutes");
 const schedulingPreferenceRoutes = require("./routes/schedulingPreferenceRoutes");
 const { seedIfEmpty } = require("./config/seedData");
+const Notification = require("./models/Notification");
+const NotificationEvent = require("./models/NotificationEvent");
+const { startNotificationWorker } = require("./services/notificationEventService");
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
 if (ensureEnvFile()) {
@@ -90,7 +93,11 @@ async function startServer() {
       );
     }
 
-    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    // Duplicate prevention must be indexed before a worker can deliver events.
+    await Promise.all([Notification.init(), NotificationEvent.init()]);
+    const stopNotificationWorker = startNotificationWorker();
+    const httpServer = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+    httpServer.on('close', stopNotificationWorker);
   } catch (err) {
     console.error("Startup error:", err.message);
     console.error(`\nCould not connect to MongoDB at: ${MONGODB_URI}`);
