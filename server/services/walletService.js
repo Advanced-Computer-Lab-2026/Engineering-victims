@@ -14,7 +14,8 @@ const WalletTransaction = require('../models/WalletTransaction');
  */
 const recordTransaction = async (
   studentId,
-  { type, amount, requestReference = null, paymentReference = null, description = '', occurredAt = new Date() }
+  { type, amount, requestReference = null, paymentReference = null, description = '', occurredAt = new Date() },
+  { notifications = true } = {}
 ) => {
   if (!WalletTransaction.TYPES.includes(type)) {
     throw new Error(`Unknown wallet transaction type: ${type}`);
@@ -50,6 +51,8 @@ const recordTransaction = async (
     paymentReference,
     description,
     occurredAt,
+    // Saved in the ledger write, so retries never repeat the balance mutation.
+    notificationPending: notifications,
   });
 
   return { wallet, transaction };

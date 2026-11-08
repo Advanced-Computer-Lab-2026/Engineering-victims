@@ -11,6 +11,7 @@ const { buildStudentQuery } = require('../services/studentQueryService');
 const { buildTemplateSchedule } = require('../services/weeklyScheduleService');
 const { recalculate, getStatusesFor } = require('../services/workflowService');
 const { notifyByEmail } = require('../services/notificationService');
+const { queueStudentNotification } = require('../services/studentNotificationService');
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -352,6 +353,10 @@ exports.assignToGroup = async (req, res) => {
     student.workflowStatus = 'Schedule Assigned';
     student.blockingStep = null;
     student.lastUpdateAt = new Date();
+    queueStudentNotification(student, 'schedule.processed', {
+      entityId: termId,
+      occurrence: String(new mongoose.Types.ObjectId()),
+    });
     await student.save();
 
     res.status(200).json({

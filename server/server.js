@@ -21,6 +21,7 @@ const { seedIfEmpty } = require("./config/seedData");
 const Notification = require("./models/Notification");
 const NotificationEvent = require("./models/NotificationEvent");
 const { startNotificationWorker } = require("./services/notificationEventService");
+const { flushStudentNotifications } = require("./services/studentNotificationService");
 const calendarRoutes = require("./routes/calendarRoutes");
 const CalendarConnection = require("./models/CalendarConnection");
 const CalendarOAuthState = require("./models/CalendarOAuthState");
@@ -101,7 +102,7 @@ async function startServer() {
     // Duplicate prevention must be indexed before a worker can deliver events.
     await Promise.all([Notification.init(), NotificationEvent.init(),
       CalendarConnection.init(), CalendarOAuthState.init(), CalendarEvent.init()]);
-    const stopNotificationWorker = startNotificationWorker();
+    const stopNotificationWorker = startNotificationWorker({ beforeBatch: flushStudentNotifications });
     const httpServer = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     httpServer.on('close', stopNotificationWorker);
   } catch (err) {

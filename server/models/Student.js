@@ -89,6 +89,16 @@ const studentSchema = new mongoose.Schema(
     blockingStep: { type: String, default: 'Schedule assignment' },
     isActive: { type: Boolean, default: true },
     lastUpdateAt: { type: Date, default: Date.now },
+    // Notification outbox: committed atomically with the student action. A
+    // background relay acknowledges each entry only after durable publication.
+    pendingNotificationEvents: [{
+      name: { type: String, required: true },
+      entityId: { type: String, required: true },
+      occurrence: { type: String, required: true },
+      title: { type: String, required: true },
+      message: { type: String, required: true },
+      link: { type: String, required: true },
+    }],
   },
   { timestamps: true }
 );

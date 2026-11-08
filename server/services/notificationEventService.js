@@ -95,13 +95,14 @@ async function deliverNextNotificationEvent(now = new Date()) {
   return true;
 }
 
-function startNotificationWorker({ intervalMs = 5000, batchSize = 25, onError = console.error } = {}) {
+function startNotificationWorker({ intervalMs = 5000, batchSize = 25, onError = console.error, beforeBatch = async () => {} } = {}) {
   let busy = false;
   let stopped = false;
   const tick = async () => {
     if (busy || stopped) return;
     busy = true;
     try {
+      await beforeBatch();
       for (let i = 0; i < batchSize && !stopped; i += 1) {
         if (!await deliverNextNotificationEvent()) break;
       }
