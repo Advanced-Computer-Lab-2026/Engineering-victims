@@ -757,3 +757,31 @@ export interface ExitExamRequestSummary {
   decidedAt: string | null;
   decidedBy: { id: string; fullName: string } | null;
 }
+
+/** Req 64-69 — an Advisor's request to remove a mandatory course, and its decision. */
+export type MandatoryRemovalStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface MandatoryRemovalRequestSummary {
+  id: string;
+  status: MandatoryRemovalStatus;
+  student: { id: string; fullName: string; studentId: string; major: string } | null;
+  advisor: { id: string; fullName: string; email: string } | null;
+  course: HistoryCourse | null;
+  /** Which of the valid cases the Advisor invoked. */
+  category: string;
+  /** Only for a restricted pair: the other course of the pair. */
+  pairedCourse: HistoryCourse | null;
+  reason: string;
+  responseNote: string;
+  submittedAt: string;
+  decidedAt: string | null;
+  decidedBy: { id: string; fullName: string } | null;
+}
+
+export interface StudentRemovalRequestsResponse {
+  requests: MandatoryRemovalRequestSummary[];
+  /** The valid cases, each with the sentence that explains it. */
+  categories: Array<{ value: string; description: string }>;
+  /** True only for the student's assigned Advisor. */
+  canRequest: boolean;
+}

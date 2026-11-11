@@ -9,6 +9,7 @@ const ScheduleTemplate = require('../models/ScheduleTemplate');
 const StudentSchedule = require('../models/StudentSchedule');
 const GraduationPlan = require('../models/GraduationPlan');
 const ExitExamRequest = require('../models/ExitExamRequest');
+const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
 const { seedWallets } = require('./walletSeed');
@@ -640,6 +641,7 @@ const seed = async () => {
   await StudentSchedule.deleteMany({});
   await GraduationPlan.deleteMany({});
   await ExitExamRequest.deleteMany({});
+  await MandatoryRemovalRequest.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),

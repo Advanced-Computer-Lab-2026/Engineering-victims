@@ -20,6 +20,7 @@ const schedulingPreferenceRoutes = require("./routes/schedulingPreferenceRoutes"
 const slotChangeRequestRoutes = require("./routes/slotChangeRequestRoutes");
 const graduationPlanRoutes = require("./routes/graduationPlanRoutes");
 const exitExamRequestRoutes = require("./routes/exitExamRequestRoutes");
+const mandatoryRemovalRoutes = require("./routes/mandatoryRemovalRoutes");
 const { seedIfEmpty } = require("./config/seedData");
 const Notification = require("./models/Notification");
 const NotificationEvent = require("./models/NotificationEvent");
@@ -62,6 +63,7 @@ app.use("/api/preferences", schedulingPreferenceRoutes);
 app.use("/api/slot-change-requests", slotChangeRequestRoutes);
 app.use("/api/graduation-plans", graduationPlanRoutes);
 app.use("/api/exit-exam-requests", exitExamRequestRoutes);
+app.use("/api/mandatory-removal-requests", mandatoryRemovalRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/semester-standings", semesterStandingRoutes);
 app.get("/", (req, res) => res.send("API running..."));
