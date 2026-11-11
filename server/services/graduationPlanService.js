@@ -1,4 +1,5 @@
 const { buildAcademicHistory } = require('./academicHistoryService');
+const ExitExamRequest = require('../models/ExitExamRequest');
 
 /**
  * Req 103-107: the rules a graduation plan has to satisfy.
@@ -66,10 +67,16 @@ const approvedCreditLimitFor = async () => null;
  * Req 103/107: an approved exit exam may stand in for the single failed course
  * it covers, leaving that course unassigned in the plan.
  *
- * Exit-exam requests (req 108-109) do not exist in this sprint, so the set is
- * always empty. When they land, only this function has to read them.
+ * Only Coordinator-approved requests release the failed course from term
+ * placement. Pending and rejected requests leave it as a required retake.
  */
-const approvedExitExamCourseIdsFor = async () => new Set();
+const approvedExitExamCourseIdsFor = async (student) => {
+  const courseIds = await ExitExamRequest.distinct('course', {
+    student: student._id,
+    status: 'Approved',
+  });
+  return new Set(courseIds.map(String));
+};
 
 /** Req 103-107: the courses a complete plan still has to place. */
 const remainingCoursesFor = async (student) => (await buildAcademicHistory(student)).remaining;

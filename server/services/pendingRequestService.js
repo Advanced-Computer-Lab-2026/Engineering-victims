@@ -3,11 +3,10 @@ const { getStatusesFor } = require('./workflowService');
 /**
  * Req 52: the "pending-request type" filter on the Advisor's advising list.
  *
- * The request collections themselves (slot change, extra hours, mandatory
- * removal, graduation plan, exit exam) do not exist yet, so there is nothing to
- * query. What does exist is the workflow status, which is derived from exactly
- * those requests: a student sits at "Change Request Pending" because a
- * slot-change request is open, and so on.
+ * This filter derives request types from workflow status rather than querying
+ * request collections. Exit-exam requests are tracked separately and do not
+ * change the student's scheduling workflow status, so they are not represented
+ * by this status-derived filter.
  *
  * Deriving keeps the filter honest rather than inventing rows, and it is a pure
  * function of a field already on every student document. When the real request

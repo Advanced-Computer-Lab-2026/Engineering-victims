@@ -6,9 +6,10 @@ import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import EmptyState from '../components/ui/EmptyState';
 import { ApiError } from '../lib/api';
+import { fetchMyExitExamRequests } from '../lib/exitExamRequestsService';
 import { fetchMyGraduationPlan } from '../lib/graduationPlansService';
 import { formatDate } from '../lib/studentsService';
-import type { GraduationPlanDetail } from '../lib/types';
+import type { ExitExamRequestSummary, GraduationPlanDetail } from '../lib/types';
 
 /**
  * Req 114: an Advising Student sees their graduation plan only after the
@@ -19,6 +20,8 @@ const MyGraduationPlanPage: React.FC = () => {
   const [plan, setPlan] = useState<GraduationPlanDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [exitExamRequests, setExitExamRequests] = useState<ExitExamRequestSummary[]>([]);
+  const [exitExamError, setExitExamError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +34,20 @@ const MyGraduationPlanPage: React.FC = () => {
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchMyExitExamRequests()
+      .then((response) => {
+        if (!cancelled) setExitExamRequests(response.requests);
+      })
+      .catch((err: ApiError) => {
+        if (!cancelled) setExitExamError(err.message);
       });
     return () => {
       cancelled = true;
@@ -83,6 +100,64 @@ const MyGraduationPlanPage: React.FC = () => {
           description="Your plan will appear here once your Advisor submits it and the Coordinator accepts it."
         />
       )}
+
+      <section className="mb-5">
+        <h2 className="mb-3 text-base font-semibold text-white">My exit-exam requests</h2>
+        {exitExamError ? (
+          <AlertBanner tone="error" title="Could not load exit-exam requests">
+            {exitExamError}
+          </AlertBanner>
+        ) : exitExamRequests.length === 0 ? (
+          <Card className="p-4 text-sm text-slate-400">
+            You do not have any exit-exam requests.
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {exitExamRequests.map((request) => (
+              <Card key={request.id} tone="raised" className="p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <h3 className="font-semibold text-slate-100">
+                      {request.course?.code ?? 'Failed course'} — {request.course?.name ?? 'Course'}
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Submitted {formatDate(request.submittedAt)}
+                      {request.decidedAt ? ` · Decided ${formatDate(request.decidedAt)}` : ''}
+                    </p>
+                  </div>
+                  <Badge
+                    tone={
+                      request.status === 'Approved'
+                        ? 'emerald'
+                        : request.status === 'Rejected'
+                          ? 'rose'
+                          : 'amber'
+                    }
+                    dot
+                  >
+                    {request.status === 'Pending' ? 'Awaiting Coordinator decision' : request.status}
+                  </Badge>
+                </div>
+                <div className="mt-3 space-y-2 text-sm">
+                  <p className="text-slate-300">
+                    <span className="font-medium text-slate-200">Advisor's explanation: </span>
+                    {request.reason}
+                  </p>
+                  {request.responseNote && (
+                    <p className="whitespace-pre-wrap text-slate-300">
+                      <span className="font-medium text-slate-200">Coordinator's response: </span>
+                      {request.responseNote}
+                    </p>
+                  )}
+                  {request.decidedBy && (
+                    <p className="text-xs text-slate-500">Reviewed by {request.decidedBy.fullName}</p>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
 
       {plan && (
         <>

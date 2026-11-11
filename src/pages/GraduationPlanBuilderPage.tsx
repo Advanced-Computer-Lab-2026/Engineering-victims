@@ -27,8 +27,16 @@ import {
   saveGraduationPlan,
   submitGraduationPlan,
 } from '../lib/graduationPlansService';
+import {
+  fetchExitExamRequestsForPlan,
+  submitExitExamRequest,
+} from '../lib/exitExamRequestsService';
 import { formatDate, formatRelative } from '../lib/studentsService';
-import type { GraduationPlanDetail, GraduationPlanPlacement } from '../lib/types';
+import type {
+  ExitExamRequestSummary,
+  GraduationPlanDetail,
+  GraduationPlanPlacement,
+} from '../lib/types';
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   Draft: 'amber',
@@ -74,6 +82,12 @@ const GraduationPlanBuilderPage: React.FC = () => {
   const [decisionNote, setDecisionNote] = useState('');
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [isDeciding, setIsDeciding] = useState(false);
+  const [exitExamRequests, setExitExamRequests] = useState<ExitExamRequestSummary[]>([]);
+  const [exitExamReason, setExitExamReason] = useState('');
+  const [exitExamError, setExitExamError] = useState<string | null>(null);
+  const [exitExamMessage, setExitExamMessage] = useState<string | null>(null);
+  const [isLoadingExitExamRequests, setIsLoadingExitExamRequests] = useState(false);
+  const [isSubmittingExitExamRequest, setIsSubmittingExitExamRequest] = useState(false);
   /**
    * The page is long, so the outcome of Save/Submit is also shown in the
    * sticky action bar at the bottom — where the buttons are — and scrolled
@@ -114,6 +128,25 @@ const GraduationPlanBuilderPage: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!planId || user?.role !== 'Advisor') return;
+    let cancelled = false;
+    setIsLoadingExitExamRequests(true);
+    fetchExitExamRequestsForPlan(planId)
+      .then((response) => {
+        if (!cancelled) setExitExamRequests(response.requests);
+      })
+      .catch((err: ApiError) => {
+        if (!cancelled) setExitExamError(err.message);
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoadingExitExamRequests(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [planId, user?.role]);
 
   const isDraft = plan?.status === 'Draft';
   const isCoordinator = user?.role === 'Coordinator';
@@ -210,6 +243,27 @@ const GraduationPlanBuilderPage: React.FC = () => {
     }
   };
 
+  const handleExitExamRequest = async (courseId: string) => {
+    if (!planId) return;
+    setIsSubmittingExitExamRequest(true);
+    setExitExamError(null);
+    setExitExamMessage(null);
+    try {
+      const response = await submitExitExamRequest({
+        planId,
+        courseId,
+        reason: exitExamReason,
+      });
+      setExitExamRequests((current) => [response.request, ...current]);
+      setExitExamReason('');
+      setExitExamMessage(response.message);
+    } catch (err) {
+      setExitExamError((err as ApiError).message);
+    } finally {
+      setIsSubmittingExitExamRequest(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
@@ -240,7 +294,17 @@ const GraduationPlanBuilderPage: React.FC = () => {
   const assignedCount = plan.remaining.filter(
     (course) => assignments[course.id] !== undefined && assignments[course.id] !== ''
   ).length;
-  const unassignedCount = plan.remaining.length - assignedCount;
+  const failedCourses = plan.remaining.filter((course) => course.isRetake);
+  const exitExamCourseId = failedCourses.length === 1 ? failedCourses[0].id : null;
+  const exitExamRequest = exitExamRequests.find(
+    (request) => request.course?.id === exitExamCourseId
+  );
+  const examApproved = exitExamRequest?.status === 'Approved';
+  const approvedExitExamUnassigned = Boolean(
+    examApproved && exitExamCourseId && !assignments[exitExamCourseId]
+  );
+  const requirementsCovered = assignedCount + Number(approvedExitExamUnassigned);
+  const unassignedCount = plan.remaining.length - requirementsCovered;
 
   return (
     <>
@@ -304,6 +368,70 @@ const GraduationPlanBuilderPage: React.FC = () => {
         </Card>
       )}
 
+      {user?.role === 'Advisor' && isDraft && (
+        <Card tone="raised" className="mb-5 p-4">
+          <h2 className="text-sm font-bold text-white">Exit-exam request</h2>
+          {isLoadingExitExamRequests ? (
+            <p className="mt-2 text-sm text-slate-400">Loading exit-exam requests...</p>
+          ) : failedCourses.length !== 1 ? (
+            <p className="mt-2 text-sm text-slate-400">
+              A request can be made only when exactly one failed course remains.
+            </p>
+          ) : exitExamRequest?.status === 'Pending' ? (
+            <p className="mt-2 text-sm text-amber-200">
+              The request for {failedCourses[0].code} is awaiting the Coordinator's decision.
+            </p>
+          ) : exitExamRequest?.status === 'Approved' ? (
+            <p className="mt-2 text-sm text-emerald-200">
+              {failedCourses[0].code} is covered by an approved exit exam and may remain unassigned.
+            </p>
+          ) : exitExamRequest?.status === 'Rejected' ? (
+            <div className="mt-2 rounded-lg border border-rose-900/60 bg-rose-950/20 p-3 text-sm text-rose-200">
+              <p>The request for {failedCourses[0].code} was rejected. Assign the course to a valid term.</p>
+              <p className="mt-1 whitespace-pre-wrap text-rose-100">{exitExamRequest.responseNote}</p>
+            </div>
+          ) : (
+            <>
+              <p className="mt-1 text-sm text-slate-400">
+                Request an exit exam for the one remaining failed course only if it cannot be repeated
+                before graduation.
+              </p>
+              <label
+                htmlFor="exit-exam-reason"
+                className="mt-3 block text-xs font-medium uppercase tracking-wide text-slate-400"
+              >
+                Why can {failedCourses[0].code} not be placed in a term?
+              </label>
+              <textarea
+                id="exit-exam-reason"
+                value={exitExamReason}
+                onChange={(event) => setExitExamReason(event.target.value)}
+                maxLength={1000}
+                rows={3}
+                className="mt-1.5 w-full resize-y rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                placeholder="For example, the course is not offered in any remaining term."
+              />
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <span className="text-xs text-slate-500">{exitExamReason.length}/1000 characters</span>
+                <CustomButton
+                  isLoading={isSubmittingExitExamRequest}
+                  disabled={!exitExamReason.trim() || Boolean(exitExamRequest)}
+                  onClick={() => handleExitExamRequest(failedCourses[0].id)}
+                >
+                  Submit exit-exam request
+                </CustomButton>
+              </div>
+            </>
+          )}
+          {exitExamMessage && <p className="mt-2 text-sm text-emerald-300">{exitExamMessage}</p>}
+          {exitExamError && (
+            <p role="alert" className="mt-2 text-sm text-rose-300">
+              {exitExamError}
+            </p>
+          )}
+        </Card>
+      )}
+
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         {plan.terms.map((term, index) => {
           const hours = hoursByTerm[index] ?? 0;
@@ -333,11 +461,14 @@ const GraduationPlanBuilderPage: React.FC = () => {
           <div>
             <h2 className="text-sm font-bold text-white">Remaining courses</h2>
             <p className="text-xs text-slate-500">
-              {assignedCount} of {plan.remaining.length} assigned · {plan.validation.creditLimit}-hour limit per term
+              {assignedCount} assigned
+              {approvedExitExamUnassigned ? ' · 1 covered by an approved exit exam' : ''}
+              {' · '}
+              {plan.validation.creditLimit}-hour limit per term
             </p>
           </div>
-          <Badge tone={assignedCount === plan.remaining.length ? 'emerald' : 'amber'}>
-            {assignedCount === plan.remaining.length ? 'All assigned' : 'Incomplete'}
+          <Badge tone={requirementsCovered === plan.remaining.length ? 'emerald' : 'amber'}>
+            {requirementsCovered === plan.remaining.length ? 'All requirements covered' : 'Incomplete'}
           </Badge>
         </div>
 
@@ -373,6 +504,11 @@ const GraduationPlanBuilderPage: React.FC = () => {
                         {course.isRetake && (
                           <Badge tone="rose" className="mt-1">
                             Retake
+                          </Badge>
+                        )}
+                        {course.isRetake && examApproved && (
+                          <Badge tone="emerald" className="ml-1 mt-1">
+                            Exit exam approved
                           </Badge>
                         )}
                       </td>
@@ -535,7 +671,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
                     1
                   )} ${Math.max(ruleErrors.length, 1) === 1 ? 'issue' : 'issues'}`
                 : unassignedCount === 0
-                  ? 'All courses assigned'
+                  ? 'All graduation requirements covered'
                   : `${unassignedCount} course${unassignedCount === 1 ? '' : 's'} still unassigned`}
             </p>
 

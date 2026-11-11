@@ -93,6 +93,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Advisor', 'Coordinator'],
     description: 'Advisors build plans; Coordinators review submissions and track decisions.',
   },
+  {
+    to: '/exit-exam-requests',
+    label: 'Exit-exam Requests',
+    icon: GraduationCap,
+    roles: ['Coordinator'],
+    description: 'Review exit-exam requests for a single remaining failed course.',
+  },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.
   {

@@ -162,6 +162,9 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Graduation plans across the next Winter, Spring and Summer terms, with
   prerequisite ordering, private Advisor drafts, and Coordinator review,
   acceptance or rejection with a response note
+- Exit-exam requests for a student's single remaining failed course, including
+  Coordinator approval or rejection and a response visible to the Advisor and
+  the student
 - Accepted graduation plans visible to the Advising Student
 - Exit exam request flow
 
