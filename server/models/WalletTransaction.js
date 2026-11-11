@@ -25,9 +25,12 @@ const walletTransactionSchema = new mongoose.Schema(
     paymentReference: { type: String, trim: true, default: null },
     description: { type: String, trim: true, default: '' },
     occurredAt: { type: Date, default: Date.now },
+    notificationPending: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
+
+walletTransactionSchema.index({ notificationPending: 1, createdAt: 1 });
 
 module.exports = mongoose.model('WalletTransaction', walletTransactionSchema);
 module.exports.TYPES = TYPES;

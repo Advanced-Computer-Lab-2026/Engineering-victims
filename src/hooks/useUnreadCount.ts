@@ -28,8 +28,19 @@ export const useUnreadCount = (): UnreadCountState => {
 
   useEffect(() => {
     refresh();
+    const refreshIfVisible = () => {
+      if (document.visibilityState === 'visible') refresh();
+    };
+    const interval = window.setInterval(refreshIfVisible, 30_000);
+    window.addEventListener('focus', refreshIfVisible);
+    document.addEventListener('visibilitychange', refreshIfVisible);
     window.addEventListener('notifications-changed', refresh);
-    return () => window.removeEventListener('notifications-changed', refresh);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refreshIfVisible);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+      window.removeEventListener('notifications-changed', refresh);
+    };
   }, [refresh]);
 
   return { unreadCount, refresh };
