@@ -85,13 +85,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Advisor'],
     description: 'Every advising student in the school, not only the ones assigned to you.',
   },
-  // Req 103-107: the Advisor's own plans, private drafts included.
+  // Req 103-113: Advisors build plans; Coordinators review submitted plans.
   {
     to: '/graduation-plans',
     label: 'Graduation Plans',
     icon: GraduationCap,
-    roles: ['Advisor'],
-    description: 'Plan the remaining courses of an advising student across the next three terms.',
+    roles: ['Advisor', 'Coordinator'],
+    description: 'Advisors build plans; Coordinators review submissions and track decisions.',
   },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.
@@ -133,6 +133,14 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Student'],
     studentTypes: ['Advising Student'],
     description: 'Balance, transactions and extra-hours requests.',
+  },
+  {
+    to: '/my-graduation-plan',
+    label: 'My Graduation Plan',
+    icon: GraduationCap,
+    roles: ['Student'],
+    studentTypes: ['Advising Student'],
+    description: 'View the graduation plan accepted by the Coordinator.',
   },
   // Req 32: both student types see their own registered courses and credits.
   {

@@ -25,8 +25,9 @@ import WeeklySchedulePage from './pages/WeeklySchedulePage';
 import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import EligibleSwapGroupsPage from './pages/EligibleSwapGroupsPage';
-import GraduationPlansPage from './pages/GraduationPlansPage';
+import GraduationPlansRoute from './pages/GraduationPlansRoute';
 import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
+import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -59,8 +60,18 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/advising-students" element={<AdvisingStudentsPage />} />
-          {/* Req 103-107: graduation planning is an Advisor workflow. */}
-          <Route path="/graduation-plans" element={<GraduationPlansPage />} />
+        </Route>
+
+        {/* Req 103-114: Advisors build and submit plans, Coordinators review
+            them. The page picks the view for the signed-in role. */}
+        <Route
+          element={
+            <ProtectedRoute roles={['Advisor', 'Coordinator']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/graduation-plans" element={<GraduationPlansRoute />} />
           <Route path="/graduation-plans/:planId" element={<GraduationPlanBuilderPage />} />
         </Route>
 
@@ -89,6 +100,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/wallet" element={<WalletPage />} />
+          {/* Req 114: the accepted graduation plan, when there is one. */}
+          <Route path="/my-graduation-plan" element={<MyGraduationPlanPage />} />
           {/* Req 54: an Advising Student's own history. */}
           <Route path="/academic-history" element={<AcademicHistoryPage />} />
           {/* Req 55: an Advising Student's own transcript, one academic year at a time. */}

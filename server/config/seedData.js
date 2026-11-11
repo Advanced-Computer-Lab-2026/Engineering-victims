@@ -7,6 +7,7 @@ const CourseOffering = require('../models/CourseOffering');
 const CourseSlot = require('../models/CourseSlot');
 const ScheduleTemplate = require('../models/ScheduleTemplate');
 const StudentSchedule = require('../models/StudentSchedule');
+const GraduationPlan = require('../models/GraduationPlan');
 const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
 const { seedWallets } = require('./walletSeed');
@@ -14,6 +15,7 @@ const { seedAcademicHistory } = require('./academicHistorySeed');
 const { seedScheduleGroups } = require('./scheduleSeed');
 const { seedAdvisingSchedules } = require('./advisingScheduleSeed');
 const { seedSchedulingPreferences } = require('./schedulingPreferenceSeed');
+const { seedGraduationPlans } = require('./graduationPlanSeed');
 
 /**
  * The demo dataset.
@@ -41,7 +43,7 @@ const ADVISORS = [
   { fullName: 'Dr. Advisor', email: 'advisor@guc.edu.eg', role: 'Advisor' },
   // A TA account. Kept last so the slot-grid instructor rotation in
   // seedOfferings (which walks the first ROOMS.length advisors) is unchanged.
-  { fullName: 'Meriam Khaled', email: 'meriam.khalifa@guc.edu.eg', role: 'Advisor' },
+  { fullName: 'Meriam Khalifa', email: 'meriam.khalifa@guc.edu.eg', role: 'Advisor' },
 ];
 
 const STAFF = [
@@ -635,6 +637,7 @@ const seed = async () => {
   // scheduleSeed.js rebuilds them once the offerings it draws from exist.
   await ScheduleTemplate.deleteMany({});
   await StudentSchedule.deleteMany({});
+  await GraduationPlan.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
@@ -704,6 +707,7 @@ const seed = async () => {
   const walletTransactions = await seedWallets(students);
   // Req 54: completed (graded) and current courses for the Advising Students.
   const courseRecords = await seedAcademicHistory({ students, courses });
+  const graduationPlans = await seedGraduationPlans({ students, users: created });
 
   const currentTerm =
     terms.find((term) => term.season === 'Winter') ?? terms[terms.length - 1] ?? null;
@@ -764,6 +768,7 @@ const seed = async () => {
     schedulingPreferences,
     walletTransactions,
     courseRecords,
+    graduationPlans: graduationPlans.length,
     notifications: notifications.length,
   };
 };

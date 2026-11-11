@@ -6,11 +6,34 @@ import type {
 } from './types';
 
 /**
- * Req 103-107. Advisor only; the server enforces it and scopes every call to
- * the signed-in Advisor, so drafts never leave their creator (req 106).
+ * Req 103-114. The server scopes every call by role: an Advisor sees their own
+ * plans, a Coordinator sees plans that have left the draft stage, and an
+ * Advising Student only their accepted plan.
  */
-export const fetchGraduationPlans = async (): Promise<{ plans: GraduationPlanSummary[] }> =>
-  apiFetch('/api/graduation-plans');
+
+/** Req 111/112 — the Coordinator's review filters. Blank values are omitted. */
+export interface GraduationPlanFilters {
+  status?: string;
+  advisor?: string;
+  submittedFrom?: string;
+  submittedTo?: string;
+  search?: string;
+}
+
+export const fetchGraduationPlans = async (
+  filters: GraduationPlanFilters = {}
+): Promise<{ plans: GraduationPlanSummary[] }> => {
+  const params = new URLSearchParams();
+  Object.entries(filters).forEach(([key, value]) => {
+    const trimmed = String(value ?? '').trim();
+    if (trimmed) params.set(key, trimmed);
+  });
+
+  const query = params.toString();
+  return apiFetch<{ plans: GraduationPlanSummary[] }>(
+    `/api/graduation-plans${query ? `?${query}` : ''}`
+  );
+};
 
 /** Req 103/106 — start a plan, or reopen the Advisor's existing draft. */
 export const createGraduationPlan = async (studentId: string): Promise<{ plan: GraduationPlanDetail }> =>
@@ -19,6 +42,7 @@ export const createGraduationPlan = async (studentId: string): Promise<{ plan: G
     body: JSON.stringify({ studentId }),
   });
 
+/** Req 103-107/110 — the owner Advisor or a reviewing Coordinator. */
 export const fetchGraduationPlan = async (planId: string): Promise<{ plan: GraduationPlanDetail }> =>
   apiFetch(`/api/graduation-plans/${planId}`);
 
@@ -41,3 +65,18 @@ export const submitGraduationPlan = async (
 /** Req 105 — delete a draft. Submitted plans cannot be deleted. */
 export const deleteGraduationPlan = async (planId: string): Promise<void> =>
   apiFetch(`/api/graduation-plans/${planId}`, { method: 'DELETE' });
+
+/** Req 113 — the Coordinator accepts or rejects with a response note. */
+export const decideGraduationPlan = async (
+  planId: string,
+  decision: 'accept' | 'reject',
+  note: string
+): Promise<{ message: string; plan: GraduationPlanDetail }> =>
+  apiFetch(`/api/graduation-plans/${planId}/decision`, {
+    method: 'POST',
+    body: JSON.stringify({ decision, note }),
+  });
+
+/** Req 114 — an Advising Student's accepted plan, or null before acceptance. */
+export const fetchMyGraduationPlan = async (): Promise<{ plan: GraduationPlanDetail | null }> =>
+  apiFetch('/api/graduation-plans/me');
