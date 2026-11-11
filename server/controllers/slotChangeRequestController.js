@@ -7,6 +7,7 @@ const SlotChangeRequest = require('../models/SlotChangeRequest');
 const { deadlineEnd } = require('../services/schedulingPreferenceService');
 const { reviewWindowFor, validateRequestInput } = require('../services/slotChangeRequestService');
 const { notify, notifyRole } = require('../services/notificationService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
 
 /**
  * Resolves the signed-in Advising Student from the token, or sends the right
@@ -95,17 +96,23 @@ const notifyRequestSubmitted = async ({ userId, student, course, slotType, snaps
       link: '/my-courses',
     });
 
-    const staffNotice = {
-      type: 'approval',
-      title: 'New slot-change request',
-      message: `${student.fullName} (${student.studentId}) asked to change ${slotLabel}.`,
-      link: `/schedule/${student._id}`,
-    };
     if (student.assignedAdvisor) {
-      await notify(student.assignedAdvisor, staffNotice);
+      await publishNotificationEvent({
+        name: 'slot_change.submitted',
+        entityId: snapshot.requestId,
+        occurrence: 'submitted',
+        studentId: student._id,
+        title: 'New slot-change request',
+        message: `${student.fullName} (${student.studentId}) asked to change ${slotLabel}.`,
+        link: `/schedule/${student._id}`,
+      });
     } else {
-      // No Advisor yet: a Coordinator may handle any advising student's request.
-      await notifyRole('Coordinator', staffNotice);
+      await notifyRole('Coordinator', {
+        type: 'approval',
+        title: 'New slot-change request',
+        message: `${student.fullName} (${student.studentId}) asked to change ${slotLabel}.`,
+        link: `/schedule/${student._id}`,
+      });
     }
   } catch (error) {
     console.error('[slot-change] Could not send notifications:', error.message);
@@ -194,7 +201,10 @@ exports.createMyRequest = async (req, res) => {
       throw error;
     }
 
-    await notifyRequestSubmitted({ userId: req.user.userId, student, course, slotType: slot.slotType, snapshot });
+    await notifyRequestSubmitted({
+      userId: req.user.userId, student, course, slotType: slot.slotType,
+      snapshot: { ...snapshot, requestId: created._id },
+    });
 
     res.status(201).json({
       message: 'Your slot-change request was submitted. Your schedule stays as it is until it is reviewed.',

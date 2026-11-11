@@ -73,7 +73,7 @@ const seedWallets = async (students) => {
     // Sequential on purpose: each row's resulting balance depends on the last.
     const ordered = [...events].sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
     for (const event of ordered) {
-      await recordTransaction(student._id, { ...event, occurredAt: new Date(event.occurredAt) });
+      await recordTransaction(student._id, { ...event, occurredAt: new Date(event.occurredAt) }, { notifications: false });
       count += 1;
     }
   }

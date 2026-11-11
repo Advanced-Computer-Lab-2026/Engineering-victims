@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PageHeader from '../components/PageHeader';
 import StudentPreferencesPanel from '../components/StudentPreferencesPanel';
+import CalendarSyncPanel from '../components/CalendarSyncPanel';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -538,6 +539,8 @@ const WeeklySchedulePage: React.FC = () => {
           </div>
         }
       />
+
+      {isOwn && user?.role === 'Student' && <CalendarSyncPanel processed={data?.stage === 'Processed' && Boolean(data?.visible)} />}
 
       {error && (
         <div className="mb-4">

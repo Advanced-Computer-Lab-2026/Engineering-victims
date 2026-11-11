@@ -6,7 +6,9 @@ const GraduationPlan = require('../models/GraduationPlan');
 const ExitExamRequest = require('../models/ExitExamRequest');
 const { remainingCoursesFor } = require('../services/graduationPlanService');
 const { validateRequest, applyDecision } = require('../services/exitExamRequestService');
-const { notify, notifyRole } = require('../services/notificationService');
+const { notify } = require('../services/notificationService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
+const { publishStudentNotification } = require('../services/studentNotificationService');
 
 const requestSummary = (request) => ({
   id: request._id,
@@ -101,12 +103,19 @@ exports.createRequest = async (req, res) => {
       reason: reason.trim(),
     });
 
-    await notifyRole('Coordinator', {
-      type: 'approval',
-      title: 'Exit-exam request needs review',
-      message: `${student.fullName} (${student.studentId}) has an exit-exam request for ${course.code}.`,
-      link: '/exit-exam-requests',
-    });
+    try {
+      await publishNotificationEvent({
+        name: 'exit_exam.action_required',
+        entityId: created._id,
+        occurrence: 'submitted',
+        studentId: student._id,
+        title: 'Exit-exam request needs review',
+        message: `${student.fullName} (${student.studentId}) has an exit-exam request for ${course.code}.`,
+        link: '/exit-exam-requests',
+      });
+    } catch (error) {
+      console.error('[exit-exam] Could not queue Coordinator notification:', error.message);
+    }
 
     res.status(201).json({
       message: 'The exit-exam request was submitted to the Coordinator.',
@@ -205,13 +214,18 @@ exports.decideRequest = async (req, res) => {
         title: `Exit-exam request ${decision}`,
         message: `The Coordinator ${decision} the request for ${course?.code ?? 'the failed course'}. ${updated.responseNote}`,
       };
-      const studentUser = await User.findOne({ email: student.email }).select('_id').lean();
-      await Promise.all([
-        notify(updated.advisor, { ...notice, link: '/graduation-plans' }),
-        studentUser
-          ? notify(studentUser._id, { ...notice, link: '/my-graduation-plan' })
-          : Promise.resolve([]),
-      ]);
+      await notify(updated.advisor, { ...notice, link: '/graduation-plans' });
+      try {
+        await publishStudentNotification('exit_exam.decided', {
+          entityId: updated._id,
+          occurrence: updated.decidedAt.toISOString(),
+          studentId: updated.student,
+          decision: updated.status,
+          reference: course?.code,
+        });
+      } catch (error) {
+        console.error('[exit-exam] Could not queue student decision notification:', error.message);
+      }
     }
 
     const populated = await requestPopulations(ExitExamRequest.findById(updated._id)).lean();

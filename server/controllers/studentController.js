@@ -11,6 +11,8 @@ const { buildStudentQuery } = require('../services/studentQueryService');
 const { buildTemplateSchedule } = require('../services/weeklyScheduleService');
 const { recalculate, getStatusesFor } = require('../services/workflowService');
 const { notifyByEmail } = require('../services/notificationService');
+const { queueStudentNotification } = require('../services/studentNotificationService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 100;
@@ -224,6 +226,19 @@ exports.assignAdvisor = async (req, res) => {
     student.assignedAdvisor = advisor._id;
     student.lastUpdateAt = new Date();
     await student.save();
+    try {
+      await publishNotificationEvent({
+        name: 'advisor.assigned',
+        entityId: student._id,
+        occurrence: String(new mongoose.Types.ObjectId()),
+        studentId: student._id,
+        title: 'A student was assigned to you',
+        message: `${student.fullName} (${student.studentId}) is now on your advising roster.`,
+        link: '/advising-students',
+      });
+    } catch (error) {
+      console.error('[students] Could not queue advisor-assignment notification:', error.message);
+    }
     await student.populate('assignedAdvisor', 'fullName email');
 
     // Requirement 14 explicitly preserves the student's schedule, requests,
@@ -352,6 +367,10 @@ exports.assignToGroup = async (req, res) => {
     student.workflowStatus = 'Schedule Assigned';
     student.blockingStep = null;
     student.lastUpdateAt = new Date();
+    queueStudentNotification(student, 'schedule.processed', {
+      entityId: termId,
+      occurrence: String(new mongoose.Types.ObjectId()),
+    });
     await student.save();
 
     res.status(200).json({

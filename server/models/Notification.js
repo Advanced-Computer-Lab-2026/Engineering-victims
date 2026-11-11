@@ -16,11 +16,18 @@ const notificationSchema = new mongoose.Schema(
     message: { type: String, required: true, trim: true },
     /** Optional in-app destination, so a notification can deep-link to its page. */
     link: { type: String, default: null },
+    /** Present only for durable workflow notifications; legacy rows stay valid. */
+    eventKey: { type: String },
     isRead: { type: Boolean, default: false, index: true },
     readAt: { type: Date, default: null },
   },
   { timestamps: true }
 );
+
+notificationSchema.index({ eventKey: 1, user: 1 }, {
+  unique: true,
+  partialFilterExpression: { eventKey: { $type: 'string' } },
+});
 
 module.exports = mongoose.model('Notification', notificationSchema);
 module.exports.TYPES = TYPES;

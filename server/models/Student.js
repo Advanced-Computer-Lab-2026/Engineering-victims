@@ -70,6 +70,7 @@ const studentSchema = new mongoose.Schema(
       enum: ['Good Standing', 'Probation', 'Dismissed'],
       default: 'Good Standing',
     },
+    consecutiveProbationSemesters: { type: Number, min: 0, default: 0 },
     /**
      * Why this student is on advising (req 59). Null for Normal Students and
      * for an Advising Student nobody has profiled yet, so the "no advising
@@ -89,6 +90,16 @@ const studentSchema = new mongoose.Schema(
     blockingStep: { type: String, default: 'Schedule assignment' },
     isActive: { type: Boolean, default: true },
     lastUpdateAt: { type: Date, default: Date.now },
+    // Notification outbox: committed atomically with the student action. A
+    // background relay acknowledges each entry only after durable publication.
+    pendingNotificationEvents: [{
+      name: { type: String, required: true },
+      entityId: { type: String, required: true },
+      occurrence: { type: String, required: true },
+      title: { type: String, required: true },
+      message: { type: String, required: true },
+      link: { type: String, required: true },
+    }],
   },
   { timestamps: true }
 );
@@ -100,6 +111,11 @@ const studentSchema = new mongoose.Schema(
 studentSchema.statics.statusesForType = function statusesForType(studentType) {
   return studentType === 'Advising Student' ? ADVISING_STATUSES : NORMAL_STATUSES;
 };
+
+// Keep this flag derived; it cannot disagree with the current standing.
+studentSchema.virtual('isProbation').get(function () {
+  return this.academicStanding === 'Probation';
+});
 
 studentSchema.pre('validate', function validate(next) {
   const valid = this.constructor.statusesForType(this.studentType);
