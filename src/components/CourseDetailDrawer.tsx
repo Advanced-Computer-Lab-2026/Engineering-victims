@@ -1,11 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { X, Loader2, BookOpen, Clock, MapPin, UserRound, Calendar } from 'lucide-react';
+import { X, Loader2, BookOpen, Clock, MapPin, UserRound, Calendar, ArrowRightLeft, Hourglass } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
-import type { CourseDetailsResponse, CourseSlotDetail } from '../lib/types';
+import type { CourseDetailsResponse, CourseSlotDetail, SlotChangeEligibility } from '../lib/types';
+import { fetchSlotChangeEligibility } from '../lib/slotChangeRequestsService';
+import { formatDate } from '../lib/studentsService';
+import { useSession } from '../hooks/useSession';
 import CustomButton from './ui/CustomButton';
 import Card from './ui/Card';
 import Badge, { type BadgeTone } from './ui/Badge';
 import AlertBanner from './ui/AlertBanner';
+import SlotChangeRequestDialog from './SlotChangeRequestDialog';
 
 interface CourseDetailDrawerProps {
   courseId: string | null;
@@ -27,6 +31,37 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
   const [data, setData] = useState<CourseDetailsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
+
+  // Req 40: Advising Students may ask for a change to one of these slots while
+  // their completed schedule is under review. The API decides; this only
+  // decides whether to offer the action.
+  const { user } = useSession();
+  const isAdvisingStudent = user?.role === 'Student' && user.studentType === 'Advising Student';
+  const [eligibility, setEligibility] = useState<SlotChangeEligibility | null>(null);
+  const [requestingSlot, setRequestingSlot] = useState<CourseSlotDetail | null>(null);
+  const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!courseId || !isAdvisingStudent) return;
+    let cancelled = false;
+    fetchSlotChangeEligibility()
+      .then((result) => {
+        if (!cancelled) setEligibility(result);
+      })
+      // Without eligibility the drawer simply stays read-only.
+      .catch(() => {
+        if (!cancelled) setEligibility(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courseId, isAdvisingStudent]);
+
+  const slotAction = (slot: CourseSlotDetail): SlotCardAction | undefined => {
+    if (!eligibility?.canRequest) return undefined;
+    if (eligibility.pendingSlotIds.includes(slot.id)) return { kind: 'pending' };
+    return { kind: 'request', onRequest: () => setRequestingSlot(slot) };
+  };
 
   useEffect(() => {
     if (!courseId) return;
@@ -89,6 +124,20 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
               </div>
             ) : data ? (
               <div className="space-y-6">
+                {submittedMessage && (
+                  <AlertBanner tone="success" title="Request sent" onDismiss={() => setSubmittedMessage(null)}>
+                    {submittedMessage}
+                  </AlertBanner>
+                )}
+
+                {isAdvisingStudent && eligibility && (
+                  <AlertBanner tone={eligibility.canRequest ? 'info' : 'neutral'} title="Slot-change requests">
+                    {eligibility.canRequest && eligibility.term
+                      ? `You can ask for a change to any of these slots until the end of ${formatDate(eligibility.term.advisingDeadline)}. Your advisor decides; the slot stays assigned until then.`
+                      : eligibility.reason}
+                  </AlertBanner>
+                )}
+
                 {/* Course Info Card */}
                 <Card tone="raised" className="p-5" sheen>
                   <div className="flex flex-wrap items-center gap-3">
@@ -115,7 +164,7 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
                     </h3>
                     <div className="space-y-3">
                       {data.slots.lectures.map((slot) => (
-                        <SlotCard key={slot.id} slot={slot} />
+                        <SlotCard key={slot.id} slot={slot} action={slotAction(slot)} />
                       ))}
                     </div>
                   </section>
@@ -130,7 +179,7 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
                     </h3>
                     <div className="space-y-3">
                       {data.slots.tutorials.map((slot) => (
-                        <SlotCard key={slot.id} slot={slot} />
+                        <SlotCard key={slot.id} slot={slot} action={slotAction(slot)} />
                       ))}
                     </div>
                   </section>
@@ -145,7 +194,7 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
                     </h3>
                     <div className="space-y-3">
                       {data.slots.labs.map((slot) => (
-                        <SlotCard key={slot.id} slot={slot} />
+                        <SlotCard key={slot.id} slot={slot} action={slotAction(slot)} />
                       ))}
                     </div>
                   </section>
@@ -161,11 +210,30 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
           </div>
         </div>
       </div>
+
+      {requestingSlot && data && (
+        <SlotChangeRequestDialog
+          course={data.course}
+          slot={requestingSlot}
+          onCancel={() => setRequestingSlot(null)}
+          onSubmitted={(request, message) => {
+            setRequestingSlot(null);
+            setSubmittedMessage(message);
+            // Mark the slot as pending so it is not offered again.
+            setEligibility((current) =>
+              current ? { ...current, pendingSlotIds: [...current.pendingSlotIds, request.currentSlot.id] } : current
+            );
+          }}
+        />
+      )}
     </div>
   );
 };
 
-const SlotCard: React.FC<{ slot: CourseSlotDetail }> = ({ slot }) => {
+/** Req 40: what a slot card offers an Advising Student, if anything. */
+type SlotCardAction = { kind: 'request'; onRequest: () => void } | { kind: 'pending' };
+
+const SlotCard: React.FC<{ slot: CourseSlotDetail; action?: SlotCardAction }> = ({ slot, action }) => {
   const style = TYPE_STYLE[slot.slotType];
 
   return (
@@ -204,6 +272,22 @@ const SlotCard: React.FC<{ slot: CourseSlotDetail }> = ({ slot }) => {
             )}
           </div>
         </div>
+
+        {action?.kind === 'request' && (
+          <CustomButton
+            variant="secondary"
+            size="sm"
+            onClick={action.onRequest}
+            icon={<ArrowRightLeft className="h-4 w-4" aria-hidden />}
+          >
+            Request change
+          </CustomButton>
+        )}
+        {action?.kind === 'pending' && (
+          <Badge tone="amber" icon={<Hourglass className="h-3.5 w-3.5" aria-hidden />}>
+            Change requested
+          </Badge>
+        )}
       </div>
     </Card>
   );
