@@ -28,6 +28,7 @@ import EligibleSwapGroupsPage from './pages/EligibleSwapGroupsPage';
 import GraduationPlansRoute from './pages/GraduationPlansRoute';
 import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
 import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
+import ExitExamRequestsPage from './pages/ExitExamRequestsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -88,6 +89,16 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/coordinator/queue" element={<CoordinatorQueuePage />} />
           <Route path="/advisors" element={<AdvisorsPage />} />
           <Route path="/schedule-templates" element={<ScheduleTemplatesPage />} />
+        </Route>
+
+        <Route
+          element={
+            <ProtectedRoute roles={['Coordinator']}>
+              <AppLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route path="/exit-exam-requests" element={<ExitExamRequestsPage />} />
         </Route>
 
         {/* Req 89: students only. A Normal Student who types the URL is told

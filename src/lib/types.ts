@@ -692,3 +692,23 @@ export interface GraduationPlanSummary {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ExitExamRequestStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface ExitExamRequestSummary {
+  id: string;
+  status: ExitExamRequestStatus;
+  student: {
+    id: string;
+    fullName: string;
+    studentId: string;
+    major: string;
+  } | null;
+  advisor: GraduationPlanAdvisor | null;
+  course: { id: string; code: string; name: string } | null;
+  reason: string;
+  responseNote: string;
+  submittedAt: string;
+  decidedAt: string | null;
+  decidedBy: { id: string; fullName: string } | null;
+}
