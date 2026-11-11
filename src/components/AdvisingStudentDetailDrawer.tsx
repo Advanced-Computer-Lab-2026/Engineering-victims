@@ -227,6 +227,16 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
               variant="secondary"
               size="sm"
               fullWidth
+              onClick={() => navigate(`/graduation-plans?studentId=${student.id}`)}
+              icon={<GraduationCap className="h-4 w-4" aria-hidden />}
+              className="mt-2"
+            >
+              Graduation plan
+            </CustomButton>
+            <CustomButton
+              variant="secondary"
+              size="sm"
+              fullWidth
               onClick={() => navigate(`/schedule/${student.id}`)}
               icon={<CalendarDays className="h-4 w-4" aria-hidden />}
               className="mt-2"

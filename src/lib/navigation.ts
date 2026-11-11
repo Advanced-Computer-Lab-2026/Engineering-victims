@@ -85,6 +85,14 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Advisor'],
     description: 'Every advising student in the school, not only the ones assigned to you.',
   },
+  // Req 103-107: the Advisor's own plans, private drafts included.
+  {
+    to: '/graduation-plans',
+    label: 'Graduation Plans',
+    icon: GraduationCap,
+    roles: ['Advisor'],
+    description: 'Plan the remaining courses of an advising student across the next three terms.',
+  },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.
   {

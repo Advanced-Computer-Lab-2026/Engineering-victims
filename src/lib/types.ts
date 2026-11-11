@@ -605,3 +605,76 @@ export interface SwapGroupScheduleResponse {
   sessions: ScheduleSession[];
 }
 
+
+/** Req 103-107 — an Advisor's graduation plan for one Advising Student. */
+export type GraduationPlanStatus = 'Draft' | 'Submitted' | 'Accepted' | 'Rejected';
+
+/** One of the next Winter, Spring or Summer terms the plan covers, in order. */
+export interface GraduationPlanTerm {
+  season: AcademicTermSeason;
+  academicYear: string;
+  label: string;
+}
+
+/** One remaining course and the term index it is assigned to. */
+export interface GraduationPlanPlacement {
+  courseId: string;
+  termIndex: number;
+}
+
+/** A course the plan still has to place, with the data the rules need. */
+export interface GraduationPlanCourse {
+  id: string;
+  code: string;
+  name: string;
+  creditHours: number;
+  courseType: string;
+  recommendedSemester: number;
+  offeringSeasons: AcademicTermSeason[];
+  prerequisites: Array<{ id: string; code: string; name: string; passed: boolean }>;
+  /** A failed course that has to be retaken. */
+  isRetake: boolean;
+}
+
+export interface GraduationPlanStudent {
+  id: string;
+  fullName: string;
+  email: string;
+  studentId: string;
+  studentType: StudentType;
+  major: string;
+  currentSemester: number;
+}
+
+/** Req 103/107 — what the server thinks of the plan as it stands. */
+export interface GraduationPlanValidation {
+  errors: string[];
+  assignedCount: number;
+  totalCourses: number;
+  termHours: Array<{ season: AcademicTermSeason; academicYear: string; hours: number }>;
+  creditLimit: number;
+}
+
+export interface GraduationPlanDetail {
+  id: string;
+  status: GraduationPlanStatus;
+  terms: GraduationPlanTerm[];
+  placements: GraduationPlanPlacement[];
+  student: GraduationPlanStudent;
+  remaining: GraduationPlanCourse[];
+  validation: GraduationPlanValidation;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GraduationPlanSummary {
+  id: string;
+  status: GraduationPlanStatus;
+  student: GraduationPlanStudent | null;
+  terms: GraduationPlanTerm[];
+  assignedCount: number;
+  submittedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
