@@ -45,6 +45,9 @@ const getTransporter = () => {
       port: SMTP_PORT,
       secure: false, // port 587 upgrades with STARTTLS
       requireTLS: true,
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 30000,
       auth: credentials,
     });
   }

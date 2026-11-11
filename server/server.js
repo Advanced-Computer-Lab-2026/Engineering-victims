@@ -26,6 +26,10 @@ const calendarRoutes = require("./routes/calendarRoutes");
 const CalendarConnection = require("./models/CalendarConnection");
 const CalendarOAuthState = require("./models/CalendarOAuthState");
 const CalendarEvent = require("./models/CalendarEvent");
+const SemesterStanding = require("./models/SemesterStanding");
+const ProbationWarning = require("./models/ProbationWarning");
+const { startProbationWorker } = require("./services/probationService");
+const semesterStandingRoutes = require("./routes/semesterStandingRoutes");
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
 if (ensureEnvFile()) {
@@ -53,6 +57,7 @@ app.use("/api/academic-history", academicHistoryRoutes);
 app.use("/api/schedules", weeklyScheduleRoutes);
 app.use("/api/preferences", schedulingPreferenceRoutes);
 app.use("/api/calendar", calendarRoutes);
+app.use("/api/semester-standings", semesterStandingRoutes);
 app.get("/", (req, res) => res.send("API running..."));
 
 const PORT = process.env.PORT || 5000;
@@ -101,10 +106,13 @@ async function startServer() {
 
     // Duplicate prevention must be indexed before a worker can deliver events.
     await Promise.all([Notification.init(), NotificationEvent.init(),
-      CalendarConnection.init(), CalendarOAuthState.init(), CalendarEvent.init()]);
+      CalendarConnection.init(), CalendarOAuthState.init(), CalendarEvent.init(),
+      SemesterStanding.init(), ProbationWarning.init()]);
     const stopNotificationWorker = startNotificationWorker({ beforeBatch: flushStudentNotifications });
+    const stopProbationWorker = startProbationWorker();
     const httpServer = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     httpServer.on('close', stopNotificationWorker);
+    httpServer.on('close', stopProbationWorker);
   } catch (err) {
     console.error("Startup error:", err.message);
     console.error(`\nCould not connect to MongoDB at: ${MONGODB_URI}`);
