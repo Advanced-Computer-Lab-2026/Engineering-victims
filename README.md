@@ -195,7 +195,7 @@ The result is faster advising, fewer errors, and complete visibility for everyon
   only.
 
 ### Integrations
-- Third-party calendar sync via OAuth (Google / Outlook)
+- Google Calendar sync via OAuth
 - Email notifications over Gmail SMTP (reset codes, password changes, advisor add/remove)
 
 ---

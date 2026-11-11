@@ -7,6 +7,12 @@ jest.mock('../services/notificationService', () => ({
   notify: jest.fn().mockResolvedValue([]),
   notifyRole: jest.fn().mockResolvedValue([]),
 }));
+jest.mock('../services/notificationEventService', () => ({
+  publishNotificationEvent: jest.fn().mockResolvedValue({}),
+}));
+jest.mock('../services/studentNotificationService', () => ({
+  publishStudentNotification: jest.fn().mockResolvedValue({}),
+}));
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -18,6 +24,8 @@ const GraduationPlan = require('../models/GraduationPlan');
 const Student = require('../models/Student');
 const User = require('../models/User');
 const { remainingCoursesFor } = require('../services/graduationPlanService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
+const { publishStudentNotification } = require('../services/studentNotificationService');
 const exitExamRequestRoutes = require('../routes/exitExamRequestRoutes');
 
 const app = express();
@@ -141,6 +149,11 @@ describe('exit-exam request access (reqs 108, 109, 115)', () => {
 
     expect(response.body.request.status).toBe('Pending');
     expect(response.body.request.reason).toBe('The course is not offered before graduation.');
+    expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'exit_exam.action_required',
+      studentId,
+      link: '/exit-exam-requests',
+    }));
     expect(ExitExamRequest.create).toHaveBeenCalledWith(
       expect.objectContaining({ student: studentId, advisor: String(advisorId), course: courseId })
     );
@@ -267,5 +280,10 @@ describe('exit-exam request access (reqs 108, 109, 115)', () => {
       { new: true, runValidators: true }
     );
     expect(response.body.request.status).toBe('Approved');
+    expect(publishStudentNotification).toHaveBeenCalledWith('exit_exam.decided', expect.objectContaining({
+      studentId,
+      decision: 'Approved',
+      reference: 'CSEN 301',
+    }));
   });
 });

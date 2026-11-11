@@ -11,6 +11,7 @@ import {
   Layers,
   ScrollText,
   SlidersHorizontal,
+  Scale,
   UserCog,
   Users,
   Wallet,
@@ -99,6 +100,13 @@ export const NAV_ITEMS: NavItem[] = [
     icon: GraduationCap,
     roles: ['Coordinator'],
     description: 'Review exit-exam requests for a single remaining failed course.',
+  },
+  {
+    to: '/semester-standings',
+    label: 'Semester Standings',
+    icon: Scale,
+    roles: ['Coordinator', 'Administrator'],
+    description: 'Finalize advising students’ semester GPA and review probation history.',
   },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.

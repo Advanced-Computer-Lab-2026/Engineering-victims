@@ -79,7 +79,15 @@ async function loadProcessedSchedule(student, now = new Date()) {
     throw google.fail('The processed schedule contains missing or inconsistent slots.', 422);
   }
   // Build and validate every event before making any external changes.
-  const events = selected.map((row) => ({ slot: row.slotId._id, body: buildRecurringEvent(row.slotId, term) }))
+  const events = selected.map((row) => ({
+    slot: row.slotId._id,
+    slotData: {
+      dayOfWeek: row.slotId.dayOfWeek,
+      startTime: row.slotId.startTime,
+      endTime: row.slotId.endTime,
+    },
+    body: buildRecurringEvent(row.slotId, term),
+  }))
     .filter((event) => event.body);
   return { term, events };
 }

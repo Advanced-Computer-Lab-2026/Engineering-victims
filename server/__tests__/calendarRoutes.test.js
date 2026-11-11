@@ -69,6 +69,12 @@ test('OAuth begins with offline consent, PKCE and expiring hashed state', async 
   expect(stored.verifier).not.toBe(google.decrypt(stored.verifier));
   expect(stored.expiresAt.getTime()).toBeGreaterThan(Date.now());
 });
+test('calendar endpoints reject unsupported providers', async () => {
+  const result = await request(app).post('/api/calendar/connect')
+    .set('Authorization', auth())
+    .send({ provider: 'unsupported' });
+  expect(result.status).toBe(400);
+});
 test('expired, replayed or other-user state cannot exchange a code', async () => {
   State.findOneAndDelete.mockReturnValue({ select: async () => null });
   const exchange = jest.spyOn(google, 'exchangeCode');
@@ -88,6 +94,7 @@ test('completion encrypts refresh tokens and binds them to the authenticated use
   expect(JSON.stringify(result.body)).not.toContain('refresh-secret');
 });
 test('sync cannot target a user or student supplied in the body', async () => {
+  Connection.findOne.mockReturnValue({ select: () => ({ lean: async () => ({ provider: 'google' }) }) });
   synchronize.mockResolvedValue({ count: 2 });
   const result = await request(app).post('/api/calendar/sync').set('Authorization', auth()).send({ userId: 'attacker', studentId: 'another-student' });
   expect(result.status).toBe(200);

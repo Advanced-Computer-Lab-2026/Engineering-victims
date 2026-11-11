@@ -8,6 +8,10 @@
  */
 process.env.JWT_SECRET = 'test_secret';
 
+jest.mock('../services/notificationEventService', () => ({
+  publishNotificationEvent: jest.fn().mockResolvedValue({}),
+}));
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -21,6 +25,7 @@ const AcademicTerm = require('../models/AcademicTerm');
 const Notification = require('../models/Notification');
 const SlotChangeRequest = require('../models/SlotChangeRequest');
 const slotChangeRequestRoutes = require('../routes/slotChangeRequestRoutes');
+const { publishNotificationEvent } = require('../services/notificationEventService');
 
 const app = express();
 app.use(express.json());
@@ -248,7 +253,12 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
     await submit(world, validBody(world));
 
     const recipients = spies.insertMany.mock.calls.map((call) => String(call[0][0].user));
-    expect(recipients).toEqual([String(world.userId), String(world.advisorId)]);
+    expect(recipients).toEqual([String(world.userId)]);
+    expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'slot_change.submitted',
+      studentId: world.student._id,
+      link: `/schedule/${world.student._id}`,
+    }));
     expect(spies.userFind).not.toHaveBeenCalled();
   });
 

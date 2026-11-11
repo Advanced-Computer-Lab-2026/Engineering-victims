@@ -4,7 +4,8 @@ const Student = require('../models/Student');
 const Connection = require('../models/CalendarConnection');
 const OAuthState = require('../models/CalendarOAuthState');
 const google = require('../services/googleCalendarClient');
-const { synchronize, timezone } = require('../services/calendarScheduleService');
+const googleSchedule = require('../services/calendarScheduleService');
+const { timezone } = googleSchedule;
 
 // Check the current database account as well as the JWT; revoked roles and
 // deactivated accounts must not retain calendar access until their JWT expires.
@@ -29,14 +30,16 @@ const handle = (action) => async (req, res) => {
 exports.status = handle(async (req, res) => {
   const connection = await Connection.findOne({ user: req.user.userId }).lean();
   res.json({
-    configured: google.isConfigured(), connected: Boolean(connection), provider: 'Google',
+    configured: google.isConfigured(),
+    connected: Boolean(connection),
     email: connection?.googleEmail || null, needsReconnect: connection?.needsReconnect || false,
     lastSyncedAt: connection?.lastSyncedAt || null, timezone: timezone(),
   });
 });
 exports.connect = handle(async (req, res) => {
+  if (req.body?.provider && req.body.provider !== 'google') throw google.fail('Only Google Calendar is supported.', 400);
   google.config();
-  if (await Connection.exists({ user: req.user.userId })) throw google.fail('Disconnect your current Google Calendar before connecting again.', 409);
+  if (await Connection.exists({ user: req.user.userId })) throw google.fail('Disconnect your current calendar before connecting another provider.', 409);
   const state = crypto.randomBytes(32).toString('base64url');
   const verifier = crypto.randomBytes(32).toString('base64url');
   await OAuthState.deleteMany({ user: req.user.userId });
@@ -45,6 +48,7 @@ exports.connect = handle(async (req, res) => {
   res.json({ url: google.authorizationUrl(state, verifier), state });
 });
 exports.complete = handle(async (req, res) => {
+  if (req.body?.provider && req.body.provider !== 'google') throw google.fail('Only Google Calendar is supported.', 400);
   google.config();
   const { state, code } = req.body;
   if (typeof state !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(state) || typeof code !== 'string' || !code || code.length > 4096) {
@@ -63,19 +67,25 @@ exports.complete = handle(async (req, res) => {
   }
   res.json({ message: 'Google Calendar connected. Select Sync to export your processed schedule.' });
 });
-exports.sync = handle(async (req, res) => res.json(await synchronize(req.user.userId, req.calendarStudent)));
+exports.sync = handle(async (req, res) => {
+  const connection = await Connection.findOne({ user: req.user.userId }).select('_id').lean();
+  if (!connection) throw google.fail('Connect a calendar before synchronizing.', 409);
+  res.json(await googleSchedule.synchronize(req.user.userId, req.calendarStudent));
+});
 exports.disconnect = handle(async (req, res) => {
   const user = req.user.userId;
   const connection = await Connection.findOneAndDelete({ user,
     $or: [{ lockUntil: null }, { lockUntil: { $lte: new Date() } }],
   }).select('+refreshToken');
   if (!connection && await Connection.exists({ user })) throw google.fail('Wait for synchronization to finish before disconnecting.', 409);
+  if (!connection) {
+    await OAuthState.deleteMany({ user });
+    return res.json({ message: 'No calendar is currently connected.' });
+  }
   await OAuthState.deleteMany({ user });
   let revoked = true;
-  if (connection) {
-    try { await google.revoke(google.decrypt(connection.refreshToken)); }
-    catch { revoked = false; }
-  }
+  try { await google.revoke(google.decrypt(connection.refreshToken)); }
+  catch { revoked = false; }
   res.json({ message: revoked
     ? 'Disconnected. Previously exported events remain in Google Calendar.'
     : 'Disconnected locally. Previously exported events remain. Remove this app from your Google account permissions to revoke access.' });

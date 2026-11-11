@@ -16,6 +16,8 @@ const {
   clearDecision,
   matchesPlanSearch,
 } = require('../services/graduationPlanService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
+const { publishStudentNotification } = require('../services/studentNotificationService');
 
 const studentSummary = (student) => ({
   id: student._id,
@@ -418,6 +420,19 @@ exports.submitPlan = async (req, res) => {
     plan.status = 'Submitted';
     plan.submittedAt = new Date();
     await plan.save();
+    try {
+      await publishNotificationEvent({
+        name: 'graduation_plan.submitted',
+        entityId: plan._id,
+        occurrence: plan.submittedAt.toISOString(),
+        studentId: plan.student,
+        title: 'Graduation plan submitted for review',
+        message: 'A graduation plan is waiting for Coordinator review.',
+        link: '/graduation-plans',
+      });
+    } catch (error) {
+      console.error('[graduation-plan] Could not queue Coordinator notification:', error.message);
+    }
 
     res.status(200).json({
       message: 'Your graduation plan was submitted and is now read-only while the Coordinator reviews it.',
@@ -452,6 +467,16 @@ exports.decidePlan = async (req, res) => {
     }
 
     await plan.save();
+    try {
+      await publishStudentNotification('graduation_plan.decided', {
+        entityId: plan._id,
+        occurrence: plan.decidedAt.toISOString(),
+        studentId: plan.student,
+        decision: plan.status === 'Accepted' ? 'Approved' : 'Rejected',
+      });
+    } catch (error) {
+      console.error('[graduation-plan] Could not queue student decision notification:', error.message);
+    }
     const message =
       plan.status === 'Accepted'
         ? 'The graduation plan was accepted and is now visible to the student.'

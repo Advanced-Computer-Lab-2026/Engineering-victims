@@ -29,6 +29,7 @@ import GraduationPlansRoute from './pages/GraduationPlansRoute';
 import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
 import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
 import ExitExamRequestsPage from './pages/ExitExamRequestsPage';
+import SemesterStandingsPage from './pages/SemesterStandingsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -89,6 +90,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/coordinator/queue" element={<CoordinatorQueuePage />} />
           <Route path="/advisors" element={<AdvisorsPage />} />
           <Route path="/schedule-templates" element={<ScheduleTemplatesPage />} />
+          <Route path="/semester-standings" element={<SemesterStandingsPage />} />
         </Route>
 
         <Route

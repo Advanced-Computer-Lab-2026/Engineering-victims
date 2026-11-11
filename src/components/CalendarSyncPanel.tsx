@@ -32,13 +32,13 @@ const CalendarSyncPanel: React.FC<{ processed: boolean }> = ({ processed }) => {
         const state = url.searchParams.get('state');
         const denied = url.searchParams.get('error');
         if (code || state || denied) {
-          ['code', 'state', 'error', 'error_description', 'scope', 'authuser', 'prompt', 'hd'].forEach((key) => url.searchParams.delete(key));
+          ['code', 'state', 'error', 'error_description', 'scope', 'authuser', 'prompt', 'hd', 'session_state', 'client_info'].forEach((key) => url.searchParams.delete(key));
           window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
           const expected = sessionStorage.getItem(STATE_KEY);
           sessionStorage.removeItem(STATE_KEY);
           if (!state || !expected || state !== expected) throw new Error('Calendar authorization could not be verified. Connect again in this browser tab.');
-          if (denied) throw new Error('Google Calendar connection was cancelled. You can connect again.');
-          if (!code) throw new Error('Google did not return an authorization code. Connect again.');
+          if (denied) throw new Error('Calendar connection was cancelled. You can connect again.');
+          if (!code) throw new Error('The calendar provider did not return an authorization code. Connect again.');
           const result = await apiFetch<{ message: string }>('/api/calendar/complete', {
             method: 'POST', body: JSON.stringify({ code, state }),
           });
@@ -59,7 +59,9 @@ const CalendarSyncPanel: React.FC<{ processed: boolean }> = ({ processed }) => {
     setNotice(null);
     try {
       if (action === 'connect') {
-        const result = await apiFetch<{ url: string; state: string }>('/api/calendar/connect', { method: 'POST' });
+        const result = await apiFetch<{ url: string; state: string }>('/api/calendar/connect', {
+          method: 'POST',
+        });
         const authUrl = new URL(result.url);
         if (authUrl.origin !== 'https://accounts.google.com' || authUrl.searchParams.get('redirect_uri') !== `${window.location.origin}/schedule`) {
           throw new Error('The calendar redirect address must match this application. Contact your administrator.');
@@ -86,19 +88,21 @@ const CalendarSyncPanel: React.FC<{ processed: boolean }> = ({ processed }) => {
     <Card className="mb-5 p-5 print:hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="flex items-center gap-2 font-semibold text-white"><CalendarDays className="h-4 w-4" aria-hidden />Google Calendar</h2>
+          <h2 className="flex items-center gap-2 font-semibold text-white"><CalendarDays className="h-4 w-4" aria-hidden />Calendar sync</h2>
           <p className="text-sm text-slate-400">Copy your processed schedule to Google Calendar for the teaching period.</p>
           {status?.connected && <p className="text-sm text-slate-300">Connected{status.email ? ` as ${status.email}` : ''} · {status.timezone}</p>}
           {status?.lastSyncedAt && <p className="text-xs text-slate-400">Last synchronized: {new Date(status.lastSyncedAt).toLocaleString()}</p>}
-          {status && !status.configured && <p className="text-sm text-amber-300">Google Calendar setup is pending. Contact your administrator.</p>}
-          {status?.needsReconnect && <p className="text-sm text-amber-300">Google access expired or was revoked. Disconnect, then connect again.</p>}
+          {status && !status.configured && <p className="text-sm text-amber-300">Calendar integration setup is pending. Contact your administrator.</p>}
+          {status?.needsReconnect && <p className="text-sm text-amber-300">Calendar access expired or was revoked. Disconnect, then connect again.</p>}
           {!processed && <p className="text-xs text-slate-400">Synchronization becomes available when your schedule is processed.</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {status?.connected ? <>
             <CustomButton size="sm" disabled={busy || !processed || !status.configured || status.needsReconnect} onClick={() => void act('sync')} icon={<RefreshCw className="h-4 w-4" aria-hidden />}>Sync schedule</CustomButton>
             <CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => void act('disconnect')} icon={<Unplug className="h-4 w-4" aria-hidden />}>Disconnect</CustomButton>
-          </> : <CustomButton size="sm" disabled={busy || !status?.configured} onClick={() => void act('connect')}>Connect Google Calendar</CustomButton>}
+          </> : <>
+            <CustomButton size="sm" disabled={busy || !status?.configured} onClick={() => void act('connect')}>Connect Google</CustomButton>
+          </>}
           {!status && !busy && <CustomButton size="sm" variant="secondary" onClick={() => void act('reload')}>Retry</CustomButton>}
         </div>
       </div>
