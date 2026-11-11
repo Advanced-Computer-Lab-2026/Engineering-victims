@@ -39,6 +39,9 @@ const ADVISORS = [
   // succeed in the demo.
   { fullName: 'Dr. Hind Rashwan', email: 'hind.rashwan@guc.edu.eg', role: 'Advisor' },
   { fullName: 'Dr. Advisor', email: 'advisor@guc.edu.eg', role: 'Advisor' },
+  // A TA account. Kept last so the slot-grid instructor rotation in
+  // seedOfferings (which walks the first ROOMS.length advisors) is unchanged.
+  { fullName: 'Meriam Khaled', email: 'meriam.khalifa@guc.edu.eg', role: 'Advisor' },
 ];
 
 const STAFF = [
