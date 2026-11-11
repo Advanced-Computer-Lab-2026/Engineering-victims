@@ -1,0 +1,206 @@
+const User = require('../models/User');
+const Student = require('../models/Student');
+const StudentSchedule = require('../models/StudentSchedule');
+const CourseSlot = require('../models/CourseSlot');
+const Course = require('../models/Course');
+const SlotChangeRequest = require('../models/SlotChangeRequest');
+const { deadlineEnd } = require('../services/schedulingPreferenceService');
+const { reviewWindowFor, validateRequestInput } = require('../services/slotChangeRequestService');
+const { notify, notifyRole } = require('../services/notificationService');
+
+/**
+ * Resolves the signed-in Advising Student from the token, or sends the right
+ * error. There is no student id in the URL or body, so a request can only ever
+ * be made for the caller's own schedule.
+ */
+const resolveStudent = async (req, res) => {
+  const user = await User.findById(req.user.userId).select('email').lean();
+  if (!user) {
+    res.status(404).json({ message: 'User not found' });
+    return null;
+  }
+  const student = await Student.findOne({ email: user.email });
+  if (!student) {
+    res.status(404).json({ message: 'No student record is linked to this account.' });
+    return null;
+  }
+  if (student.studentType !== 'Advising Student') {
+    res.status(403).json({
+      message: 'Slot-change requests are only for Advising Students. Normal Students use whole-schedule swaps.',
+    });
+    return null;
+  }
+  return student;
+};
+
+const serializeTerm = (term) =>
+  term
+    ? {
+        id: term._id,
+        label: `${term.academicYear} ${term.season}`,
+        advisingDeadline: term.advisingDeadline,
+        closesAt: deadlineEnd(term),
+      }
+    : null;
+
+const serializeRequest = (doc, course) => ({
+  id: doc._id,
+  status: doc.status,
+  course: { id: course._id, code: course.code, name: course.name },
+  slotType: doc.slotType,
+  currentSlot: { id: doc.currentSlot, ...doc.currentSlotSnapshot },
+  preferenceNote: doc.preferenceNote,
+  submittedAt: doc.createdAt,
+});
+
+/**
+ * Req 40: whether the signed-in Advising Student may request a slot change
+ * right now, and which of their slots already have a pending request, so the
+ * page can offer the action only where it would be accepted. The submission
+ * route re-checks everything; this is a convenience for the UI.
+ */
+exports.getMyEligibility = async (req, res) => {
+  try {
+    const student = await resolveStudent(req, res);
+    if (!student) return;
+
+    const window = await reviewWindowFor(student);
+    const pending = window.term
+      ? await SlotChangeRequest.find({ student: student._id, term: window.term._id, status: 'Pending' })
+          .select('currentSlot')
+          .lean()
+      : [];
+
+    res.status(200).json({
+      canRequest: window.isOpen,
+      reason: window.reason,
+      workflowStatus: student.workflowStatus,
+      term: serializeTerm(window.term),
+      pendingSlotIds: pending.map((entry) => String(entry.currentSlot)),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not check slot-change requests', error: error.message });
+  }
+};
+
+/** Side effect only: a failed notification must never fail the request. */
+const notifyRequestSubmitted = async ({ userId, student, course, slotType, snapshot }) => {
+  try {
+    const slotLabel = `${course.code} ${slotType} group ${snapshot.groupNumber} (${snapshot.dayOfWeek} ${snapshot.startTime}-${snapshot.endTime})`;
+
+    await notify(userId, {
+      type: 'schedule',
+      title: 'Slot-change request submitted',
+      message: `Your request to change ${slotLabel} was sent for review. Your schedule stays as it is until it is resolved.`,
+      link: '/my-courses',
+    });
+
+    const staffNotice = {
+      type: 'approval',
+      title: 'New slot-change request',
+      message: `${student.fullName} (${student.studentId}) asked to change ${slotLabel}.`,
+      link: `/schedule/${student._id}`,
+    };
+    if (student.assignedAdvisor) {
+      await notify(student.assignedAdvisor, staffNotice);
+    } else {
+      // No Advisor yet: a Coordinator may handle any advising student's request.
+      await notifyRole('Coordinator', staffNotice);
+    }
+  } catch (error) {
+    console.error('[slot-change] Could not send notifications:', error.message);
+  }
+};
+
+/**
+ * Req 40: request a change to one assigned lecture, tutorial or lab slot.
+ *
+ * Only a request is recorded: the student's StudentSchedule rows and the
+ * CourseSlot seat counts are never touched here, and the workflow status stays
+ * Ready for Student Review — pending requests are tracked by this collection
+ * rather than by a status change, so several slots may be requested at once.
+ */
+exports.createMyRequest = async (req, res) => {
+  try {
+    const student = await resolveStudent(req, res);
+    if (!student) return;
+
+    // Status and deadline first: a closed window is the answer whatever was sent.
+    const window = await reviewWindowFor(student);
+    if (!window.isOpen) return res.status(window.status).json({ message: window.reason });
+    const { term } = window;
+
+    const input = validateRequestInput(req.body);
+    if (input.error) return res.status(400).json({ message: input.error });
+
+    // The slot must be one the student actually holds in the schedule under review.
+    const entry = await StudentSchedule.findOne({
+      studentId: student._id,
+      slotId: input.slotId,
+      termId: term._id,
+      status: 'Active',
+    })
+      .select('_id slotId')
+      .lean();
+    if (!entry) {
+      return res.status(404).json({ message: 'That slot is not part of your schedule under review.' });
+    }
+
+    const slot = await CourseSlot.findById(input.slotId).populate('offeringId', 'courseId termId').lean();
+    if (!slot || !slot.offeringId) {
+      return res.status(404).json({ message: 'That slot is no longer available.' });
+    }
+    if (String(slot.offeringId.courseId) !== input.courseId) {
+      return res.status(400).json({ message: 'That slot does not belong to the selected course.' });
+    }
+    if (slot.slotType !== input.slotType) {
+      return res.status(400).json({ message: `That slot is a ${slot.slotType}, not a ${input.slotType}.` });
+    }
+
+    const course = await Course.findById(input.courseId).select('code name').lean();
+    if (!course) return res.status(404).json({ message: 'Course not found.' });
+
+    const duplicate = await SlotChangeRequest.exists({ student: student._id, currentSlot: slot._id, status: 'Pending' });
+    if (duplicate) {
+      return res.status(409).json({ message: 'You already have a pending change request for this slot.' });
+    }
+
+    const snapshot = {
+      groupNumber: slot.groupNumber,
+      dayOfWeek: slot.dayOfWeek,
+      startTime: slot.startTime,
+      endTime: slot.endTime,
+      room: slot.roomId,
+    };
+
+    let created;
+    try {
+      created = await SlotChangeRequest.create({
+        student: student._id,
+        term: term._id,
+        scheduleEntry: entry._id,
+        course: course._id,
+        offering: slot.offeringId._id,
+        slotType: slot.slotType,
+        currentSlot: slot._id,
+        currentSlotSnapshot: snapshot,
+        preferenceNote: input.preferenceNote,
+      });
+    } catch (error) {
+      // The partial unique index catches a simultaneous duplicate submission.
+      if (error?.code === 11000) {
+        return res.status(409).json({ message: 'You already have a pending change request for this slot.' });
+      }
+      throw error;
+    }
+
+    await notifyRequestSubmitted({ userId: req.user.userId, student, course, slotType: slot.slotType, snapshot });
+
+    res.status(201).json({
+      message: 'Your slot-change request was submitted. Your schedule stays as it is until it is reviewed.',
+      request: serializeRequest(created, course),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not submit your slot-change request', error: error.message });
+  }
+};

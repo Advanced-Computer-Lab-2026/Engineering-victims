@@ -532,6 +532,44 @@ export interface CourseDetailsResponse {
   totalSlots: number;
 }
 
+/** Req 40 — an Advising Student's slot-change requests. */
+export type SlotChangeRequestStatus = 'Pending' | 'Approved' | 'Rejected' | 'Withdrawn';
+
+/** Whether the signed-in Advising Student may request a slot change right now. */
+export interface SlotChangeEligibility {
+  canRequest: boolean;
+  /** Why requests are closed; null while they are open. */
+  reason: string | null;
+  workflowStatus: string;
+  term: { id: string; label: string; advisingDeadline: string; closesAt: string } | null;
+  /** Slots that already have a pending request, so they are not requested twice. */
+  pendingSlotIds: string[];
+}
+
+export interface SlotChangeRequestInput {
+  courseId: string;
+  slotType: CourseSlotDetail['slotType'];
+  slotId: string;
+  preferenceNote?: string;
+}
+
+export interface SlotChangeRequestSummary {
+  id: string;
+  status: SlotChangeRequestStatus;
+  course: { id: string; code: string; name: string };
+  slotType: CourseSlotDetail['slotType'];
+  currentSlot: {
+    id: string;
+    groupNumber: number;
+    dayOfWeek: WeekDay;
+    startTime: string;
+    endTime: string;
+    room: string;
+  };
+  preferenceNote: string;
+  submittedAt: string;
+}
+
 /** Req 34 — eligible groups for whole-schedule swap. */
 export interface EligibleSwapGroup {
   studyGroup: string;

@@ -7,7 +7,10 @@ import AlertBanner from '../components/ui/AlertBanner';
 import EmptyState from '../components/ui/EmptyState';
 import CustomButton from '../components/ui/CustomButton';
 import CourseDetailDrawer from '../components/CourseDetailDrawer';
-import { Course } from '../lib/types';
+import { Course, SlotChangeEligibility } from '../lib/types';
+import { useSession } from '../hooks/useSession';
+import { fetchSlotChangeEligibility } from '../lib/slotChangeRequestsService';
+import { formatDate } from '../lib/studentsService';
 
 interface RegisteredCourse extends Course {
   id: string;
@@ -31,6 +34,27 @@ const MyRegisteredCoursesPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [selectedCourseName, setSelectedCourseName] = useState<string>('');
+
+  // Req 40: tell an Advising Student under review that slot changes can be
+  // requested from a course's details, and until when.
+  const { user } = useSession();
+  const isAdvisingStudent = user?.role === 'Student' && user.studentType === 'Advising Student';
+  const [eligibility, setEligibility] = useState<SlotChangeEligibility | null>(null);
+
+  useEffect(() => {
+    if (!isAdvisingStudent) return;
+    let cancelled = false;
+    fetchSlotChangeEligibility()
+      .then((result) => {
+        if (!cancelled) setEligibility(result);
+      })
+      .catch(() => {
+        if (!cancelled) setEligibility(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdvisingStudent]);
 
   useEffect(() => {
     const loadCourses = async () => {
@@ -68,6 +92,15 @@ const MyRegisteredCoursesPage: React.FC = () => {
         <div className="mb-4">
           <AlertBanner tone="error" title="Error" onDismiss={() => setError(null)}>
             {error}
+          </AlertBanner>
+        </div>
+      )}
+
+      {eligibility?.canRequest && eligibility.term && courses.length > 0 && (
+        <div className="mb-4">
+          <AlertBanner tone="info" title="Your schedule is ready for review">
+            Open a course's details to request a change to one of its lecture, tutorial or lab slots. Requests close on{' '}
+            <span className="font-semibold">{formatDate(eligibility.term.advisingDeadline)}</span> (end of day).
           </AlertBanner>
         </div>
       )}
