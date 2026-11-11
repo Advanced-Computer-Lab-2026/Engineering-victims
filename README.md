@@ -159,7 +159,10 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Mandatory course selection & removal requests
 - Validation engine (prerequisites, clashes, capacity, credit limits)
 - Ready for Review → Process → Reopen lifecycle
-- Graduation plan builder with prerequisite ordering
+- Graduation plans across the next Winter, Spring and Summer terms, with
+  prerequisite ordering, private Advisor drafts, and Coordinator review,
+  acceptance or rejection with a response note
+- Accepted graduation plans visible to the Advising Student
 - Exit exam request flow
 
 ### Financial
@@ -305,6 +308,7 @@ Seeded logins:
 | Advisor | `karim.fahmy@guc.edu.eg` | `password123` | Holds advising students |
 | Advisor | `advisor@guc.edu.eg` | `password123` | Holds advising students |
 | Advisor | `hind.rashwan@guc.edu.eg` | `password123` | **No** assigned students, so *Remove advisor* can succeed |
+| Advisor | `meriam.khalifa@guc.edu.eg` | `password123` | Additional seeded Advisor account |
 | Coordinator | `coordinator@guc.edu.eg` | `password123` | Primary coordinator |
 | Coordinator | `rania.hosny@guc.edu.eg` | `password123` | Spare account, so *Add advisor* has something to promote without destroying a demo login |
 | Administrator | `admin@guc.edu.eg` | `password123` | Full access, and the `createdBy` on every term and course |
@@ -360,6 +364,12 @@ The dataset is built so that no screen, filter or action is decorative:
   offering and is deliberately not seeded.
 - **75 courses** with prerequisites linked by id (no dangling codes, no cycles),
   so the prerequisite picker and the *Required by* panel both have content.
+- **4 graduation plans** exercise the review workflow: an accepted plan, a
+  submission awaiting Coordinator review, a rejected plan returned to its
+  Advisor as a private draft with the Coordinator's note, and an unfinished
+  private draft. Drafts are visible only to their creating Advisor; Coordinators
+  see submitted and accepted plans, and the Advising Student sees only their
+  accepted plan.
 - **81 notifications**, written *from* the state above rather than from a fixed
   script: a student's notifications match their workflow status, an inactive
   student is not told they can sign in, an advisor's message names their actual
@@ -406,4 +416,3 @@ the browser calls it directly instead of through the proxy.
 | `VITE_API_PROXY_TARGET` | `http://localhost:5000` | Dev-only proxy target for `/api` |
 | `VITE_API_URL` | empty | Absolute backend URL for production builds |
 | `CLIENT_PORT` | `5173` | Port for the Vite dev server |
-

@@ -11,6 +11,7 @@ import {
   Send,
   Trash2,
   TriangleAlert,
+  XCircle,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
@@ -18,7 +19,9 @@ import Badge, { type BadgeTone } from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import { ApiError } from '../lib/api';
+import { useSession } from '../hooks/useSession';
 import {
+  decideGraduationPlan,
   deleteGraduationPlan,
   fetchGraduationPlan,
   saveGraduationPlan,
@@ -31,7 +34,6 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   Draft: 'amber',
   Submitted: 'sky',
   Accepted: 'emerald',
-  Rejected: 'rose',
 };
 
 /** Term index as a select value; '' is "unassigned". */
@@ -56,6 +58,7 @@ const placementsFrom = (assignments: AssignmentMap): GraduationPlanPlacement[] =
 const GraduationPlanBuilderPage: React.FC = () => {
   const { planId } = useParams<{ planId: string }>();
   const navigate = useNavigate();
+  const { user } = useSession();
 
   const [plan, setPlan] = useState<GraduationPlanDetail | null>(null);
   const [assignments, setAssignments] = useState<AssignmentMap>({});
@@ -68,6 +71,9 @@ const GraduationPlanBuilderPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const [decisionNote, setDecisionNote] = useState('');
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [isDeciding, setIsDeciding] = useState(false);
   /**
    * The page is long, so the outcome of Save/Submit is also shown in the
    * sticky action bar at the bottom — where the buttons are — and scrolled
@@ -110,6 +116,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
   }, [load]);
 
   const isDraft = plan?.status === 'Draft';
+  const isCoordinator = user?.role === 'Coordinator';
 
   const hoursByTerm = useMemo(() => {
     if (!plan) return [];
@@ -186,6 +193,23 @@ const GraduationPlanBuilderPage: React.FC = () => {
     }
   };
 
+  const handleDecision = async (decision: 'accept' | 'reject') => {
+    if (!planId) return;
+    setIsDeciding(true);
+    setDecisionError(null);
+    try {
+      const response = await decideGraduationPlan(planId, decision, decisionNote);
+      navigate('/graduation-plans', {
+        replace: true,
+        state: { notice: response.message },
+      });
+    } catch (err) {
+      setDecisionError((err as ApiError).message);
+    } finally {
+      setIsDeciding(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
@@ -250,10 +274,34 @@ const GraduationPlanBuilderPage: React.FC = () => {
 
       {!isDraft && (
         <div className="mb-4">
-          <AlertBanner tone="neutral" title="Read-only plan">
-            This plan was submitted and cannot be changed while it awaits the Coordinator's decision.
+          <AlertBanner
+            tone="neutral"
+            title={plan.status === 'Submitted' ? 'Submitted for review' : 'Read-only plan'}
+          >
+            {plan.status === 'Submitted'
+              ? "This plan cannot be changed while it awaits the Coordinator's decision."
+              : 'This accepted plan cannot be changed.'}
           </AlertBanner>
         </div>
+      )}
+
+      {plan.advisor && (
+        <Card tone="raised" className="mb-4 p-4">
+          <p className="text-sm text-slate-300">
+            Prepared by <span className="font-medium text-slate-100">{plan.advisor.fullName}</span>
+            <span className="ml-2 text-slate-500">{plan.advisor.email}</span>
+          </p>
+        </Card>
+      )}
+
+      {plan.responseNote && (
+        <Card tone="raised" className="mb-4 border border-indigo-800/50 p-4">
+          <h2 className="text-sm font-semibold text-slate-100">Coordinator's response</h2>
+          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{plan.responseNote}</p>
+          {plan.decidedAt && (
+            <p className="mt-2 text-xs text-slate-500">Recorded {formatDate(plan.decidedAt)}</p>
+          )}
+        </Card>
       )}
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -380,6 +428,58 @@ const GraduationPlanBuilderPage: React.FC = () => {
           </div>
         )}
       </Card>
+
+      {isCoordinator && plan.status === 'Submitted' && (
+        <Card tone="raised" className="mt-5 p-4">
+          <h2 className="text-sm font-bold text-white">Coordinator decision</h2>
+          <p className="mt-1 text-sm text-slate-400">
+            Acceptance confirms the remaining graduation requirements can be completed within one year.
+            Rejection returns this plan to the Advisor as a private draft.
+          </p>
+          <label
+            htmlFor="graduation-plan-response"
+            className="mt-4 block text-xs font-medium uppercase tracking-wide text-slate-400"
+          >
+            Response note (required)
+          </label>
+          <textarea
+            id="graduation-plan-response"
+            value={decisionNote}
+            onChange={(event) => setDecisionNote(event.target.value)}
+            maxLength={1000}
+            rows={4}
+            className="mt-1.5 w-full resize-y rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+            placeholder="Explain the decision to the Advisor."
+          />
+          <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs text-slate-500">{decisionNote.length}/1000 characters</span>
+            {decisionError && (
+              <span role="alert" className="text-xs text-rose-300">
+                {decisionError}
+              </span>
+            )}
+          </div>
+          <div className="mt-4 flex flex-wrap justify-end gap-2">
+            <CustomButton
+              variant="danger"
+              icon={<XCircle className="h-4 w-4" aria-hidden />}
+              isLoading={isDeciding}
+              disabled={!decisionNote.trim()}
+              onClick={() => handleDecision('reject')}
+            >
+              Reject and return to Advisor
+            </CustomButton>
+            <CustomButton
+              icon={<CheckCircle2 className="h-4 w-4" aria-hidden />}
+              isLoading={isDeciding}
+              disabled={!decisionNote.trim()}
+              onClick={() => handleDecision('accept')}
+            >
+              Accept plan
+            </CustomButton>
+          </div>
+        </Card>
+      )}
 
       {isDraft || error || success ? (
         <div

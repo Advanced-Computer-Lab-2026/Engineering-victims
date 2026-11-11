@@ -84,6 +84,7 @@ async function startServer() {
         slots,
         groups,
         schedules,
+        graduationPlans,
         notifications,
       } = result;
       console.log(
@@ -92,6 +93,7 @@ async function startServer() {
       console.log(
         `Scheduling: ${offerings} offerings, ${slots} slots, ${groups} schedule groups, ${schedules} processed student schedules`,
       );
+      console.log(`Graduation plans: ${graduationPlans}`);
     }
 
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

@@ -29,7 +29,6 @@ const STATUS_TONE: Record<string, BadgeTone> = {
   Draft: 'amber',
   Submitted: 'sky',
   Accepted: 'emerald',
-  Rejected: 'rose',
 };
 
 /**

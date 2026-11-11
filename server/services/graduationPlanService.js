@@ -197,9 +197,76 @@ const validatePlan = ({
   };
 };
 
+/** Req 113: the largest Coordinator response note the workflow accepts. */
+const RESPONSE_NOTE_LIMIT = 1000;
+
+/** Req 110-112: the only statuses a Coordinator may list or filter on. */
+const SUBMITTED_STATUSES = ['Submitted', 'Accepted'];
+
+const DECISION_STATUS = { accept: 'Accepted', reject: 'Draft' };
+
+/**
+ * Req 113: apply the Coordinator's decision to a submitted plan.
+ *
+ * Mutates the plan and returns `null`, or returns the message explaining why
+ * the decision cannot be applied. Rejection deliberately turns the plan back
+ * into a Draft: that is what makes it private to its Advisor again and lets it
+ * be corrected and resubmitted.
+ */
+const applyDecision = (plan, { decision, note, coordinatorId, now = new Date() }) => {
+  if (!Object.prototype.hasOwnProperty.call(DECISION_STATUS, decision)) {
+    return 'Choose whether to accept or reject the plan.';
+  }
+  if (plan.status !== 'Submitted') {
+    return 'Only a submitted plan can be accepted or rejected.';
+  }
+
+  const responseNote = typeof note === 'string' ? note.trim() : '';
+  if (!responseNote) return 'Add a response note for the Advisor.';
+  if (responseNote.length > RESPONSE_NOTE_LIMIT) {
+    return `Keep the response note under ${RESPONSE_NOTE_LIMIT} characters.`;
+  }
+
+  plan.status = DECISION_STATUS[decision];
+  plan.responseNote = responseNote;
+  plan.decidedAt = now;
+  plan.decidedBy = coordinatorId ?? null;
+  // A rejected plan is no longer awaiting a decision, so it has no submission
+  // date until the Advisor submits the corrected draft again.
+  if (decision === 'reject') plan.submittedAt = null;
+  return null;
+};
+
+/**
+ * Req 107/113: a resubmission starts a fresh review, so the previous
+ * Coordinator response is cleared rather than shown against the new attempt.
+ */
+const clearDecision = (plan) => {
+  plan.responseNote = '';
+  plan.decidedAt = null;
+  plan.decidedBy = null;
+};
+
+/**
+ * Req 112: a Coordinator search matches the student ID or the creating
+ * Advisor's name or GUC email. Blank searches match everything.
+ */
+const matchesPlanSearch = (plan, search) => {
+  const term = String(search ?? '').trim().toLowerCase();
+  if (!term) return true;
+
+  const student = plan.student ?? {};
+  const advisor = plan.advisor ?? {};
+  return [student.studentId, advisor.fullName, advisor.email].some((value) =>
+    String(value ?? '').toLowerCase().includes(term)
+  );
+};
+
 module.exports = {
   STANDARD_CREDIT_LIMIT,
   SEASONS,
+  RESPONSE_NOTE_LIMIT,
+  SUBMITTED_STATUSES,
   planningTerms,
   termLabel,
   approvedCreditLimitFor,
@@ -207,4 +274,7 @@ module.exports = {
   remainingCoursesFor,
   normalizePlacements,
   validatePlan,
+  applyDecision,
+  clearDecision,
+  matchesPlanSearch,
 };

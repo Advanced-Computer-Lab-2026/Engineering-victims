@@ -9,11 +9,10 @@ const mongoose = require('mongoose');
  * is read, so the plan can never claim a course the student no longer owes.
  *
  * Req 106: a Draft is private to the Advisor who created it. Req 107: once
- * Submitted it is read-only while the Coordinator decides (req 113 adds the
- * Accepted/Rejected statuses; they are listed now so the collection does not
- * have to migrate).
+ * Submitted it is read-only while the Coordinator decides. Acceptance is a
+ * terminal Accepted status; rejection returns the plan to a private Draft.
  */
-const STATUSES = ['Draft', 'Submitted', 'Accepted', 'Rejected'];
+const STATUSES = ['Draft', 'Submitted', 'Accepted'];
 const SEASONS = ['Winter', 'Spring', 'Summer'];
 
 /** A term bucket in the plan, e.g. 2026/2027 Spring. Order is the term order. */
@@ -48,6 +47,10 @@ const graduationPlanSchema = new mongoose.Schema(
     },
     placements: { type: [placementSchema], default: [] },
     submittedAt: { type: Date, default: null },
+    /** Req 113: the Coordinator's response to the latest submission. */
+    responseNote: { type: String, default: '', trim: true },
+    decidedAt: { type: Date, default: null },
+    decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   },
   { timestamps: true }
 );
@@ -61,6 +64,9 @@ graduationPlanSchema.index(
 );
 // The Advisor's own plan list, newest first (req 110).
 graduationPlanSchema.index({ advisor: 1, updatedAt: -1 });
+// Req 110-112: the Coordinator's submitted-plan list, filtered by status and
+// ordered by submission date.
+graduationPlanSchema.index({ status: 1, submittedAt: -1 });
 
 module.exports = mongoose.model('GraduationPlan', graduationPlanSchema);
 module.exports.STATUSES = STATUSES;

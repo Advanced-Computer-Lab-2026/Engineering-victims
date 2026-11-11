@@ -607,7 +607,7 @@ export interface SwapGroupScheduleResponse {
 
 
 /** Req 103-107 — an Advisor's graduation plan for one Advising Student. */
-export type GraduationPlanStatus = 'Draft' | 'Submitted' | 'Accepted' | 'Rejected';
+export type GraduationPlanStatus = 'Draft' | 'Submitted' | 'Accepted';
 
 /** One of the next Winter, Spring or Summer terms the plan covers, in order. */
 export interface GraduationPlanTerm {
@@ -661,20 +661,34 @@ export interface GraduationPlanDetail {
   terms: GraduationPlanTerm[];
   placements: GraduationPlanPlacement[];
   student: GraduationPlanStudent;
+  /** Req 110: the Advisor who created the plan. */
+  advisor: GraduationPlanAdvisor | null;
   remaining: GraduationPlanCourse[];
   validation: GraduationPlanValidation;
   submittedAt: string | null;
+  /** Req 113: the Coordinator's response to the latest submission. */
+  responseNote: string;
+  decidedAt: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface GraduationPlanAdvisor {
+  id: string;
+  fullName: string;
+  email: string;
 }
 
 export interface GraduationPlanSummary {
   id: string;
   status: GraduationPlanStatus;
   student: GraduationPlanStudent | null;
+  advisor: GraduationPlanAdvisor | null;
   terms: GraduationPlanTerm[];
   assignedCount: number;
   submittedAt: string | null;
+  responseNote: string;
+  decidedAt: string | null;
   createdAt: string;
   updatedAt: string;
 }
