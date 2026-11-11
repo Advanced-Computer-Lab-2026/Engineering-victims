@@ -18,6 +18,7 @@ const academicHistoryRoutes = require("./routes/academicHistoryRoutes");
 const weeklyScheduleRoutes = require("./routes/weeklyScheduleRoutes");
 const schedulingPreferenceRoutes = require("./routes/schedulingPreferenceRoutes");
 const slotChangeRequestRoutes = require("./routes/slotChangeRequestRoutes");
+const graduationPlanRoutes = require("./routes/graduationPlanRoutes");
 const { seedIfEmpty } = require("./config/seedData");
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
@@ -46,6 +47,7 @@ app.use("/api/academic-history", academicHistoryRoutes);
 app.use("/api/schedules", weeklyScheduleRoutes);
 app.use("/api/preferences", schedulingPreferenceRoutes);
 app.use("/api/slot-change-requests", slotChangeRequestRoutes);
+app.use("/api/graduation-plans", graduationPlanRoutes);
 app.get("/", (req, res) => res.send("API running..."));
 
 const PORT = process.env.PORT || 5000;

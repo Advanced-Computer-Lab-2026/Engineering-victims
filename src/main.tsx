@@ -25,6 +25,8 @@ import WeeklySchedulePage from './pages/WeeklySchedulePage';
 import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import EligibleSwapGroupsPage from './pages/EligibleSwapGroupsPage';
+import GraduationPlansPage from './pages/GraduationPlansPage';
+import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -57,6 +59,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/advising-students" element={<AdvisingStudentsPage />} />
+          {/* Req 103-107: graduation planning is an Advisor workflow. */}
+          <Route path="/graduation-plans" element={<GraduationPlansPage />} />
+          <Route path="/graduation-plans/:planId" element={<GraduationPlanBuilderPage />} />
         </Route>
 
         {/* Req 11-12: managing the advising roster itself stays staff-only. */}
