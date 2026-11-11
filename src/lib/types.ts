@@ -143,6 +143,51 @@ export interface AdvisingStudentsResponse {
   filterOptions: AdvisingFilterOptions;
 }
 
+/** Req 59 — a course still standing between a student and the bachelor project. */
+export interface OutstandingCourse {
+  course: { id: string; code: string; name: string; creditHours: number };
+  semester: number;
+  state: 'Failed' | 'In progress' | 'Not attended';
+}
+
+/** Req 59 — everything here is calculated by the server; none of it is editable. */
+export interface AdvisingOverview {
+  advisingReason: string | null;
+  allowance: {
+    semester: number | null;
+    /** Which standard allowance applied, e.g. "Semesters 5-6". */
+    band: string;
+    standardHours: number;
+    allowedHours: number;
+    /** GUC scale, lower is better; null until something is graded. */
+    gpa: number | null;
+    isProbation: boolean;
+    reductionPercent: number;
+    canReceiveIncrease: boolean;
+  };
+  schedule: { status: string; blockingStep: string | null; lastUpdateAt: string };
+  completedHours: number;
+  bachelorProject: {
+    eligible: boolean;
+    explanation: string;
+    englishComplete: boolean;
+    outstandingEnglish: OutstandingCourse[];
+    outstandingCourses: OutstandingCourse[];
+  };
+}
+
+export interface AdvisingOverviewResponse {
+  student: {
+    id: string;
+    fullName: string;
+    studentId: string;
+    major: string;
+    currentSemester: number;
+    academicStanding: string;
+  };
+  overview: AdvisingOverview;
+}
+
 export interface StudentDetailResponse {
   student: StudentSummary;
   availableStatuses: string[];
