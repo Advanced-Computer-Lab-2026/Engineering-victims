@@ -134,7 +134,7 @@ const TERMS = [
     termEndDate: '2026-12-20',
     teachingStartDate: '2026-09-22',
     teachingEndDate: '2026-12-18',
-    advisingDeadline: '2026-10-15',
+    advisingDeadline: '2027-01-15',
     swapDeadline: '2026-10-10',
   },
   {
