@@ -20,6 +20,9 @@ const schedulingPreferenceRoutes = require("./routes/schedulingPreferenceRoutes"
 const slotChangeRequestRoutes = require("./routes/slotChangeRequestRoutes");
 const graduationPlanRoutes = require("./routes/graduationPlanRoutes");
 const exitExamRequestRoutes = require("./routes/exitExamRequestRoutes");
+const swapRequestRoutes = require("./routes/swapRequestRoutes");
+const coordinatorDashboardRoutes = require("./routes/coordinatorDashboardRoutes");
+const scheduleActivityRoutes = require("./routes/scheduleActivityRoutes");
 const { seedIfEmpty } = require("./config/seedData");
 const Notification = require("./models/Notification");
 const NotificationEvent = require("./models/NotificationEvent");
@@ -31,6 +34,8 @@ const CalendarOAuthState = require("./models/CalendarOAuthState");
 const CalendarEvent = require("./models/CalendarEvent");
 const SemesterStanding = require("./models/SemesterStanding");
 const ProbationWarning = require("./models/ProbationWarning");
+const SwapRequest = require("./models/SwapRequest");
+const ScheduleActivityLog = require("./models/ScheduleActivityLog");
 const { startProbationWorker } = require("./services/probationService");
 const semesterStandingRoutes = require("./routes/semesterStandingRoutes");
 
@@ -64,6 +69,9 @@ app.use("/api/graduation-plans", graduationPlanRoutes);
 app.use("/api/exit-exam-requests", exitExamRequestRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/semester-standings", semesterStandingRoutes);
+app.use("/api/swaps", swapRequestRoutes);
+app.use("/api/coordinator", coordinatorDashboardRoutes);
+app.use("/api/schedule-history", scheduleActivityRoutes);
 app.get("/", (req, res) => res.send("API running..."));
 
 const PORT = process.env.PORT || 5000;
@@ -113,9 +121,17 @@ async function startServer() {
     }
 
     // Duplicate prevention must be indexed before a worker can deliver events.
-    await Promise.all([Notification.init(), NotificationEvent.init(),
-      CalendarConnection.init(), CalendarOAuthState.init(), CalendarEvent.init(),
-      SemesterStanding.init(), ProbationWarning.init()]);
+    await Promise.all([
+      Notification.init(),
+      NotificationEvent.init(),
+      CalendarConnection.init(),
+      CalendarOAuthState.init(),
+      CalendarEvent.init(),
+      SemesterStanding.init(),
+      ProbationWarning.init(),
+      SwapRequest.init(),
+      ScheduleActivityLog.init(),
+    ]);
     const stopNotificationWorker = startNotificationWorker({ beforeBatch: flushStudentNotifications });
     const stopProbationWorker = startProbationWorker();
     const httpServer = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

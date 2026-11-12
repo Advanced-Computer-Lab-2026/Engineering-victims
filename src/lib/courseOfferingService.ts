@@ -1,6 +1,50 @@
 import { apiFetch } from './api';
 import { CourseOffering, CourseSlot } from './types';
 
+export interface DuplicateOfferingSummary {
+  id: string;
+  courseId: string;
+  courseCode: string;
+  courseName: string;
+  publicationStatus: 'Draft';
+  slotsCopied: number;
+  totalMaxCapacity: number;
+  totalRemainingCapacity: number;
+}
+
+export interface SkippedOfferingSummary {
+  courseId: string;
+  courseCode: string;
+  courseName: string;
+  reason: string;
+}
+
+export interface DuplicateOfferingConflict {
+  type: 'room' | 'instructor';
+  courseCode: string;
+  conflictingCourseCode: string;
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  groupNumber: number;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+  roomId?: string;
+  instructorName?: string;
+  message: string;
+}
+
+export interface DuplicateOfferingsResponse {
+  message: string;
+  sourceTerm: { id: string; academicYear: string; season: string };
+  targetTerm: { id: string; academicYear: string; season: string };
+  copiedCount: number;
+  skippedCount: number;
+  conflictCount: number;
+  copiedOfferings: DuplicateOfferingSummary[];
+  skippedOfferings: SkippedOfferingSummary[];
+  conflicts: DuplicateOfferingConflict[];
+}
+
 export const courseOfferingService = {
   async getOfferingsByTerm(termId: string): Promise<{ offerings: CourseOffering[] }> {
     return apiFetch<{ offerings: CourseOffering[] }>(`/api/offerings?termId=${termId}`);
@@ -10,10 +54,22 @@ export const courseOfferingService = {
     return apiFetch<{ offering: CourseOffering; slots: CourseSlot[] }>(`/api/offerings/${id}`);
   },
 
-  async createOffering(data: any): Promise<{ message: string; offering: CourseOffering }> {
+  async createOffering(data: unknown): Promise<{ message: string; offering: CourseOffering }> {
     return apiFetch<{ message: string; offering: CourseOffering }>('/api/offerings', {
       method: 'POST',
       body: JSON.stringify(data),
+    });
+  },
+
+  async duplicateOfferings(payload: {
+    sourceTermId?: string;
+    sourceAcademicYear?: string;
+    sourceSeason?: string;
+    targetTermId: string;
+  }): Promise<DuplicateOfferingsResponse> {
+    return apiFetch<DuplicateOfferingsResponse>('/api/offerings/duplicate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     });
   },
 

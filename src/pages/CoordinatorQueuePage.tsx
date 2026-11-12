@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, Loader2, Search, ExternalLink } from 'lucide-react';
+import { AlertCircle, Loader2, Search, ExternalLink, LayoutDashboard } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -36,7 +36,7 @@ export default function CoordinatorQueuePage() {
       } else {
         setStudents([]);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Queue fetch error:', err);
       setError((err as ApiError).message || 'Failed to load the approval queue');
     } finally {
@@ -60,6 +60,17 @@ export default function CoordinatorQueuePage() {
       <PageHeader
         title="Approval Queue"
         description="Students awaiting coordinator decision on their scheduling workflow"
+        onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
+        meta={
+          <CustomButton
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/coordinator/pending-work')}
+            icon={<LayoutDashboard className="h-4 w-4" aria-hidden />}
+          >
+            Pending-Work Dashboard
+          </CustomButton>
+        }
       />
 
       <div className="flex flex-col md:flex-row gap-4 items-center justify-between">

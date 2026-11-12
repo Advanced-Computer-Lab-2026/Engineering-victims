@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Loader2, RefreshCcw, Calendar, BookOpen, Users, ArrowRightLeft, Eye, Clock, MapPin, UserRound, Coffee } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
 import { fetchSwapGroupSchedule } from '../lib/weeklyScheduleService';
@@ -23,6 +24,7 @@ const TYPE_STYLE: Record<ScheduleSession['slotType'], { tone: BadgeTone; card: s
  * the exact same course-code set in the same term.
  */
 const EligibleSwapGroupsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<EligibleSwapGroupsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -86,15 +88,25 @@ const EligibleSwapGroupsPage: React.FC = () => {
         description="View other study groups with the exact same course set that you can swap your schedule with."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
-          <CustomButton
-            variant="secondary"
-            size="sm"
-            onClick={() => load(true)}
-            isLoading={isRefreshing}
-            icon={<RefreshCcw className="h-4 w-4" />}
-          >
-            Refresh
-          </CustomButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <CustomButton
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/swaps')}
+              icon={<ArrowRightLeft className="h-4 w-4" />}
+            >
+              Manage Swap Requests
+            </CustomButton>
+            <CustomButton
+              variant="secondary"
+              size="sm"
+              onClick={() => load(true)}
+              isLoading={isRefreshing}
+              icon={<RefreshCcw className="h-4 w-4" />}
+            >
+              Refresh
+            </CustomButton>
+          </div>
         }
       />
 
@@ -225,8 +237,8 @@ const EligibleSwapGroupsPage: React.FC = () => {
               {/* Note about submitting swap requests */}
               <AlertBanner tone="neutral" title="Next Steps">
                 Open <strong>View Schedule</strong> on any group above to see its complete lecture, tutorial and lab
-                timetable before you decide. Submitting the swap itself is handled by the swap request feature
-                (Requirement 35), which lets you select one or more of these eligible groups.
+                timetable, or open <strong>Manage Swap Requests</strong> to submit a whole-schedule swap request,
+                complete an open peer swap, or withdraw your active request.
               </AlertBanner>
             </>
           )}

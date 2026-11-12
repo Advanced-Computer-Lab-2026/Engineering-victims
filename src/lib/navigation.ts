@@ -55,12 +55,28 @@ export const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     description: 'Overview and shortcuts for everything your role can reach.',
   },
+  // Req 122: Coordinator pending-work dashboard
+  {
+    to: '/coordinator/pending-work',
+    label: 'Pending-Work Dashboard',
+    icon: Layers,
+    roles: ['Coordinator', 'Administrator'],
+    description: 'Every student’s workflow status, blocking step and awaiting requests grouped by student type, request type and Advisor.',
+  },
   {
     to: '/coordinator/queue',
     label: 'Approval Queue',
     icon: Bell,
     roles: ['Coordinator', 'Administrator'],
     description: 'Work waiting on your decision — reviews, swaps and slot changes.',
+  },
+  // Req 123–125: Global schedule activity history for Coordinator / Administrator
+  {
+    to: '/schedule-history',
+    label: 'Schedule History',
+    icon: ScrollText,
+    roles: ['Coordinator', 'Administrator'],
+    description: 'Automatically recorded history of advising schedule processing and reopening actions.',
   },
   {
     to: '/students',
@@ -138,7 +154,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Course Offerings',
     icon: Layers,
     roles: ['Administrator'],
-    description: 'Publish offerings and their lecture, tutorial and lab slots.',
+    description: 'Publish, duplicate and manage offerings and their lecture, tutorial and lab slots.',
   },
   // Req 89: Normal Students have no wallet, so the item is hidden from them.
   {
@@ -173,6 +189,15 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Student'],
     studentTypes: ['Normal Student'],
     description: 'View other groups with the same courses for schedule swapping.',
+  },
+  // Req 35–39: Normal Students submit, view, complete, and withdraw whole-schedule swaps.
+  {
+    to: '/swaps',
+    label: 'Schedule Swaps',
+    icon: ArrowRightLeft,
+    roles: ['Student'],
+    studentTypes: ['Normal Student'],
+    description: 'Submit a whole-schedule swap request, complete an open peer swap, or withdraw your request.',
   },
   // Req 54: staff reach a student's history from the student lists instead.
   {

@@ -17,6 +17,7 @@ import {
 import { apiFetch, ApiError } from '../lib/api';
 import { formatDate, formatRelative } from '../lib/studentsService';
 import type { Role, StudentDetailResponse } from '../lib/types';
+import StudentScheduleHistorySection from './StudentScheduleHistorySection';
 import AlertBanner from './ui/AlertBanner';
 import Badge, { type BadgeTone } from './ui/Badge';
 import CustomButton from './ui/CustomButton';
@@ -83,6 +84,18 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
   // Administrator has read-only access to every student's.
   const canViewSchedule = role === 'Administrator' || canViewHistory;
   const navigate = useNavigate();
+
+  const reloadStudent = () => {
+    if (!studentId) return;
+    apiFetch<StudentDetailResponse>(`/api/students/${studentId}`)
+      .then((response) => {
+        setData(response);
+        setSelectedAdvisorId(response.student.assignedAdvisor?.id ?? '');
+      })
+      .catch((err: ApiError) => {
+        setError(err.message);
+      });
+  };
 
   useEffect(() => {
     if (!studentId) return;
@@ -340,6 +353,19 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                   </DetailRow>
                 </dl>
               </section>
+
+              {/* Req 123: Show schedule processing and reopening history in advising details */}
+              {student.studentType === 'Advising Student' && (
+                <StudentScheduleHistorySection
+                  studentObjectId={student.id}
+                  workflowStatus={student.workflowStatus}
+                  role={role}
+                  onWorkflowChanged={() => {
+                    reloadStudent();
+                    onStatusChange();
+                  }}
+                />
+              )}
 
               <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
                 <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
