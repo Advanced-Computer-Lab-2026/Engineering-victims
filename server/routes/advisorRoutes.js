@@ -35,6 +35,16 @@ router.get(
   advisingStudentsController.getAdvisingStudent
 );
 
+// Req 59: advising reason, credit-hour allowance, schedule status and
+// bachelor-project eligibility. Wider than the two routes above because the
+// workbook names the Coordinator and Administrator as well as the Advisor.
+router.get(
+  '/advising-students/:id/overview',
+  authenticate,
+  requireRole('Advisor', 'Coordinator', 'Administrator'),
+  advisingStudentsController.getAdvisingOverview
+);
+
 // Get list of all advisors (useful for UI)
 router.get('/', ...staffOnly, advisorController.listAdvisors);
 

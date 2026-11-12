@@ -19,6 +19,7 @@ import { ApiError } from '../lib/api';
 import { formatDate, formatRelative } from '../lib/studentsService';
 import type { AdvisingStudentRow } from '../lib/types';
 import StudentScheduleHistorySection from './StudentScheduleHistorySection';
+import AdvisingOverviewPanel from './AdvisingOverviewPanel';
 import AlertBanner from './ui/AlertBanner';
 import Badge, { type BadgeTone } from './ui/Badge';
 import CustomButton from './ui/CustomButton';
@@ -223,6 +224,8 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
                 role="Advisor"
                 onWorkflowChanged={reloadStudent}
               />
+              {/* Req 59: system-calculated allowance and bachelor-project eligibility. */}
+              <AdvisingOverviewPanel studentId={student.id} showReason={false} />
             </>
           )}
         </div>

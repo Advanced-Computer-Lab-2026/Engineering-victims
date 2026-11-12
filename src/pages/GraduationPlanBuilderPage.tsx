@@ -435,7 +435,8 @@ const GraduationPlanBuilderPage: React.FC = () => {
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         {plan.terms.map((term, index) => {
           const hours = hoursByTerm[index] ?? 0;
-          const over = hours > plan.validation.creditLimit;
+          const limit = plan.validation.creditLimits[index] ?? 0;
+          const over = hours > limit;
           return (
             <Card key={term.label} tone="raised" className="p-4">
               <div className="flex items-center gap-2 text-slate-400">
@@ -443,7 +444,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
                 <span className="text-xs font-semibold uppercase tracking-wide">{term.label}</span>
               </div>
               <p className={`mt-2 text-2xl font-bold ${over ? 'text-rose-300' : 'text-white'}`}>
-                {hours} <span className="text-sm font-medium text-slate-500">/ {plan.validation.creditLimit} hrs</span>
+                {hours} <span className="text-sm font-medium text-slate-500">/ {limit} hrs</span>
               </p>
               {over && (
                 <p className="mt-1 flex items-center gap-1 text-xs text-rose-300">
@@ -464,7 +465,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
               {assignedCount} assigned
               {approvedExitExamUnassigned ? ' · 1 covered by an approved exit exam' : ''}
               {' · '}
-              {plan.validation.creditLimit}-hour limit per term
+              credit-hour limits follow the student&apos;s semester allowance
             </p>
           </div>
           <Badge tone={requirementsCovered === plan.remaining.length ? 'emerald' : 'amber'}>

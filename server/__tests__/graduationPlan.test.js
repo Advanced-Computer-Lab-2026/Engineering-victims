@@ -2,14 +2,16 @@
  * Req 103-107: the graduation-plan rules.
  *
  * The rules are pure, so these tests exercise them directly without a database:
- * terms, season placement, prerequisite order, the credit limit, completeness
- * and the single failed-course exit-exam exception.
+ * terms, season placement, prerequisite order, the per-term credit-hour limits
+ * of req 59, completeness and the single failed-course exit-exam exception.
  */
 const {
-  STANDARD_CREDIT_LIMIT,
   planningTerms,
+  termSemestersFor,
+  creditLimitsFor,
   validatePlan,
 } = require('../services/graduationPlanService');
+const { deriveAllowance } = require('../services/advisingOverviewService');
 
 const course = (overrides) => ({
   id: overrides.id ?? overrides.code,
@@ -23,8 +25,15 @@ const course = (overrides) => ({
 
 const termsFor = (date) => planningTerms(new Date(date));
 
-const validate = ({ placements, remaining, terms, ...rest }) =>
-  validatePlan({ placements, remaining, terms, ...rest });
+/**
+ * One flat limit per term, so a rule that is not about the allowance can be
+ * checked without also depending on req 59's bands. The allowance itself is
+ * covered by its own tests below.
+ */
+const fixtureLimits = (terms, limit = 18) => terms.map(() => limit);
+
+const validate = ({ placements, remaining, terms, creditLimits = fixtureLimits(terms), ...rest }) =>
+  validatePlan({ placements, remaining, terms, creditLimits, ...rest });
 
 describe('planningTerms (req 103)', () => {
   it('moves a November plan to the next Spring, Summer and Winter', () => {
@@ -154,7 +163,7 @@ describe('validatePlan (req 103)', () => {
     expect(result.errors).toEqual([]);
   });
 
-  it('rejects a term over the standard credit-hour limit', () => {
+  it('rejects a term over its credit-hour limit', () => {
     const remaining = [
       course({ code: 'CSEN 301', creditHours: 6 }),
       course({ code: 'CSEN 501', creditHours: 6 }),
@@ -168,8 +177,39 @@ describe('validatePlan (req 103)', () => {
       requireComplete: true,
     });
 
-    expect(STANDARD_CREDIT_LIMIT).toBe(18);
     expect(result.errors).toContain('2026/2027 Spring has 24 credit hours, over the 18-hour limit.');
+  });
+
+  it('checks each term against its own limit (req 59)', () => {
+    const remaining = [
+      course({ code: 'CSEN 301', creditHours: 26 }),
+      course({ code: 'CSEN 501', creditHours: 26 }),
+    ];
+    const result = validate({
+      terms,
+      remaining,
+      // A Spring term of 26 hours fits, the Winter one behind it does not.
+      creditLimits: [30, 30, 24],
+      placements: [
+        { courseId: 'CSEN 301', termIndex: 0 },
+        { courseId: 'CSEN 501', termIndex: 2 },
+      ],
+      requireComplete: true,
+    });
+
+    expect(result.creditLimits).toEqual([30, 30, 24]);
+    expect(result.errors).toEqual([
+      '2027/2028 Winter has 26 credit hours, over the 24-hour limit.',
+    ]);
+  });
+
+  it('refuses to guess a limit when the caller did not send one', () => {
+    expect(() => validatePlan({ terms, remaining: [], placements: [] })).toThrow(
+      /one credit-hour limit per term/i
+    );
+    expect(() =>
+      validatePlan({ terms, remaining: [], placements: [], creditLimits: [34] })
+    ).toThrow(/one credit-hour limit per term/i);
   });
 
   it('uses a separately approved credit-hour limit when one exists', () => {
@@ -181,12 +221,12 @@ describe('validatePlan (req 103)', () => {
       terms,
       remaining,
       placements: remaining.map((entry) => ({ courseId: entry.id, termIndex: 0 })),
-      creditLimit: 24,
+      creditLimits: fixtureLimits(terms, 24),
       requireComplete: true,
     });
 
     expect(result.errors).toEqual([]);
-    expect(result.creditLimit).toBe(24);
+    expect(result.creditLimits).toEqual([24, 24, 24]);
   });
 
   it('rejects the same course assigned twice', () => {
@@ -286,5 +326,69 @@ describe('validatePlan (req 103)', () => {
       { season: 'Summer', academicYear: '2026/2027', hours: 0 },
       { season: 'Winter', academicYear: '2027/2028', hours: 4 },
     ]);
+  });
+});
+
+describe('credit-hour allowance (req 59 applied to req 103)', () => {
+  const terms = termsFor('2026-11-11T10:00:00'); // Spring, Summer, Winter
+
+  const limits = (currentSemester, { gpa = null, ...overrides } = {}) =>
+    creditLimitsFor({
+      student: { currentSemester, academicStanding: 'Good Standing', ...overrides },
+      gpa,
+      terms,
+    });
+
+  it('walks one semester per taught term and lets Summer keep the previous one', () => {
+    expect(termSemestersFor(terms, 5)).toEqual([6, 6, 7]);
+    expect(termSemestersFor(terms, 1)).toEqual([2, 2, 3]);
+    // Starting after a Summer term keeps Winter odd and the Spring after it even.
+    expect(termSemestersFor(termsFor('2027-01-20T10:00:00'), 6)).toEqual([6, 7, 8]);
+    // A student record without a semester falls back to semester 1, not NaN.
+    expect(termSemestersFor(terms, undefined)).toEqual([2, 2, 3]);
+  });
+
+  it('takes every band from req 59, semesters 1-2 included', () => {
+    expect(limits(1)).toEqual([34, 34, 34]);
+    expect(limits(2)).toEqual([34, 34, 34]);
+    expect(limits(3)).toEqual([34, 34, 30]);
+    expect(limits(4)).toEqual([30, 30, 30]);
+    expect(limits(5)).toEqual([30, 30, 28]);
+    expect(limits(6)).toEqual([28, 28, 24]);
+    expect(limits(7)).toEqual([24, 24, 24]);
+    expect(limits(12)).toEqual([24, 24, 24]);
+  });
+
+  it('cuts the allowance by 25% rounded up while on probation', () => {
+    expect(limits(5, { academicStanding: 'Probation' })).toEqual([23, 23, 21]);
+    expect(limits(7, { academicStanding: 'Probation' })).toEqual([18, 18, 18]);
+    // The GPA alone decides it when the standing has not been finalised yet.
+    expect(limits(7, { academicStanding: 'Good Standing', gpa: 3.7 })).toEqual([18, 18, 18]);
+    expect(limits(7, { academicStanding: 'Good Standing', gpa: 3.69 })).toEqual([24, 24, 24]);
+  });
+
+  it('agrees with the allowance the advising overview derives (req 59)', () => {
+    for (const semester of [1, 3, 5, 7, 8]) {
+      const student = { currentSemester: semester, academicStanding: 'Good Standing' };
+      const perTerm = termSemestersFor(terms, semester).map((termSemester) =>
+        deriveAllowance({ student: { ...student, currentSemester: termSemester } }).allowedHours
+      );
+
+      expect(creditLimitsFor({ student, terms })).toEqual(perTerm);
+    }
+  });
+
+  it('applies a separately approved limit to every term, but never to a probation student', () => {
+    expect(creditLimitsFor({
+      student: { currentSemester: 5, academicStanding: 'Good Standing' },
+      terms,
+      approvedLimit: 40,
+    })).toEqual([40, 40, 40]);
+
+    expect(creditLimitsFor({
+      student: { currentSemester: 5, academicStanding: 'Probation' },
+      terms,
+      approvedLimit: 40,
+    })).toEqual([23, 23, 21]);
   });
 });

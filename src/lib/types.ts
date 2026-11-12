@@ -143,6 +143,51 @@ export interface AdvisingStudentsResponse {
   filterOptions: AdvisingFilterOptions;
 }
 
+/** Req 59 — a course still standing between a student and the bachelor project. */
+export interface OutstandingCourse {
+  course: { id: string; code: string; name: string; creditHours: number };
+  semester: number;
+  state: 'Failed' | 'In progress' | 'Not attended';
+}
+
+/** Req 59 — everything here is calculated by the server; none of it is editable. */
+export interface AdvisingOverview {
+  advisingReason: string | null;
+  allowance: {
+    semester: number | null;
+    /** Which standard allowance applied, e.g. "Semesters 5-6". */
+    band: string;
+    standardHours: number;
+    allowedHours: number;
+    /** GUC scale, lower is better; null until something is graded. */
+    gpa: number | null;
+    isProbation: boolean;
+    reductionPercent: number;
+    canReceiveIncrease: boolean;
+  };
+  schedule: { status: string; blockingStep: string | null; lastUpdateAt: string };
+  completedHours: number;
+  bachelorProject: {
+    eligible: boolean;
+    explanation: string;
+    englishComplete: boolean;
+    outstandingEnglish: OutstandingCourse[];
+    outstandingCourses: OutstandingCourse[];
+  };
+}
+
+export interface AdvisingOverviewResponse {
+  student: {
+    id: string;
+    fullName: string;
+    studentId: string;
+    major: string;
+    currentSemester: number;
+    academicStanding: string;
+  };
+  overview: AdvisingOverview;
+}
+
 export interface StudentDetailResponse {
   student: StudentSummary;
   availableStatuses: string[];
@@ -652,7 +697,8 @@ export interface GraduationPlanValidation {
   assignedCount: number;
   totalCourses: number;
   termHours: Array<{ season: AcademicTermSeason; academicYear: string; hours: number }>;
-  creditLimit: number;
+  /** Req 59 — one credit-hour allowance per entry of `terms`, in term order. */
+  creditLimits: number[];
 }
 
 export interface GraduationPlanDetail {
@@ -711,4 +757,32 @@ export interface ExitExamRequestSummary {
   submittedAt: string;
   decidedAt: string | null;
   decidedBy: { id: string; fullName: string } | null;
+}
+
+/** Req 64-69 — an Advisor's request to remove a mandatory course, and its decision. */
+export type MandatoryRemovalStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface MandatoryRemovalRequestSummary {
+  id: string;
+  status: MandatoryRemovalStatus;
+  student: { id: string; fullName: string; studentId: string; major: string } | null;
+  advisor: { id: string; fullName: string; email: string } | null;
+  course: HistoryCourse | null;
+  /** Which of the valid cases the Advisor invoked. */
+  category: string;
+  /** Only for a restricted pair: the other course of the pair. */
+  pairedCourse: HistoryCourse | null;
+  reason: string;
+  responseNote: string;
+  submittedAt: string;
+  decidedAt: string | null;
+  decidedBy: { id: string; fullName: string } | null;
+}
+
+export interface StudentRemovalRequestsResponse {
+  requests: MandatoryRemovalRequestSummary[];
+  /** The valid cases, each with the sentence that explains it. */
+  categories: Array<{ value: string; description: string }>;
+  /** True only for the student's assigned Advisor. */
+  canRequest: boolean;
 }

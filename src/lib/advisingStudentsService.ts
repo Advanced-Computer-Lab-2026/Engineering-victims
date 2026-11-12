@@ -1,6 +1,7 @@
 import { apiFetch } from './api';
 import {
   EMPTY_ADVISING_FILTERS,
+  type AdvisingOverviewResponse,
   type AdvisingStudentFilters,
   type AdvisingStudentRow,
   type AdvisingStudentsResponse,
@@ -33,3 +34,7 @@ export interface AdvisingStudentDetailResponse {
 
 export const fetchAdvisingStudent = async (studentId: string): Promise<AdvisingStudentDetailResponse> =>
   apiFetch<AdvisingStudentDetailResponse>(`/api/advisors/advising-students/${studentId}`);
+
+/** Req 59 — advising reason, credit-hour allowance, schedule status and bachelor-project eligibility. */
+export const fetchAdvisingOverview = async (studentId: string): Promise<AdvisingOverviewResponse> =>
+  apiFetch<AdvisingOverviewResponse>(`/api/advisors/advising-students/${encodeURIComponent(studentId)}/overview`);

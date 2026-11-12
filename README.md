@@ -162,6 +162,9 @@ The result is faster advising, fewer errors, and complete visibility for everyon
 - Graduation plans across the next Winter, Spring and Summer terms, with
   prerequisite ordering, private Advisor drafts, and Coordinator review,
   acceptance or rejection with a response note
+- Graduation-plan credit-hour limits follow the student's semester allowance
+  from req 59 (34 for semesters 3-4, 30 for 5-6, 28 for 7, 24 from 8 on, minus
+  25% rounded up on probation), one limit per plan term
 - Exit-exam requests for a student's single remaining failed course, including
   Coordinator approval or rejection and a response visible to the Advisor and
   the student

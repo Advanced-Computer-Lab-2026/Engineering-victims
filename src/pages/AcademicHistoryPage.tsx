@@ -16,6 +16,7 @@ import {
   Sigma,
   UserRound,
 } from 'lucide-react';
+import MandatoryRemovalRequestDialog from '../components/MandatoryRemovalRequestDialog';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
@@ -30,12 +31,15 @@ import {
   fetchMyAcademicHistory,
   fetchStudentAcademicHistory,
 } from '../lib/academicHistoryService';
+import { fetchStudentRemovalRequests } from '../lib/mandatoryRemovalService';
 import type {
   AcademicHistoryResponse,
   CompletedCourse,
   MandatoryCandidate,
   MandatoryCandidatesResponse,
+  MandatoryRemovalRequestSummary,
   RemainingCourse,
+  StudentRemovalRequestsResponse,
 } from '../lib/types';
 
 /** GUC scale: 0.7 is the best grade, 5.0 a fail, so the tone follows the letter. */
@@ -79,6 +83,10 @@ const AcademicHistoryPage: React.FC = () => {
   const [downloadError, setDownloadError] = useState<ApiError | null>(null);
   const [candidates, setCandidates] = useState<MandatoryCandidatesResponse['candidates'] | null>(null);
   const [candidatesError, setCandidatesError] = useState<ApiError | null>(null);
+  // Req 64: the removal requests behind the mandatory list, and the form state.
+  const [removals, setRemovals] = useState<StudentRemovalRequestsResponse | null>(null);
+  const [removalTarget, setRemovalTarget] = useState<MandatoryCandidate | null>(null);
+  const [removalNotice, setRemovalNotice] = useState<string | null>(null);
 
   const isOwn = !studentId;
 
@@ -108,6 +116,13 @@ const AcademicHistoryPage: React.FC = () => {
     fetchMandatoryCandidates(studentId)
       .then((response) => !cancelled && setCandidates(response.candidates))
       .catch((err) => !cancelled && setCandidatesError(err as ApiError));
+    // Req 64: optional context. If it fails the list still shows, just
+    // without request statuses or the request button.
+    setRemovals(null);
+    setRemovalNotice(null);
+    fetchStudentRemovalRequests(studentId)
+      .then((response) => !cancelled && setRemovals(response))
+      .catch(() => undefined);
     return () => {
       cancelled = true;
     };
@@ -126,6 +141,21 @@ const AcademicHistoryPage: React.FC = () => {
   }, [data]);
 
   const student = data?.student;
+
+  // Req 64: the newest request per course; the API returns newest first.
+  const latestRemoval = useMemo(() => {
+    const byCourse = new Map<string, MandatoryRemovalRequestSummary>();
+    (removals?.requests ?? []).forEach((request) => {
+      if (request.course && !byCourse.has(request.course.id)) byCourse.set(request.course.id, request);
+    });
+    return byCourse;
+  }, [removals]);
+
+  const handleRemovalSubmitted = (request: MandatoryRemovalRequestSummary, message: string) => {
+    setRemovals((current) => (current ? { ...current, requests: [request, ...current.requests] } : current));
+    setRemovalTarget(null);
+    setRemovalNotice(message);
+  };
 
   // Req 56: the displayed history as a PDF, under the same access rules.
   const handleDownload = async () => {
@@ -269,9 +299,17 @@ const AcademicHistoryPage: React.FC = () => {
                   description="This student has no failed or unattended courses."
                 />
               ) : (
+                <>
+                {removalNotice && (
+                  <div className="mb-3">
+                    <AlertBanner tone="success" title="Removal request sent" onDismiss={() => setRemovalNotice(null)}>
+                      {removalNotice}
+                    </AlertBanner>
+                  </div>
+                )}
                 <Card tone="raised" className="overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[40rem] text-left text-sm">
+                    <table className="w-full min-w-[48rem] text-left text-sm">
                       <caption className="sr-only">Failed and unattended courses that are mandatory-course candidates</caption>
                       <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
                         <tr>
@@ -279,17 +317,29 @@ const AcademicHistoryPage: React.FC = () => {
                           <th scope="col" className="px-4 py-3 font-semibold">Course</th>
                           <th scope="col" className="px-4 py-3 font-semibold">Reason</th>
                           <th scope="col" className="px-4 py-3 font-semibold">When</th>
-                          <th scope="col" className="px-4 py-3 text-right font-semibold">Status</th>
+                          <th scope="col" className="px-4 py-3 font-semibold">Status</th>
+                          <th scope="col" className="px-4 py-3 text-right font-semibold">Removal</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
                         {candidates.map((candidate) => (
-                          <CandidateRow key={candidate.course.id} candidate={candidate} />
+                          <CandidateRow
+                            key={candidate.course.id}
+                            candidate={candidate}
+                            removal={latestRemoval.get(candidate.course.id)}
+                            onRequestRemoval={removals?.canRequest ? () => setRemovalTarget(candidate) : undefined}
+                          />
                         ))}
                       </tbody>
                     </table>
                   </div>
                 </Card>
+                {removals && !removals.canRequest && user?.role === 'Advisor' && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Only this student's assigned Advisor can request a mandatory-course removal.
+                  </p>
+                )}
+                </>
               )}
             </Section>
           )}
@@ -427,6 +477,18 @@ const AcademicHistoryPage: React.FC = () => {
           </Section>
         </div>
       ) : null}
+
+      {/* Req 64: the assigned Advisor's removal request form. */}
+      {studentId && removalTarget && candidates && removals && (
+        <MandatoryRemovalRequestDialog
+          studentId={studentId}
+          candidate={removalTarget}
+          candidates={candidates}
+          categories={removals.categories}
+          onCancel={() => setRemovalTarget(null)}
+          onSubmitted={handleRemovalSubmitted}
+        />
+      )}
     </>
   );
 };
@@ -461,7 +523,15 @@ const Section: React.FC<{
   </section>
 );
 
-const CandidateRow: React.FC<{ candidate: MandatoryCandidate }> = ({ candidate }) => (
+interface CandidateRowProps {
+  candidate: MandatoryCandidate;
+  /** Req 64: the newest removal request for this course, if any. */
+  removal?: MandatoryRemovalRequestSummary;
+  /** Present only for the student's assigned Advisor. */
+  onRequestRemoval?: () => void;
+}
+
+const CandidateRow: React.FC<CandidateRowProps> = ({ candidate, removal, onRequestRemoval }) => (
   <tr className="hover:bg-slate-800/40">
     <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">{candidate.course.code}</td>
     <td className="px-4 py-3 text-slate-200">
@@ -476,10 +546,26 @@ const CandidateRow: React.FC<{ candidate: MandatoryCandidate }> = ({ candidate }
     <td className="px-4 py-3 text-slate-400">
       {candidate.term ? `${candidate.term} · Semester ${candidate.semester}` : `Semester ${candidate.semester} · not taken`}
     </td>
-    <td className="px-4 py-3 text-right">
+    <td className="px-4 py-3">
       <Badge tone="rose" dot>
         Mandatory
       </Badge>
+    </td>
+    <td className="px-4 py-3 text-right">
+      <span className="flex flex-wrap items-center justify-end gap-2">
+        {removal?.status === 'Pending' && <Badge tone="amber">Removal pending</Badge>}
+        {removal?.status === 'Rejected' && (
+          <span title={removal.responseNote || undefined}>
+            <Badge tone="neutral">Removal rejected</Badge>
+          </span>
+        )}
+        {onRequestRemoval && removal?.status !== 'Pending' && (
+          <CustomButton variant="secondary" size="sm" onClick={onRequestRemoval}>
+            Request removal
+          </CustomButton>
+        )}
+        {!removal && !onRequestRemoval && <span className="text-xs text-slate-600">None</span>}
+      </span>
     </td>
   </tr>
 );

@@ -6,6 +6,7 @@ const { serialize } = require('./studentController');
 const { getStatusesFor } = require('../services/workflowService');
 const { buildStudentQuery } = require('../services/studentQueryService');
 const { pendingRequestOptions, pendingRequestFor } = require('../services/pendingRequestService');
+const { buildAdvisingOverview } = require('../services/advisingOverviewService');
 
 const ADVISING_SCOPE = { studentType: 'Advising Student' };
 
@@ -146,5 +147,44 @@ exports.getAdvisingStudent = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not load the student', error: error.message });
+  }
+};
+
+/**
+ * Req 59: an Advisor, Coordinator or Administrator views an advising student's
+ * advising reason, system-calculated credit-hour allowance, schedule status and
+ * bachelor-project eligibility.
+ *
+ * Read-only, and open for any advising student like req 53: nothing here can
+ * be set by the caller, so there is no assignment check to make.
+ */
+exports.getAdvisingOverview = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'That student link is not valid.' });
+    }
+
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    if (student.studentType !== 'Advising Student') {
+      return res.status(404).json({ message: 'That student is not an advising student.' });
+    }
+
+    res.status(200).json({
+      student: {
+        id: student._id,
+        fullName: student.fullName,
+        studentId: student.studentId,
+        major: student.major,
+        currentSemester: student.currentSemester,
+        academicStanding: student.academicStanding,
+      },
+      overview: await buildAdvisingOverview(student),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load the advising overview', error: error.message });
   }
 };
