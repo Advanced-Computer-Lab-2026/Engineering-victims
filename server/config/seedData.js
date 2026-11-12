@@ -10,6 +10,15 @@ const StudentSchedule = require('../models/StudentSchedule');
 const GraduationPlan = require('../models/GraduationPlan');
 const ExitExamRequest = require('../models/ExitExamRequest');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
+const SwapRequest = require('../models/SwapRequest');
+const NotificationEvent = require('../models/NotificationEvent');
+const ScheduleActivityLog = require('../models/ScheduleActivityLog');
+const SlotChangeRequest = require('../models/SlotChangeRequest');
+const SemesterStanding = require('../models/SemesterStanding');
+const ProbationWarning = require('../models/ProbationWarning');
+const CalendarConnection = require('../models/CalendarConnection');
+const CalendarOAuthState = require('../models/CalendarOAuthState');
+const CalendarEvent = require('../models/CalendarEvent');
 const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
 const { seedWallets } = require('./walletSeed');
@@ -642,6 +651,19 @@ const seed = async () => {
   await GraduationPlan.deleteMany({});
   await ExitExamRequest.deleteMany({});
   await MandatoryRemovalRequest.deleteMany({});
+  // Runtime collections: written by live traffic, never by seed() itself.
+  // They have to go too, or a reseed leaves rows pointing at student/term ids
+  // that no longer exist — a SwapRequest whose requester was deleted is an
+  // orphan the swaps screen can still be asked to render.
+  await SwapRequest.deleteMany({});
+  await NotificationEvent.deleteMany({});
+  await ScheduleActivityLog.deleteMany({});
+  await SlotChangeRequest.deleteMany({});
+  await SemesterStanding.deleteMany({});
+  await ProbationWarning.deleteMany({});
+  await CalendarConnection.deleteMany({});
+  await CalendarOAuthState.deleteMany({});
+  await CalendarEvent.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
@@ -712,6 +734,15 @@ const seed = async () => {
   // Req 54: completed (graded) and current courses for the Advising Students.
   const courseRecords = await seedAcademicHistory({ students, courses });
   const graduationPlans = await seedGraduationPlans({ students, users: created });
+
+  // Req 35-39: the swap requests the swaps screen reads, for the students the
+  // seed marks with a swap workflowStatus. Built through the same lazy seeder
+  // the controllers use, so a fresh seed and a database that has been visited
+  // agree exactly — otherwise the first page load writes rows a fresh seed does
+  // not have, and scripts/verify-seed-state.cjs reports a permanent diff.
+  // The lazy path stays: it is what repairs databases seeded before Req 35.
+  const { ensureSeededSwapRequests } = require('../controllers/swapRequestController');
+  await ensureSeededSwapRequests();
 
   const currentTerm =
     terms.find((term) => term.season === 'Winter') ?? terms[terms.length - 1] ?? null;

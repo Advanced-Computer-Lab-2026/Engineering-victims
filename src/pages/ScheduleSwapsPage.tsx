@@ -372,7 +372,7 @@ const ScheduleSwapsPage: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
-                Open Swap Requests You Are Eligible to Complete ({openRequests.length})
+                Eligible Open Swap Requests ({openRequests.length})
               </h2>
             </div>
 

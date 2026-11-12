@@ -145,8 +145,42 @@ const courseCodesOfTemplate = async (template) => {
  * has a corresponding SwapRequest record in MongoDB when swap or dashboard
  * endpoints are queried. Keeping this lazy means `seed()` itself does not add
  * extra collections during `scripts/verify-seed-state.cjs`.
+ *
+ * The swaps page fires `/mine` and `/eligible-open` together (and React
+ * StrictMode mounts the effect twice), so this routine is entered concurrently
+ * by several requests on a cold database. Without a lock, every caller sees
+ * `countDocuments === 0` for the same student and races to insert: the unique
+ * partial index on {requesterId, termId} where status is 'Open' then rejects
+ * the loser with E11000, which surfaced to the UI as
+ * "Could not load your swap requests." (500). Requests whose status is not
+ * 'Open' are outside that partial index, so the same race silently wrote
+ * duplicate rows instead.
+ *
+ * Two layers guard it: a single-flight promise so concurrent callers inside
+ * this process share one run, and an E11000 swallow so a caller that still
+ * loses (e.g. a second server process) treats "already inserted" as success
+ * rather than failing the page load.
  */
+let seedRunInFlight = null;
+
 const ensureSeededSwapRequests = async () => {
+  if (seedRunInFlight) return seedRunInFlight;
+
+  seedRunInFlight = seedSwapRequestsOnce()
+    .catch((error) => {
+      // Never cache a failure: the next request should be free to retry.
+      // A duplicate key here means another caller inserted the row first,
+      // which is exactly the state we wanted, so it is not an error.
+      if (error?.code !== 11000) throw error;
+    })
+    .finally(() => {
+      seedRunInFlight = null;
+    });
+
+  return seedRunInFlight;
+};
+
+const seedSwapRequestsOnce = async () => {
   const swapStudents = await Student.find({
     studentType: 'Normal Student',
     workflowStatus: {
@@ -182,17 +216,22 @@ const ensureSeededSwapRequests = async () => {
     };
     const mappedStatus = statusMap[st.workflowStatus] || 'Open';
 
-    await SwapRequest.create({
-      requesterId: st._id,
-      termId: ctx.term._id,
-      currentGroup: st.studyGroup,
-      desiredGroups,
-      courseCodesSnapshot: ctx.courseCodes,
-      scheduleSnapshot: ctx.scheduleSnapshot,
-      status: mappedStatus,
-      completedAt: mappedStatus === 'Completed' ? st.lastUpdateAt || new Date() : null,
-      withdrawnAt: mappedStatus === 'Withdrawn' ? st.lastUpdateAt || new Date() : null,
-    });
+    try {
+      await SwapRequest.create({
+        requesterId: st._id,
+        termId: ctx.term._id,
+        currentGroup: st.studyGroup,
+        desiredGroups,
+        courseCodesSnapshot: ctx.courseCodes,
+        scheduleSnapshot: ctx.scheduleSnapshot,
+        status: mappedStatus,
+        completedAt: mappedStatus === 'Completed' ? st.lastUpdateAt || new Date() : null,
+        withdrawnAt: mappedStatus === 'Withdrawn' ? st.lastUpdateAt || new Date() : null,
+      });
+    } catch (error) {
+      // Lost the insert race to a concurrent caller; the row exists either way.
+      if (error?.code !== 11000) throw error;
+    }
   }
 };
 
