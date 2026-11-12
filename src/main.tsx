@@ -16,6 +16,8 @@ import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
 import CourseOfferingsPage from './pages/CourseOfferingsPage';
 import CoordinatorQueuePage from './pages/CoordinatorQueuePage';
+import PendingWorkDashboardPage from './pages/PendingWorkDashboardPage';
+import ScheduleActivityHistoryPage from './pages/ScheduleActivityHistoryPage';
 import ScheduleTemplatesPage from './pages/ScheduleTemplatesPage';
 import WalletPage from './pages/WalletPage';
 import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
@@ -25,6 +27,7 @@ import WeeklySchedulePage from './pages/WeeklySchedulePage';
 import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import EligibleSwapGroupsPage from './pages/EligibleSwapGroupsPage';
+import ScheduleSwapsPage from './pages/ScheduleSwapsPage';
 import GraduationPlansRoute from './pages/GraduationPlansRoute';
 import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
 import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
@@ -77,7 +80,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/graduation-plans/:planId" element={<GraduationPlanBuilderPage />} />
         </Route>
 
-        {/* Req 11-12: managing the advising roster itself stays staff-only. */}
+        {/* Req 11-12, Req 122, Req 123-125: Coordinator & Administrator routes. */}
         <Route
           element={
             <ProtectedRoute roles={['Coordinator', 'Administrator']}>
@@ -85,9 +88,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             </ProtectedRoute>
           }
         >
-          {/* /students lives in the directory guard above, where main widened it
-              to Advisors. Only Omars' own route belongs here. */}
+          <Route path="/coordinator/pending-work" element={<PendingWorkDashboardPage />} />
           <Route path="/coordinator/queue" element={<CoordinatorQueuePage />} />
+          <Route path="/schedule-history" element={<ScheduleActivityHistoryPage />} />
           <Route path="/advisors" element={<AdvisorsPage />} />
           <Route path="/schedule-templates" element={<ScheduleTemplatesPage />} />
           <Route path="/semester-standings" element={<SemesterStandingsPage />} />
@@ -125,6 +128,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           {/* Req 34: Normal Students can view eligible swap groups with
               exact same course set. */}
           <Route path="/eligible-swap-groups" element={<EligibleSwapGroupsPage />} />
+          {/* Req 35-39: Normal Students submit, view, complete, and withdraw whole-schedule swaps. */}
+          <Route path="/swaps" element={<ScheduleSwapsPage />} />
           {/* Req 31: a student's own weekly schedule. */}
           <Route path="/schedule" element={<WeeklySchedulePage />} />
           {/* Req 57: Advising Students' scheduling preferences. */}

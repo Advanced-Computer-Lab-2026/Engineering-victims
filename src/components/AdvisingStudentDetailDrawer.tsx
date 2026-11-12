@@ -18,6 +18,7 @@ import { fetchAdvisingStudent } from '../lib/advisingStudentsService';
 import { ApiError } from '../lib/api';
 import { formatDate, formatRelative } from '../lib/studentsService';
 import type { AdvisingStudentRow } from '../lib/types';
+import StudentScheduleHistorySection from './StudentScheduleHistorySection';
 import AdvisingOverviewPanel from './AdvisingOverviewPanel';
 import AlertBanner from './ui/AlertBanner';
 import Badge, { type BadgeTone } from './ui/Badge';
@@ -72,6 +73,13 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+
+  const reloadStudent = () => {
+    if (!studentId) return;
+    fetchAdvisingStudent(studentId)
+      .then((response) => setStudent(response.student))
+      .catch((err: ApiError) => setError(err.message));
+  };
 
   useEffect(() => {
     if (!studentId) return;
@@ -209,6 +217,13 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
                 </dl>
               </section>
 
+              {/* Req 123: Schedule processing and reopening history */}
+              <StudentScheduleHistorySection
+                studentObjectId={student.id}
+                workflowStatus={student.workflowStatus}
+                role="Advisor"
+                onWorkflowChanged={reloadStudent}
+              />
               {/* Req 59: system-calculated allowance and bachelor-project eligibility. */}
               <AdvisingOverviewPanel studentId={student.id} showReason={false} />
             </>

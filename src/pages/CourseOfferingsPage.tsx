@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   BookOpen,
+  Layers,
   Loader2,
   RotateCcw,
   Plus,
@@ -18,6 +19,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 import { type CourseOffering, type CourseSlot, type Course, type AcademicTerm } from '../lib/types';
 import OfferingDrawer, { type OfferingDrawerMode } from '../components/OfferingDrawer';
+import DuplicateOfferingsPanel from '../components/DuplicateOfferingsPanel';
 
 const CourseOfferingsPage: React.FC = () => {
   const [selectedTerm, setSelectedTerm] = useState<string>('');
@@ -27,12 +29,13 @@ const CourseOfferingsPage: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Data for the Offering Drawer
+  // Data for the Offering Drawer & Duplicate Dialog
   const [courses, setCourses] = useState<Course[]>([]);
   const [terms, setTerms] = useState<AcademicTerm[]>([]);
   const [drawerMode, setDrawerMode] = useState<OfferingDrawerMode | null>(null);
   const [selectedOffering, setSelectedOffering] = useState<CourseOffering | null>(null);
   const [selectedSlots, setSelectedSlots] = useState<CourseSlot[]>([]);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -122,19 +125,29 @@ const CourseOfferingsPage: React.FC = () => {
         description="Manage the specific instances of courses offered in each academic term."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
-          <CustomButton
-            variant="primary"
-            size="sm"
-            onClick={() => {
-              setSelectedOffering(null);
-              setSelectedSlots([]);
-              setNotice(null);
-              setDrawerMode('create');
-            }}
-            icon={<Plus className="h-4 w-4" aria-hidden />}
-          >
-            New Offering
-          </CustomButton>
+          <div className="flex flex-wrap items-center gap-2">
+            <CustomButton
+              variant="secondary"
+              size="sm"
+              onClick={() => setShowDuplicateModal(true)}
+              icon={<Layers className="h-4 w-4" aria-hidden />}
+            >
+              Duplicate Offerings
+            </CustomButton>
+            <CustomButton
+              variant="primary"
+              size="sm"
+              onClick={() => {
+                setSelectedOffering(null);
+                setSelectedSlots([]);
+                setNotice(null);
+                setDrawerMode('create');
+              }}
+              icon={<Plus className="h-4 w-4" aria-hidden />}
+            >
+              New Offering
+            </CustomButton>
+          </div>
         }
       />
 
@@ -260,6 +273,17 @@ const CourseOfferingsPage: React.FC = () => {
         onDetailsRefreshed={handleDetailsRefreshed}
         onSaved={handleSaved}
       />
+
+      {showDuplicateModal && (
+        <DuplicateOfferingsPanel
+          terms={terms}
+          defaultTargetTermId={selectedTerm}
+          onDuplicated={(targetTermId, message) => {
+            handleSaved(targetTermId, message);
+          }}
+          onClose={() => setShowDuplicateModal(false)}
+        />
+      )}
     </>
   );
 };
