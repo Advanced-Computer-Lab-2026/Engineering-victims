@@ -1,8 +1,9 @@
 const GraduationPlan = require('../models/GraduationPlan');
 const {
   planningTerms,
-  remainingCoursesFor,
-  STANDARD_CREDIT_LIMIT,
+  planInputsFor,
+  creditLimitsFor,
+  normalizeCreditLimits,
   validatePlan,
 } = require('../services/graduationPlanService');
 
@@ -18,7 +19,14 @@ const DEMO_PLANS = [
   { studentId: '64-20046', status: 'Draft' },
 ];
 
-const planPlacements = (remaining, terms) => {
+/**
+ * Greedily packs the remaining courses into the three terms: a course must be
+ * offered in that season, come after its prerequisites and fit the term's req
+ * 59 allowance (`creditLimits`, one per term), backtracking when a choice dead
+ * ends. Returns `null` when the remaining courses cannot be packed at all.
+ */
+const planPlacements = (remaining, terms, creditLimits) => {
+  const limits = normalizeCreditLimits(terms, creditLimits);
   const courseById = new Map(remaining.map((course) => [String(course.id), course]));
   const placements = new Map();
   const hoursByTerm = terms.map(() => 0);
@@ -48,7 +56,7 @@ const planPlacements = (remaining, terms) => {
           ({ term, termIndex }) =>
             (course.offeringSeasons ?? []).includes(term.season) &&
             prerequisiteIndexes.every((prerequisiteIndex) => prerequisiteIndex < termIndex) &&
-            hoursByTerm[termIndex] + course.creditHours <= STANDARD_CREDIT_LIMIT
+            hoursByTerm[termIndex] + course.creditHours <= limits[termIndex]
         );
 
       for (const { termIndex } of options) {
@@ -94,11 +102,13 @@ const seedGraduationPlans = async ({ students, users, now = new Date() }) => {
       throw new Error(`The graduation-plan demo data could not find ${demoPlan.studentId}'s Advisor.`);
     }
 
-    const remaining = await remainingCoursesFor(student);
+    const { remaining, gpa } = await planInputsFor(student);
+    // Req 59: every term of the demo plan is packed against its own allowance.
+    const creditLimits = creditLimitsFor({ student, terms, gpa });
     const placements =
       demoPlan.status === 'Draft' && !demoPlan.wasRejected
         ? []
-        : planPlacements(remaining, terms);
+        : planPlacements(remaining, terms, creditLimits);
     if (!placements) {
       throw new Error(`Could not create a valid demo graduation plan for ${demoPlan.studentId}.`);
     }
@@ -108,7 +118,7 @@ const seedGraduationPlans = async ({ students, users, now = new Date() }) => {
         placements,
         remaining,
         terms,
-        creditLimit: STANDARD_CREDIT_LIMIT,
+        creditLimits,
         requireComplete: true,
       });
       if (validation.errors.length) {

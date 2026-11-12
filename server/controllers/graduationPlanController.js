@@ -3,13 +3,13 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const GraduationPlan = require('../models/GraduationPlan');
 const {
-  STANDARD_CREDIT_LIMIT,
   SUBMITTED_STATUSES,
   planningTerms,
   termLabel,
+  creditLimitsFor,
   approvedCreditLimitFor,
   approvedExitExamCourseIdsFor,
-  remainingCoursesFor,
+  planInputsFor,
   normalizePlacements,
   validatePlan,
   applyDecision,
@@ -44,8 +44,8 @@ const buildDetail = async (plan) => {
   ]);
   if (!student) return null;
 
-  const [remaining, approvedLimit, approvedExitExamCourseIds] = await Promise.all([
-    remainingCoursesFor(student),
+  const [planInputs, approvedLimit, approvedExitExamCourseIds] = await Promise.all([
+    planInputsFor(student),
     approvedCreditLimitFor(student),
     approvedExitExamCourseIdsFor(student),
   ]);
@@ -58,12 +58,18 @@ const buildDetail = async (plan) => {
     season: term.season,
     academicYear: term.academicYear,
   }));
-  const creditLimit = approvedLimit ?? STANDARD_CREDIT_LIMIT;
+  // Req 59: each term is limited by the allowance of the semester it lands in.
+  const creditLimits = creditLimitsFor({
+    student,
+    terms,
+    gpa: planInputs.gpa,
+    approvedLimit,
+  });
   const validation = validatePlan({
     placements,
-    remaining,
+    remaining: planInputs.remaining,
     terms,
-    creditLimit,
+    creditLimits,
     approvedExitExamCourseIds,
     // A draft is allowed to be unfinished (req 106); a submitted plan is not.
     requireComplete: plan.status !== 'Draft',
@@ -76,7 +82,7 @@ const buildDetail = async (plan) => {
     placements,
     student: studentSummary(student),
     advisor: advisorSummary(advisor),
-    remaining,
+    remaining: planInputs.remaining,
     validation,
     submittedAt: plan.submittedAt,
     responseNote: plan.responseNote ?? '',
@@ -334,17 +340,22 @@ exports.updatePlan = async (req, res) => {
     const student = await Student.findById(plan.student);
     if (!student) return res.status(404).json({ message: 'Student not found.' });
 
-    const [remaining, approvedLimit, approvedExitExamCourseIds] = await Promise.all([
-      remainingCoursesFor(student),
+    const [planInputs, approvedLimit, approvedExitExamCourseIds] = await Promise.all([
+      planInputsFor(student),
       approvedCreditLimitFor(student),
       approvedExitExamCourseIdsFor(student),
     ]);
 
     const validation = validatePlan({
       placements,
-      remaining,
+      remaining: planInputs.remaining,
       terms: plan.terms,
-      creditLimit: approvedLimit ?? STANDARD_CREDIT_LIMIT,
+      creditLimits: creditLimitsFor({
+        student,
+        terms: plan.terms,
+        gpa: planInputs.gpa,
+        approvedLimit,
+      }),
       approvedExitExamCourseIds,
       requireComplete: false,
     });
@@ -394,8 +405,8 @@ exports.submitPlan = async (req, res) => {
     const student = await Student.findById(plan.student);
     if (!student) return res.status(404).json({ message: 'Student not found.' });
 
-    const [remaining, approvedLimit, approvedExitExamCourseIds] = await Promise.all([
-      remainingCoursesFor(student),
+    const [planInputs, approvedLimit, approvedExitExamCourseIds] = await Promise.all([
+      planInputsFor(student),
       approvedCreditLimitFor(student),
       approvedExitExamCourseIdsFor(student),
     ]);
@@ -406,9 +417,14 @@ exports.submitPlan = async (req, res) => {
     }));
     const validation = validatePlan({
       placements,
-      remaining,
+      remaining: planInputs.remaining,
       terms: plan.terms,
-      creditLimit: approvedLimit ?? STANDARD_CREDIT_LIMIT,
+      creditLimits: creditLimitsFor({
+        student,
+        terms: plan.terms,
+        gpa: planInputs.gpa,
+        approvedLimit,
+      }),
       approvedExitExamCourseIds,
       requireComplete: true,
     });
