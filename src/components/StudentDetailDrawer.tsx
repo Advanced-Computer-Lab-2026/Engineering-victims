@@ -17,6 +17,7 @@ import {
 import { apiFetch, ApiError } from '../lib/api';
 import { formatDate, formatRelative } from '../lib/studentsService';
 import type { Role, StudentDetailResponse } from '../lib/types';
+import AdvisingOverviewPanel from './AdvisingOverviewPanel';
 import AlertBanner from './ui/AlertBanner';
 import Badge, { type BadgeTone } from './ui/Badge';
 import CustomButton from './ui/CustomButton';
@@ -340,6 +341,9 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                   </DetailRow>
                 </dl>
               </section>
+
+              {/* Req 59: advising reason, allowance and bachelor-project eligibility. */}
+              {student.studentType === 'Advising Student' && <AdvisingOverviewPanel studentId={student.id} />}
 
               <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
                 <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">

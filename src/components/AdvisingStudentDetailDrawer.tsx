@@ -18,6 +18,7 @@ import { fetchAdvisingStudent } from '../lib/advisingStudentsService';
 import { ApiError } from '../lib/api';
 import { formatDate, formatRelative } from '../lib/studentsService';
 import type { AdvisingStudentRow } from '../lib/types';
+import AdvisingOverviewPanel from './AdvisingOverviewPanel';
 import AlertBanner from './ui/AlertBanner';
 import Badge, { type BadgeTone } from './ui/Badge';
 import CustomButton from './ui/CustomButton';
@@ -207,6 +208,9 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
                   </DetailRow>
                 </dl>
               </section>
+
+              {/* Req 59: system-calculated allowance and bachelor-project eligibility. */}
+              <AdvisingOverviewPanel studentId={student.id} showReason={false} />
             </>
           )}
         </div>
