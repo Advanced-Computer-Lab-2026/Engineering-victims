@@ -697,7 +697,8 @@ export interface GraduationPlanValidation {
   assignedCount: number;
   totalCourses: number;
   termHours: Array<{ season: AcademicTermSeason; academicYear: string; hours: number }>;
-  creditLimit: number;
+  /** Req 59 — one credit-hour allowance per entry of `terms`, in term order. */
+  creditLimits: number[];
 }
 
 export interface GraduationPlanDetail {

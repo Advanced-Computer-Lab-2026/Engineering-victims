@@ -1,4 +1,5 @@
 const { buildAcademicHistory } = require('./academicHistoryService');
+const { deriveAllowance } = require('./advisingOverviewService');
 const ExitExamRequest = require('../models/ExitExamRequest');
 
 /**
@@ -6,11 +7,14 @@ const ExitExamRequest = require('../models/ExitExamRequest');
  *
  * The calculation is kept out of the controller so it can be tested directly:
  * `validatePlan` is a pure function over the remaining courses, the plan's
- * three terms and the placements.
+ * three terms, the placements and the credit-hour limits of those terms.
+ *
+ * The limits are no longer one flat semester load. Req 59 fixes the allowance
+ * to the semester the student will be in, so a plan spanning three terms has
+ * three limits, each taken from `advisingOverviewService` — the same place the
+ * advising overview reads them from, so the two screens can never disagree.
  */
 
-/** Req 103: the standard semester load. Extra hours can raise it when approved. */
-const STANDARD_CREDIT_LIMIT = 18;
 const SEASONS = ['Winter', 'Spring', 'Summer'];
 
 /**
@@ -55,11 +59,61 @@ const planningTerms = (now = new Date()) => {
 const termLabel = (term) => `${term.academicYear} ${term.season}`;
 
 /**
+ * Req 59/103: the semester each of the plan's terms lands in.
+ *
+ * The catalogue teaches odd semesters in Winter and even ones in Spring, so
+ * every Winter or Spring term the student reaches is one semester further on
+ * from `currentSemester`. Summer is a break term — no course is offered in it
+ * and req 59 gives it no allowance of its own — so it keeps the term's
+ * semester instead of consuming one, which would push the later terms onto the
+ * wrong band.
+ */
+const termSemestersFor = (terms, currentSemester) => {
+  let semester = Number.isInteger(currentSemester) && currentSemester > 0 ? currentSemester : 1;
+  return terms.map((term) => {
+    if (term.season !== 'Summer') semester += 1;
+    return semester;
+  });
+};
+
+/**
+ * Req 59 + 103: one credit-hour limit per term of the plan.
+ *
+ * Req 59's allowance belongs to a semester (34 for 3-4, 30 for 5-6, 28 for 7,
+ * 24 from 8 on, semesters 1-2 taking the 3-4 band), and is 25% less rounded up
+ * while the student is on probation. `gpa` is the same input req 59 passes to
+ * `deriveAllowance`, so a probation student sees the same numbers here as on
+ * the advising overview.
+ *
+ * A separately approved limit (req 103's "separately approved credit-hour
+ * limit", raised by the extra-hours flow of req 89+) applies to every term of
+ * the plan — except on probation, because req 59 says a probation student
+ * cannot receive an increase.
+ */
+const creditLimitsFor = ({ student, terms, gpa = null, approvedLimit = null }) => {
+  const semesters = termSemestersFor(terms, student?.currentSemester);
+  const allowances = semesters.map((semester) =>
+    deriveAllowance({
+      student: { currentSemester: semester, academicStanding: student?.academicStanding },
+      gpa,
+    })
+  );
+
+  // Req 59: a probation student cannot receive an increase, so an approved
+  // limit only overrides the allowance for a student who may receive one.
+  const onProbation = allowances.some(({ isProbation }) => isProbation);
+  if (approvedLimit != null && Number.isFinite(approvedLimit) && !onProbation) {
+    return terms.map(() => approvedLimit);
+  }
+  return allowances.map(({ allowedHours }) => allowedHours);
+};
+
+/**
  * Req 103: "separately approved credit-hour limit".
  *
  * Extra-hours approvals (req 89+) do not exist in this sprint, so no student
- * has a separately approved limit yet and the standard load applies. When the
- * approval flow lands, only this function has to read it.
+ * has a separately approved limit yet and the req 59 allowance applies. When
+ * the approval flow lands, only this function has to read it.
  */
 const approvedCreditLimitFor = async () => null;
 
@@ -78,8 +132,19 @@ const approvedExitExamCourseIdsFor = async (student) => {
   return new Set(courseIds.map(String));
 };
 
+/**
+ * Req 103-107: everything the plan rules need about the student.
+ *
+ * The remaining courses and the GPA come from one academic-history read, so
+ * validating a plan never costs more queries than reading it did.
+ */
+const planInputsFor = async (student) => {
+  const history = await buildAcademicHistory(student);
+  return { remaining: history.remaining, gpa: history.summary.gpa };
+};
+
 /** Req 103-107: the courses a complete plan still has to place. */
-const remainingCoursesFor = async (student) => (await buildAcademicHistory(student)).remaining;
+const remainingCoursesFor = async (student) => (await planInputsFor(student)).remaining;
 
 /** Turns a mongoose plan (or a plain object) into the ids and indexes the rules use. */
 const normalizePlacements = (placements) => {
@@ -93,18 +158,41 @@ const normalizePlacements = (placements) => {
 };
 
 /**
+ * Req 59: exactly one finite limit per term.
+ *
+ * Guessing a limit here would silently decide whether a plan may overload, so
+ * a missing or misaligned `creditLimits` throws instead — every caller builds
+ * it with `creditLimitsFor`.
+ */
+const normalizeCreditLimits = (terms, creditLimits) => {
+  const valid =
+    Array.isArray(creditLimits) &&
+    creditLimits.length === terms.length &&
+    creditLimits.every((limit) => Number.isFinite(limit) && limit > 0);
+  if (!valid) {
+    throw new Error('A graduation plan needs one credit-hour limit per term (req 59).');
+  }
+  return creditLimits;
+};
+
+/**
  * Req 103: every rule the workbook lists, as plain messages the Advisor can act
  * on. `requireComplete` is what separates saving a draft (req 106) from
  * submitting it (req 107).
+ *
+ * `creditLimits` carries one req 59 allowance per entry of `terms`; the caller
+ * builds it with `creditLimitsFor`. A limit is never guessed here — a missing
+ * one is a programming mistake, not a plan that is allowed to overload.
  */
 const validatePlan = ({
   placements,
   remaining,
   terms,
-  creditLimit = STANDARD_CREDIT_LIMIT,
+  creditLimits,
   approvedExitExamCourseIds = new Set(),
   requireComplete = false,
 }) => {
+  const limits = normalizeCreditLimits(terms, creditLimits);
   const errors = [];
   const byId = new Map(remaining.map((course) => [String(course.id), course]));
   const placed = new Map(); // course id -> term index
@@ -139,14 +227,15 @@ const validatePlan = ({
     }
   });
 
-  // Req 103: the plan may not overload a term.
+  // Req 103/59: a term may not exceed its own semester's allowance.
   const hoursByTerm = terms.map((term) => ({ term, hours: 0 }));
   placed.forEach((termIndex, courseId) => {
     hoursByTerm[termIndex].hours += byId.get(courseId)?.creditHours ?? 0;
   });
-  hoursByTerm.forEach(({ term, hours }) => {
-    if (hours > creditLimit) {
-      errors.push(`${termLabel(term)} has ${hours} credit hours, over the ${creditLimit}-hour limit.`);
+  hoursByTerm.forEach(({ term, hours }, index) => {
+    const limit = limits[index];
+    if (hours > limit) {
+      errors.push(`${termLabel(term)} has ${hours} credit hours, over the ${limit}-hour limit.`);
     }
   });
 
@@ -200,7 +289,8 @@ const validatePlan = ({
       academicYear: term.academicYear,
       hours,
     })),
-    creditLimit,
+    // Req 59: the allowance each term was checked against, in term order.
+    creditLimits: limits,
   };
 };
 
@@ -270,16 +360,19 @@ const matchesPlanSearch = (plan, search) => {
 };
 
 module.exports = {
-  STANDARD_CREDIT_LIMIT,
   SEASONS,
   RESPONSE_NOTE_LIMIT,
   SUBMITTED_STATUSES,
   planningTerms,
   termLabel,
+  termSemestersFor,
+  creditLimitsFor,
   approvedCreditLimitFor,
   approvedExitExamCourseIdsFor,
+  planInputsFor,
   remainingCoursesFor,
   normalizePlacements,
+  normalizeCreditLimits,
   validatePlan,
   applyDecision,
   clearDecision,

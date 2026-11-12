@@ -1,18 +1,24 @@
 jest.mock('../models/GraduationPlan', () => ({ insertMany: jest.fn() }));
-jest.mock('../services/graduationPlanService', () => ({
-  planningTerms: jest.fn(() => [
-    { season: 'Spring', academicYear: '2026/2027' },
-    { season: 'Summer', academicYear: '2026/2027' },
-    { season: 'Winter', academicYear: '2027/2028' },
-  ]),
-  remainingCoursesFor: jest.fn(),
-  STANDARD_CREDIT_LIMIT: 18,
-  validatePlan: jest.fn(() => ({ errors: [] })),
-}));
+jest.mock('../services/graduationPlanService', () => {
+  const actual = jest.requireActual('../services/graduationPlanService');
+  return {
+    planningTerms: jest.fn(() => [
+      { season: 'Spring', academicYear: '2026/2027' },
+      { season: 'Summer', academicYear: '2026/2027' },
+      { season: 'Winter', academicYear: '2027/2028' },
+    ]),
+    planInputsFor: jest.fn(),
+    // Every seeded term is packed with the most generous req 59 band; the
+    // packing rules themselves are covered by the planPlacements tests below.
+    creditLimitsFor: jest.fn(() => [34, 34, 34]),
+    normalizeCreditLimits: actual.normalizeCreditLimits,
+    validatePlan: jest.fn(() => ({ errors: [] })),
+  };
+});
 
 const GraduationPlan = require('../models/GraduationPlan');
 const {
-  remainingCoursesFor,
+  planInputsFor,
   validatePlan,
 } = require('../services/graduationPlanService');
 const { seedGraduationPlans, planPlacements } = require('../config/graduationPlanSeed');
@@ -40,7 +46,7 @@ const fixture = () => {
 beforeEach(() => {
   jest.clearAllMocks();
   GraduationPlan.insertMany.mockImplementation(async (plans) => plans);
-  remainingCoursesFor.mockResolvedValue([fixture().course]);
+  planInputsFor.mockResolvedValue({ remaining: [fixture().course], gpa: null });
 });
 
 describe('planPlacements', () => {
@@ -52,7 +58,9 @@ describe('planPlacements', () => {
       { season: 'Winter', academicYear: '2027/2028' },
     ];
 
-    expect(planPlacements([course], terms)).toEqual([{ courseId: 'course-id', termIndex: 2 }]);
+    expect(planPlacements([course], terms, [34, 34, 34])).toEqual([
+      { courseId: 'course-id', termIndex: 2 },
+    ]);
   });
 
   it('returns null when the remaining courses cannot fit a valid term sequence', () => {
@@ -69,7 +77,7 @@ describe('planPlacements', () => {
       { season: 'Winter', academicYear: '2027/2028' },
     ];
 
-    expect(planPlacements([dependent, prerequisite], terms)).toBeNull();
+    expect(planPlacements([dependent, prerequisite], terms, [34, 34, 34])).toBeNull();
   });
 
   it('creates valid complete plans for the final-year Computer Science and DMET cohorts', () => {
@@ -100,14 +108,22 @@ describe('planPlacements', () => {
       course('dmet-huma', 'HUMA 1001', 4, 10),
     ];
 
+    // A semester 7 student: Spring and Summer terms hold semesters 8, the
+    // Winter one semester 9, so every band is the 24-hour one.
+    const creditLimits = realGraduationPlanRules.creditLimitsFor({
+      student: { currentSemester: 7, academicStanding: 'Good Standing' },
+      terms,
+    });
+
     for (const remaining of [computerScience, dmet]) {
-      const placements = planPlacements(remaining, terms);
+      const placements = planPlacements(remaining, terms, creditLimits);
       expect(placements).not.toBeNull();
       expect(
         realGraduationPlanRules.validatePlan({
           placements,
           remaining,
           terms,
+          creditLimits,
           requireComplete: true,
         }).errors
       ).toEqual([]);
