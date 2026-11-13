@@ -501,6 +501,7 @@ const SlotChangeRequestsReviewPage: React.FC = () => {
         showsAll={showsAll}
         onClose={closeDetails}
         onStale={refreshAfterStale}
+        onDecided={refreshAfterStale}
       />
     </>
   );

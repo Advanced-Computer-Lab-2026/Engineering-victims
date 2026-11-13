@@ -34,5 +34,9 @@ router.get(
   requireRole('Advisor', 'Coordinator'),
   slotChangeRequestController.getRequestAlternatives
 );
+// Req 48: decide a Pending request. Approval moves the student into the
+// chosen replacement group in one transaction; rejection changes only the request.
+router.patch('/:id/approve', authenticate, requireRole('Advisor', 'Coordinator'), slotChangeRequestController.approveRequest);
+router.patch('/:id/reject', authenticate, requireRole('Advisor', 'Coordinator'), slotChangeRequestController.rejectRequest);
 
 module.exports = router;

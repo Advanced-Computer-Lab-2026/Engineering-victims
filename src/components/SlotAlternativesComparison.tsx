@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Columns2, Loader2, Lock, MapPin, RotateCcw, UsersRound, XCircle } from 'lucide-react';
 import type { ApiError } from '../lib/api';
 import { fetchSlotChangeAlternatives } from '../lib/slotChangeRequestsService';
@@ -10,6 +10,14 @@ import CustomButton from './ui/CustomButton';
 interface SlotAlternativesComparisonProps {
   requestId: string;
   courseCode: string | null;
+  /** Req 48: lets staff choose one available group as the replacement. */
+  selectable?: boolean;
+  selectedId?: string | null;
+  onSelect?: (alternative: SlotAlternative | null) => void;
+  /** Req 48: change it to re-read seats and clashes (e.g. after a refused approval). */
+  reloadKey?: number;
+  /** Req 48: while a decision is being confirmed or saved, the chosen group cannot change. */
+  selectionLocked?: boolean;
 }
 
 const timeLine = (slot: SlotComparisonTimes) => `${slot.dayOfWeek} ${slot.startTime}–${slot.endTime}`;
@@ -60,10 +68,20 @@ const Verdict: React.FC<{ alt: SlotAlternative }> = ({ alt }) => {
  * the rest of the student's timetable. Everything comes from the server,
  * which finds the request inside the viewer's scope first.
  *
- * Read-only by design: groups are compared, never chosen here. Deciding a
- * request and picking its replacement is req 48.
+ * Req 48: with `selectable`, each available group can be chosen as the
+ * replacement; full, clashing or otherwise unavailable groups stay visible
+ * but cannot be chosen. Without it the comparison stays read-only. The server
+ * re-checks the chosen group when the request is approved.
  */
-const SlotAlternativesComparison: React.FC<SlotAlternativesComparisonProps> = ({ requestId, courseCode }) => {
+const SlotAlternativesComparison: React.FC<SlotAlternativesComparisonProps> = ({
+  requestId,
+  courseCode,
+  selectable = false,
+  selectedId = null,
+  onSelect,
+  reloadKey = 0,
+  selectionLocked = false,
+}) => {
   const [comparison, setComparison] = useState<SlotChangeComparison | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,10 +105,26 @@ const SlotAlternativesComparison: React.FC<SlotAlternativesComparisonProps> = ({
     };
   }, [requestId]);
 
+  // One effect, so each change of request or reload asks the server once. A
+  // new request starts from an empty view; a reload (req 48) re-reads in
+  // place, keeping the current view until the answer arrives.
+  const shownRequest = useRef<string | null>(null);
   useEffect(() => {
-    setComparison(null);
+    if (shownRequest.current !== requestId) {
+      shownRequest.current = requestId;
+      setComparison(null);
+    }
     return load();
-  }, [load]);
+  }, [load, reloadKey]);
+
+  // After a read, a chosen group that is no longer available is unchosen, and
+  // one that still is is handed back with its fresh seats.
+  useEffect(() => {
+    if (!comparison || !selectedId || !onSelect) return;
+    const still = comparison.alternatives.find((alt) => alt.id === selectedId);
+    // Choosing a group hands back this same object, so that is a no-op.
+    onSelect(still && still.isEligible ? still : null);
+  }, [comparison, selectedId, onSelect]);
 
   const component = comparison?.slotType.toLowerCase() ?? 'slot';
 
@@ -188,14 +222,42 @@ const SlotAlternativesComparison: React.FC<SlotAlternativesComparisonProps> = ({
                 <li
                   key={alt.id}
                   className={`rounded-xl border p-3 ${
-                    alt.isEligible ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-slate-800 bg-slate-950/40'
+                    selectable && selectedId === alt.id
+                      ? 'border-indigo-400 bg-indigo-500/10 ring-1 ring-indigo-400/60'
+                      : alt.isEligible
+                        ? 'border-emerald-500/30 bg-emerald-500/5'
+                        : 'border-slate-800 bg-slate-950/40'
                   }`}
                   aria-label={`Group ${alt.groupNumber}: ${alt.isEligible ? 'available' : 'not available'}`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-100">Group {alt.groupNumber}</span>
+                        {selectable && (
+                          // Req 48: only an available group can be chosen as the replacement.
+                          <input
+                            type="radio"
+                            id={`replacement-${alt.id}`}
+                            name={`replacement-${requestId}`}
+                            value={alt.id}
+                            checked={selectedId === alt.id}
+                            disabled={!alt.isEligible || selectionLocked}
+                            onChange={() => {
+                              if (!selectionLocked) onSelect?.(alt);
+                            }}
+                            aria-describedby={`replacement-${alt.id}-why`}
+                            className="h-4 w-4 accent-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                          />
+                        )}
+                        <label
+                          htmlFor={selectable ? `replacement-${alt.id}` : undefined}
+                          className={`text-sm font-semibold text-slate-100 ${selectable && alt.isEligible && !selectionLocked ? 'cursor-pointer' : ''}`}
+                        >
+                          Group {alt.groupNumber}
+                        </label>
+                        <span id={`replacement-${alt.id}-why`} className="sr-only">
+                          {alt.isEligible ? 'Available' : `Cannot be chosen: ${alt.reasons.join(', ')}`}
+                        </span>
                         <Verdict alt={alt} />
                       </div>
                       <p className={`text-sm ${alt.isEligible ? 'text-slate-200' : 'text-slate-400'}`}>{timeLine(alt)}</p>
@@ -233,7 +295,9 @@ const SlotAlternativesComparison: React.FC<SlotAlternativesComparisonProps> = ({
 
           <p className="flex items-center gap-1.5 text-[11px] text-slate-500">
             <Lock className="h-3 w-3" aria-hidden />
-            Comparison only. Nothing is changed here.
+            {selectable
+              ? 'Only available groups can be chosen. Seats and clashes are checked again when you approve.'
+              : 'Comparison only. Nothing is changed here.'}
           </p>
         </div>
       )}

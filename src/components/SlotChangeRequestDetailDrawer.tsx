@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   BookOpen,
@@ -16,8 +16,9 @@ import { ApiError } from '../lib/api';
 import { fetchStaffSlotChangeRequest } from '../lib/slotChangeRequestsService';
 import { SLOT_TONE, STATUS_TONE, slotLabel } from '../lib/slotChangeDisplay';
 import { formatDate, formatRelative } from '../lib/studentsService';
-import type { StaffSlotChangeRequestItem } from '../lib/types';
+import type { SlotAlternative, StaffSlotChangeRequestItem } from '../lib/types';
 import SlotAlternativesComparison from './SlotAlternativesComparison';
+import SlotChangeDecisionPanel from './SlotChangeDecisionPanel';
 import AlertBanner from './ui/AlertBanner';
 import Badge from './ui/Badge';
 import CustomButton from './ui/CustomButton';
@@ -30,6 +31,8 @@ interface SlotChangeRequestDetailDrawerProps {
   onClose: () => void;
   /** Called when the request turned out to be gone or out of scope, so the list can refresh. */
   onStale: () => void;
+  /** Req 48: called after a decision is saved, so the list can refresh with the same filters. */
+  onDecided: () => void;
 }
 
 interface DetailRowProps {
@@ -67,21 +70,60 @@ const when = (value: string) => (
  * request that was withdrawn, decided or moved to another Advisor since the
  * list loaded is shown as it is now, or not at all.
  *
- * Req 47 adds a read-only comparison of the current slot with the other
- * groups of the same component. Deciding the request (req 48) is later.
+ * Req 47 adds a comparison of the current slot with the other groups of the
+ * same component.
+ *
+ * Req 48: while the request is Pending, an available group can be chosen in
+ * that comparison and the request approved into it, or the request rejected,
+ * with an optional note. After a decision the drawer shows the request as it
+ * now is and the list behind it refreshes with the same search and filters.
  */
 const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps> = ({
   selected,
   showsAll,
   onClose,
   onStale,
+  onDecided,
 }) => {
   const [request, setRequest] = useState<StaffSlotChangeRequestItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isGone, setIsGone] = useState(false);
+  const [replacement, setReplacement] = useState<SlotAlternative | null>(null);
+  const [compareKey, setCompareKey] = useState(0);
+  const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
+  const [selectionLocked, setSelectionLocked] = useState(false);
   const closeButton = useRef<HTMLButtonElement>(null);
   const selectedId = selected?.id ?? null;
+
+  /** Req 48: show the decided request and refresh the list and comparison. */
+  const handleDecided = useCallback(
+    (updated: StaffSlotChangeRequestItem | null, message: string) => {
+      setDecisionNotice(message);
+      setReplacement(null);
+      if (updated) {
+        setRequest(updated);
+      } else if (selectedId) {
+        fetchStaffSlotChangeRequest(selectedId)
+          .then((response) => setRequest(response.request))
+          .catch(() => undefined);
+      }
+      setCompareKey((key) => key + 1);
+      onDecided();
+    },
+    [selectedId, onDecided]
+  );
+
+  /** Req 48: the server refused because seats or the timetable changed; re-read them. */
+  const handleConflict = useCallback(() => {
+    setReplacement(null);
+    setCompareKey((key) => key + 1);
+    if (selectedId) {
+      fetchStaffSlotChangeRequest(selectedId)
+        .then((response) => setRequest(response.request))
+        .catch(() => undefined);
+    }
+  }, [selectedId]);
 
   useEffect(() => {
     if (!selected) return;
@@ -91,6 +133,9 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
     setError(null);
     setIsGone(false);
     setIsLoading(true);
+    setReplacement(null);
+    setDecisionNotice(null);
+    setSelectionLocked(false);
 
     fetchStaffSlotChangeRequest(selected.id)
       .then((response) => {
@@ -177,6 +222,11 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
               {error} The details below are from the list and may be out of date.
             </AlertBanner>
           )}
+          {decisionNotice && (
+            <AlertBanner tone="success" title="Decision saved" onDismiss={() => setDecisionNotice(null)}>
+              {decisionNotice}
+            </AlertBanner>
+          )}
 
           {request && (
             <>
@@ -226,8 +276,27 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                 </dl>
               </section>
 
-              {/* Req 47: current slot vs. the other groups of this component. Read-only. */}
-              <SlotAlternativesComparison requestId={request.id} courseCode={request.course?.code ?? null} />
+              {/* Req 47: current slot vs. the other groups of this component.
+                  Req 48: while Pending, an available group can be chosen as the replacement. */}
+              <SlotAlternativesComparison
+                requestId={request.id}
+                courseCode={request.course?.code ?? null}
+                selectable={request.status === 'Pending' && !isGone}
+                selectedId={replacement?.id ?? null}
+                onSelect={setReplacement}
+                reloadKey={compareKey}
+                selectionLocked={selectionLocked}
+              />
+
+              {request.status === 'Pending' && !isGone && (
+                <SlotChangeDecisionPanel
+                  request={request}
+                  replacement={replacement}
+                  onDecided={handleDecided}
+                  onConflict={handleConflict}
+                  onLockChange={setSelectionLocked}
+                />
+              )}
 
               <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</h3>

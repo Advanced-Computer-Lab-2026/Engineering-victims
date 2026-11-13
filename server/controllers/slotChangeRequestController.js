@@ -14,7 +14,13 @@ const {
   buildStaffRequestFilter,
   staffFilterOptions,
   compareSlotAlternatives,
+  validateDecisionInput,
+  approveSlotChangeRequest,
+  rejectSlotChangeRequest,
+  SlotChangeDecisionError,
+  isObjectIdString,
 } = require('../services/slotChangeRequestService');
+const { supportsTransactions, isTransactionUnsupportedError } = require('../services/transactionSupport');
 const { notify, notifyRole } = require('../services/notificationService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
 
@@ -311,6 +317,119 @@ exports.getStaffRequest = async (req, res) => {
     res.status(500).json({ message: 'Could not load the slot-change request', error: error.message });
   }
 };
+
+/** Req 48: a decided request, re-read with the list's references for the response. */
+const decidedResponse = async (res, id, message) => {
+  let request = null;
+  try {
+    const doc = await withStaffDetails(SlotChangeRequest.findById(id));
+    request = doc ? serializeStaffItem(doc) : null;
+  } catch {
+    // The decision is already saved; the drawer re-reads it if this read fails.
+  }
+  res.status(200).json({ message, request });
+};
+
+/**
+ * Req 48: checks shared by both decisions, before anything is read: the
+ * role, the id, the body and (for an Advisor) that anyone is assigned at
+ * all. Answers the error itself and returns null, or returns the clean body.
+ */
+const decisionPreflight = async (req, res, { approve }) => {
+  const access = await staffRequestScope(req.user);
+  if (!access) {
+    res.status(403).json({ message: 'Only Advisors and Coordinators can decide slot-change requests.' });
+    return null;
+  }
+  if (!isObjectIdString(req.params.id)) {
+    res.status(400).json({ message: 'That slot-change request id is not valid.' });
+    return null;
+  }
+  const input = validateDecisionInput(req.body, { approve });
+  if (input.error) {
+    res.status(400).json({ message: input.error });
+    return null;
+  }
+  if (!access.filter) {
+    res.status(404).json({ message: 'Slot-change request not found.' });
+    return null;
+  }
+  return { input };
+};
+
+const TRANSACTIONS_UNAVAILABLE =
+  'Deciding requests needs a database that supports transactions (a replica set), and this one does not. Nothing was changed.';
+const TRANSACTIONS_UNCHECKED =
+  'Could not reach the database to start the decision. Nothing was changed. Please try again shortly.';
+
+/**
+ * Req 48: whether a decision may start. Answers 503 itself and returns false
+ * when it may not, telling apart a database that cannot run transactions
+ * from one that could not be asked.
+ */
+const transactionsReady = async (res) => {
+  let supported;
+  try {
+    supported = await supportsTransactions();
+  } catch (error) {
+    console.error('[slot-change] Could not check transaction support:', error);
+    res.status(503).json({ message: TRANSACTIONS_UNCHECKED });
+    return false;
+  }
+  if (!supported) {
+    res.status(503).json({ message: TRANSACTIONS_UNAVAILABLE });
+    return false;
+  }
+  return true;
+};
+
+/**
+ * Req 48: runs one decision end to end. Refusals answer with their own
+ * status and message; anything else is logged on the server and answered
+ * with a fixed message, never the internal error text.
+ */
+const decide = async (req, res, { approve, run, done, failed }) => {
+  try {
+    const ready = await decisionPreflight(req, res, { approve });
+    if (!ready) return;
+    if (!(await transactionsReady(res))) return;
+
+    const id = await run({ user: req.user, requestId: req.params.id, ...ready.input });
+    await decidedResponse(res, id, done);
+  } catch (error) {
+    if (error instanceof SlotChangeDecisionError) return res.status(error.status).json({ message: error.message });
+    if (isTransactionUnsupportedError(error)) return res.status(503).json({ message: TRANSACTIONS_UNAVAILABLE });
+    console.error(`[slot-change] ${approve ? 'Approval' : 'Rejection'} failed:`, error);
+    res.status(500).json({ message: failed });
+  }
+};
+
+/**
+ * Req 48: approve a Pending request into the exact replacement group. The
+ * whole change runs in one MongoDB transaction (approveSlotChangeRequest);
+ * without transaction support it is refused up front, never done partially.
+ */
+exports.approveRequest = (req, res) =>
+  decide(req, res, {
+    approve: true,
+    run: approveSlotChangeRequest,
+    done: 'Request approved. The student was moved to the replacement group.',
+    failed: 'Could not approve the slot-change request. Nothing was changed.',
+  });
+
+/**
+ * Req 48: reject a Pending request with an optional note. Only the request
+ * changes; the schedule and seat counts are untouched. It also runs in a
+ * transaction, so it cannot commit after the student has left review
+ * (see rejectSlotChangeRequest).
+ */
+exports.rejectRequest = (req, res) =>
+  decide(req, res, {
+    approve: false,
+    run: rejectSlotChangeRequest,
+    done: 'Request rejected. The student keeps their current group.',
+    failed: 'Could not reject the slot-change request. Nothing was changed.',
+  });
 
 /**
  * Req 47: the request's current slot beside the other groups of the same

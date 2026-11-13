@@ -698,6 +698,12 @@ export interface SlotChangeComparison {
   summary: { total: number; eligible: number; full: number; clashing: number };
 }
 
+/** Req 48 — the outcome of approving or rejecting; `request` is null only if re-reading it failed. */
+export interface SlotChangeDecisionResult {
+  message: string;
+  request: StaffSlotChangeRequestItem | null;
+}
+
 /** Req 46 — one request opened from the staff list; `request` has the list row's shape. */
 export interface StaffSlotChangeRequestDetails {
   scope: 'assigned' | 'all';

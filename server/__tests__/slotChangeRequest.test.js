@@ -12,6 +12,12 @@ jest.mock('../services/notificationEventService', () => ({
   publishNotificationEvent: jest.fn().mockResolvedValue({}),
 }));
 
+// Req 48: whether the database can run transactions is decided per test.
+jest.mock('../services/transactionSupport', () => ({
+  supportsTransactions: jest.fn(),
+  isTransactionUnsupportedError: jest.requireActual('../services/transactionSupport').isTransactionUnsupportedError,
+}));
+
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -3260,6 +3266,575 @@ describe('GET /api/slot-change-requests/:id/alternatives (req 47)', () => {
       [at('Monday', '08:00', '09:30'), null, false],
     ])('%p vs %p -> %p', (a, b, expected) => {
       expect(slotsOverlap(a, b)).toBe(expected);
+    });
+  });
+});
+
+describe('PATCH /api/slot-change-requests/:id/approve and /reject (req 48, mocked)', () => {
+  // Writes, rollback and concurrency run against a real replica set in
+  // slotChangeDecision.replset.test.js; these cover every check made before
+  // a write, the error mapping and the full rejection path.
+  const { supportsTransactions } = require('../services/transactionSupport');
+  const REVIEW = 'Ready for Student Review';
+
+  const decide = (action, role, id, body = {}, userId = oid()) =>
+    request(app)
+      .patch(`/api/slot-change-requests/${id}/${action}`)
+      .set('Authorization', tokenFor(role, userId))
+      .send(body);
+
+  /** A chainable query that also accepts .session(), as inside the approval transaction. */
+  const txQuery = (result) => {
+    const q = {
+      session: jest.fn(() => q),
+      select: jest.fn(() => q),
+      populate: jest.fn(() => q),
+      sort: jest.fn(() => q),
+      lean: jest.fn(() => Promise.resolve(result)),
+      then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
+    };
+    return q;
+  };
+
+  const writeSpies = () => [
+    jest.spyOn(SlotChangeRequest, 'updateOne'),
+    jest.spyOn(SlotChangeRequest, 'findOneAndUpdate'),
+    jest.spyOn(SlotChangeRequest, 'updateMany'),
+    jest.spyOn(SlotChangeRequest.prototype, 'save'),
+    jest.spyOn(Student, 'updateOne'),
+    jest.spyOn(StudentSchedule, 'updateOne'),
+    jest.spyOn(StudentSchedule, 'updateMany'),
+    jest.spyOn(StudentSchedule, 'deleteMany'),
+    jest.spyOn(StudentSchedule, 'insertMany'),
+    jest.spyOn(CourseSlot, 'updateOne'),
+    jest.spyOn(CourseSlot, 'updateMany'),
+    jest.spyOn(CourseSlot, 'bulkWrite'),
+    jest.spyOn(Notification, 'create'),
+  ];
+
+  /** A fake session whose withTransaction just runs the callback once. */
+  const fakeSession = () => {
+    const session = { withTransaction: jest.fn(async (fn) => fn()), endSession: jest.fn().mockResolvedValue() };
+    jest.spyOn(mongoose, 'startSession').mockResolvedValue(session);
+    return session;
+  };
+
+  beforeEach(() => {
+    supportsTransactions.mockReset();
+    supportsTransactions.mockResolvedValue(true);
+  });
+
+  describe('approve: checks before any transaction', () => {
+    it('requires a session', async () => {
+      const res = await request(app).patch(`/api/slot-change-requests/${oid()}/approve`).send({ replacementSlotId: String(oid()) });
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Student', 'Administrator'])('refuses %s accounts before any lookup', async (role) => {
+      const start = jest.spyOn(mongoose, 'startSession');
+      const find = jest.spyOn(Student, 'find');
+
+      const res = await decide('approve', role, oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(403);
+      expect(start).not.toHaveBeenCalled();
+      expect(find).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['an invalid request id', 'abc', { replacementSlotId: String(oid()) }, 'That slot-change request id is not valid.'],
+      ['no replacement', String(oid()), {}, 'Choose the replacement group to approve.'],
+      ['an invalid replacement', String(oid()), { replacementSlotId: 'G2' }, 'Choose the replacement group to approve.'],
+      ['a non-text replacement', String(oid()), { replacementSlotId: 12 }, 'Choose the replacement group to approve.'],
+      ['a non-text note', String(oid()), { replacementSlotId: String(oid()), responseNote: 5 }, 'The response note must be text.'],
+      ['a note over 500 characters', String(oid()), { replacementSlotId: String(oid()), responseNote: 'x'.repeat(501) }, 'The response note can be at most 500 characters.'],
+    ])('answers 400 for %s without starting a transaction', async (_label, id, body, message) => {
+      const start = jest.spyOn(mongoose, 'startSession');
+
+      const res = await decide('approve', 'Coordinator', id, body);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe(message);
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for an Advisor with nobody assigned, before checking the database', async () => {
+      jest.spyOn(Student, 'find').mockReturnValue(query([]));
+      const start = jest.spyOn(mongoose, 'startSession');
+
+      const res = await decide('approve', 'Advisor', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(404);
+      expect(supportsTransactions).not.toHaveBeenCalled();
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it('answers 503 and writes nothing when the database cannot run transactions', async () => {
+      supportsTransactions.mockResolvedValue(false);
+      const start = jest.spyOn(mongoose, 'startSession');
+      const writes = writeSpies();
+
+      const res = await decide('approve', 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(503);
+      expect(res.body.message).toMatch(/supports transactions \(a replica set\).*Nothing was changed/);
+      expect(start).not.toHaveBeenCalled();
+      writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    });
+
+    it('answers 503 when the transaction check itself fails', async () => {
+      supportsTransactions.mockRejectedValue(new Error('not connected'));
+      const start = jest.spyOn(mongoose, 'startSession');
+
+      const res = await decide('approve', 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(503);
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it('answers 503 when the server refuses to start a transaction', async () => {
+      const refusal = Object.assign(new Error('Transaction numbers are only allowed on a replica set member or mongos'), { code: 20 });
+      jest.spyOn(mongoose, 'startSession').mockRejectedValue(refusal);
+
+      const res = await decide('approve', 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(503);
+    });
+
+    it('answers 500 for any other failure, saying nothing was changed', async () => {
+      jest.spyOn(mongoose, 'startSession').mockRejectedValue(new Error('db down'));
+
+      const res = await decide('approve', 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(500);
+      expect(res.body.message).toBe('Could not approve the slot-change request. Nothing was changed.');
+    });
+  });
+
+  describe('approve: checks inside the transaction, before the first write', () => {
+    const pending = (overrides = {}) => ({
+      _id: oid(),
+      student: oid(),
+      offering: oid(),
+      term: oid(),
+      slotType: 'Lecture',
+      currentSlot: oid(),
+      scheduleEntry: oid(),
+      status: 'Pending',
+      ...overrides,
+    });
+
+    /** Stubs the two reads the transaction starts with. */
+    const stubTx = ({ req, student }) => {
+      const session = fakeSession();
+      const requestQuery = txQuery(req);
+      const studentQuery = txQuery(student);
+      jest.spyOn(SlotChangeRequest, 'findById').mockReturnValue(requestQuery);
+      jest.spyOn(Student, 'findById').mockReturnValue(studentQuery);
+      return { session, requestQuery, studentQuery, writes: writeSpies() };
+    };
+
+    const run = async ({ role = 'Coordinator', userId = oid(), req, student, replacement = oid(), roster }) => {
+      jest.spyOn(Student, 'find').mockReturnValue(query(roster ?? [{ _id: req?.student ?? oid() }]));
+      const spies = stubTx({ req, student });
+      const res = await decide('approve', role, req?._id ?? oid(), { replacementSlotId: String(replacement) }, userId);
+      return { res, ...spies };
+    };
+
+    it('reads the request and student inside the transaction session', async () => {
+      const req = pending();
+      const { res, session, requestQuery, studentQuery } = await run({ req, student: null });
+
+      expect(res.status).toBe(409); // Coordinator, deleted student
+      expect(requestQuery.session).toHaveBeenCalledWith(session);
+      expect(studentQuery.session).toHaveBeenCalledWith(session);
+      expect(session.endSession).toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a missing request', 'Coordinator', null, null, 404, 'Slot-change request not found.'],
+      ["a request from a student not assigned to the Advisor", 'Advisor', pending(), { studentType: 'Advising Student', assignedAdvisor: oid(), workflowStatus: REVIEW }, 404, 'Slot-change request not found.'],
+      ['a request whose student was deleted, as an Advisor', 'Advisor', pending(), null, 404, 'Slot-change request not found.'],
+      ['a request whose student was deleted, as a Coordinator', 'Coordinator', pending(), null, 409, 'The student record for this request no longer exists.'],
+      ['a decided request', 'Coordinator', pending({ status: 'Rejected' }), { workflowStatus: REVIEW }, 409, 'This request is already rejected.'],
+      ['a student who is not Ready for Student Review', 'Coordinator', pending(), { workflowStatus: 'Change Request Pending' }, 409, "Requests can only be decided while the student's schedule is Ready for Student Review; it is now Change Request Pending."],
+    ])('refuses %s with no write', async (_label, role, req, student, status, message) => {
+      const { res, writes } = await run({ role, req, student });
+
+      expect(res.status).toBe(status);
+      expect(res.body.message).toBe(message);
+      writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    });
+
+    it('lets an Advisor through the scope check for a currently assigned student', async () => {
+      const me = oid();
+      const req = pending();
+      // Stops at the "same group" check, after scope, status and review checks have passed.
+      const { res, writes } = await run({
+        role: 'Advisor',
+        userId: me,
+        req,
+        student: { studentType: 'Advising Student', assignedAdvisor: me, workflowStatus: REVIEW },
+        replacement: req.currentSlot,
+      });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('Choose a group other than the current one.');
+      writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    });
+
+    it('takes the request, student and slots from the database, never from extra body fields', async () => {
+      const req = pending();
+      jest.spyOn(Student, 'find').mockReturnValue(query([]));
+      stubTx({ req, student: { workflowStatus: REVIEW } });
+
+      await request(app)
+        .patch(`/api/slot-change-requests/${req._id}/approve`)
+        .set('Authorization', tokenFor('Coordinator'))
+        .send({ replacementSlotId: String(req.currentSlot), student: String(oid()), status: 'Approved', currentSlot: String(oid()) });
+
+      expect(SlotChangeRequest.findById).toHaveBeenCalledWith(String(req._id));
+      expect(Student.findById).toHaveBeenCalledWith(req.student);
+    });
+  });
+
+  describe('approve and reject: strict ids, failure mapping and no internal details', () => {
+    const TWELVE = 'abcdefghijkl'; // mongoose.isValidObjectId accepts any 12-character string
+
+    it.each(['approve', 'reject'])('%s answers 400 for a 12-character request id that is not hex', async (action) => {
+      const start = jest.spyOn(mongoose, 'startSession');
+
+      const res = await decide(action, 'Coordinator', TWELVE, { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('That slot-change request id is not valid.');
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it('answers 400 for a 12-character replacement id that is not hex', async () => {
+      const start = jest.spyOn(mongoose, 'startSession');
+
+      const res = await decide('approve', 'Coordinator', oid(), { replacementSlotId: TWELVE });
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('Choose the replacement group to approve.');
+      expect(start).not.toHaveBeenCalled();
+    });
+
+    it.each(['approve', 'reject'])(
+      '%s tells a failed transaction check apart from a database without transactions',
+      async (action) => {
+        const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+        const start = jest.spyOn(mongoose, 'startSession');
+        supportsTransactions.mockRejectedValue(new Error('connection pool closed'));
+
+        const res = await decide(action, 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+        expect(res.status).toBe(503);
+        expect(res.body.message).toBe(
+          'Could not reach the database to start the decision. Nothing was changed. Please try again shortly.'
+        );
+        expect(JSON.stringify(res.body)).not.toMatch(/pool closed|replica set/);
+        expect(logged).toHaveBeenCalled();
+        expect(start).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['approve', 'Could not approve the slot-change request. Nothing was changed.'],
+      ['reject', 'Could not reject the slot-change request. Nothing was changed.'],
+    ])('%s answers 500 with a fixed message and logs the real error', async (action, message) => {
+      const logged = jest.spyOn(console, 'error').mockImplementation(() => {});
+      jest.spyOn(mongoose, 'startSession').mockRejectedValue(new Error('secret internal detail'));
+
+      const res = await decide(action, 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ message });
+      expect(logged).toHaveBeenCalled();
+    });
+
+    const duplicate = (keyPattern, message = 'E11000 duplicate key error') =>
+      Object.assign(new Error(message), { code: 11000, ...(keyPattern ? { keyPattern } : {}) });
+
+    it.each([
+      ['the schedule (studentId, slotId) index', duplicate({ studentId: 1, slotId: 1 }), 409],
+      [
+        'the schedule index named in the message only',
+        duplicate(null, 'E11000 duplicate key error collection: x.studentschedules index: studentId_1_slotId_1 dup key'),
+        409,
+      ],
+      ['another unique index', duplicate({ student: 1, currentSlot: 1 }), 500],
+      ['an unnamed duplicate', duplicate(null), 500],
+    ])('maps a duplicate key from %s', async (_label, error, status) => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const session = fakeSession();
+      session.withTransaction.mockRejectedValue(error);
+
+      const res = await decide('approve', 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(status);
+      if (status === 409) expect(res.body.message).toBe('The student already has that group in their schedule.');
+      else expect(res.body).toEqual({ message: 'Could not approve the slot-change request. Nothing was changed.' });
+      expect(session.endSession).toHaveBeenCalled();
+    });
+  });
+
+  describe('scope shared by the list and the decisions', () => {
+    const { advisorStudentCriteria, canDecideFor, staffRequestScope } = require('../services/slotChangeRequestService');
+
+    it('the decision check accepts exactly the students the list query selects', async () => {
+      const me = oid();
+      const find = jest.spyOn(Student, 'find').mockReturnValue(query([]));
+      await staffRequestScope({ role: 'Advisor', userId: String(me) });
+
+      const criteria = advisorStudentCriteria(String(me));
+      expect(find).toHaveBeenCalledWith(criteria);
+      expect(canDecideFor({ role: 'Advisor', userId: String(me) }, { ...criteria, workflowStatus: REVIEW })).toBe(true);
+    });
+
+    it.each([
+      ['another Advisor’s student', { assignedAdvisor: oid(), studentType: 'Advising Student' }],
+      ['an unassigned student', { assignedAdvisor: null, studentType: 'Advising Student' }],
+      ['a student who is not an Advising Student', { studentType: 'Regular Student' }],
+      ['no student', null],
+    ])('the decision check refuses %s for an Advisor', (_label, overrides) => {
+      const me = String(oid());
+      const student = overrides && { assignedAdvisor: me, ...overrides };
+      expect(canDecideFor({ role: 'Advisor', userId: me }, student)).toBe(false);
+    });
+
+    it('lets a Coordinator decide for any student, and nobody else', () => {
+      expect(canDecideFor({ role: 'Coordinator', userId: String(oid()) }, null)).toBe(true);
+      expect(canDecideFor({ role: 'Student', userId: String(oid()) }, { studentType: 'Advising Student' })).toBe(false);
+    });
+  });
+
+  describe('reject', () => {
+    const stored = (overrides = {}) => ({
+      _id: oid(),
+      student: { _id: oid(), fullName: 'Salma Ibrahim', studentId: '64-30010', assignedAdvisor: null },
+      term: { _id: oid(), academicYear: '2026/2027', season: 'Winter' },
+      course: { _id: oid(), code: 'CSEN 501', name: 'Data Base I' },
+      slotType: 'Lecture',
+      currentSlot: oid(),
+      currentSlotSnapshot: { groupNumber: 1, dayOfWeek: 'Monday', startTime: '13:15', endTime: '14:45', room: 'H1-01' },
+      preferenceNote: '',
+      status: 'Rejected',
+      replacementSlot: null,
+      responseNote: 'No free group fits.',
+      respondedBy: { _id: oid(), fullName: 'Nour Coordinator', role: 'Coordinator' },
+      respondedAt: new Date('2026-11-14T10:00:00Z'),
+      withdrawnAt: null,
+      createdAt: new Date('2026-11-13T12:21:11Z'),
+      ...overrides,
+    });
+
+    /**
+     * Stubs the rejection transaction: the in-session reads of the request and
+     * student, the student lock and the conditional claim, then the re-read
+     * for the response.
+     */
+    const stubReject = ({
+      found = { _id: oid(), student: oid(), status: 'Pending' },
+      student = { workflowStatus: REVIEW },
+      claimed = 1,
+      roster,
+    } = {}) => {
+      const spies = {};
+      spies.studentFind = jest.spyOn(Student, 'find').mockReturnValue(query(roster ?? [{ _id: found?.student ?? oid() }]));
+      spies.session = fakeSession();
+      spies.requestQuery = txQuery(found);
+      spies.studentQuery = txQuery(student);
+      spies.findById = jest
+        .spyOn(SlotChangeRequest, 'findById')
+        .mockReturnValueOnce(spies.requestQuery)
+        .mockReturnValueOnce(txQuery(stored({ _id: found?._id ?? oid() })));
+      spies.studentById = jest.spyOn(Student, 'findById').mockReturnValue(spies.studentQuery);
+      spies.writes = writeSpies();
+      spies.claim = spies.writes[0].mockResolvedValue({ modifiedCount: claimed });
+      spies.lock = spies.writes[4].mockResolvedValue({ modifiedCount: 1 });
+      return spies;
+    };
+
+    it('records Rejected with the trimmed note and responder, conditional on Pending', async () => {
+      const me = oid();
+      const spies = stubReject();
+
+      const res = await decide('reject', 'Coordinator', oid(), { responseNote: '  No free group fits.  ' }, me);
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toBe('Request rejected. The student keeps their current group.');
+      const [filter, update, options] = spies.claim.mock.calls[0];
+      expect(Object.keys(filter)).toEqual(['_id', 'status']);
+      expect(filter.status).toBe('Pending');
+      expect(update.$set).toMatchObject({ status: 'Rejected', replacementSlot: null, responseNote: 'No free group fits.' });
+      expect(String(update.$set.respondedBy)).toBe(String(me));
+      expect(update.$set.respondedAt).toBeInstanceOf(Date);
+      expect(options).toEqual({ session: spies.session });
+      expect(res.body.request).toMatchObject({ status: 'Rejected', response: { note: 'No free group fits.', replacementSlot: null } });
+    });
+
+    it('re-reads the request and student and locks the student inside one transaction', async () => {
+      const found = { _id: oid(), student: oid(), status: 'Pending' };
+      const spies = stubReject({ found, student: { _id: found.student, workflowStatus: REVIEW } });
+
+      await decide('reject', 'Coordinator', found._id);
+
+      expect(supportsTransactions).toHaveBeenCalled();
+      expect(spies.session.withTransaction).toHaveBeenCalledTimes(1);
+      expect(spies.session.withTransaction.mock.calls[0][1]).toMatchObject({ readConcern: { level: 'snapshot' } });
+      expect(spies.requestQuery.session).toHaveBeenCalledWith(spies.session);
+      expect(spies.studentQuery.session).toHaveBeenCalledWith(spies.session);
+      const [lockFilter, lockUpdate, lockOptions] = spies.lock.mock.calls[0];
+      expect(lockFilter).toEqual({ _id: found.student });
+      expect(Object.keys(lockUpdate.$set)).toEqual(['lastUpdateAt']);
+      expect(lockOptions).toEqual({ session: spies.session });
+      // The lock is taken before the request is claimed.
+      expect(spies.lock.mock.invocationCallOrder[0]).toBeLessThan(spies.claim.mock.invocationCallOrder[0]);
+      expect(spies.session.endSession).toHaveBeenCalled();
+    });
+
+    it('never touches schedule rows or seat counts, and never changes the workflow status', async () => {
+      const spies = stubReject();
+
+      await decide('reject', 'Coordinator', oid());
+
+      spies.writes
+        .filter((spy) => spy !== spies.claim && spy !== spies.lock)
+        .forEach((spy) => expect(spy).not.toHaveBeenCalled());
+      expect(JSON.stringify(spies.lock.mock.calls[0][1])).not.toMatch(/workflowStatus/);
+    });
+
+    it('accepts no note and ignores a replacement in the body', async () => {
+      const spies = stubReject();
+
+      const res = await decide('reject', 'Coordinator', oid(), { replacementSlotId: String(oid()) });
+
+      expect(res.status).toBe(200);
+      expect(spies.claim.mock.calls[0][1].$set).toMatchObject({ responseNote: '', replacementSlot: null });
+    });
+
+    it("lets an Advisor reject for their own student and gives another Advisor's request a 404", async () => {
+      const me = oid();
+      const found = { _id: oid(), student: oid(), status: 'Pending' };
+      const own = stubReject({ found, student: { studentType: 'Advising Student', assignedAdvisor: me, workflowStatus: REVIEW } });
+      expect((await decide('reject', 'Advisor', found._id, {}, me)).status).toBe(200);
+      expect(own.claim).toHaveBeenCalledTimes(1);
+
+      jest.restoreAllMocks();
+      supportsTransactions.mockResolvedValue(true);
+      const other = stubReject({ found, student: { studentType: 'Advising Student', assignedAdvisor: oid(), workflowStatus: REVIEW } });
+      const res = await decide('reject', 'Advisor', found._id, {}, me);
+      expect(res.status).toBe(404);
+      expect(res.body.message).toBe('Slot-change request not found.');
+      expect(other.lock).not.toHaveBeenCalled();
+      expect(other.claim).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for an Advisor with nobody assigned, before any transaction', async () => {
+      const spies = stubReject({ roster: [] });
+
+      const res = await decide('reject', 'Advisor', oid());
+
+      expect(res.status).toBe(404);
+      expect(spies.session.withTransaction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['a missing request', { found: null }, 404, 'Slot-change request not found.'],
+      ['a decided request', { found: { _id: oid(), student: oid(), status: 'Approved' } }, 409, 'This request is already approved.'],
+      ['a deleted student', { student: null }, 409, 'The student record for this request no longer exists.'],
+      [
+        'a student not in review',
+        { student: { workflowStatus: 'Processed' } },
+        409,
+        "Requests can only be decided while the student's schedule is Ready for Student Review; it is now Processed.",
+      ],
+    ])('refuses %s without locking or claiming anything', async (_label, setup, status, message) => {
+      const spies = stubReject(setup);
+
+      const res = await decide('reject', 'Coordinator', oid());
+
+      expect(res.status).toBe(status);
+      expect(res.body.message).toBe(message);
+      expect(spies.lock).not.toHaveBeenCalled();
+      expect(spies.claim).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 when the request was decided or withdrawn a moment ago', async () => {
+      stubReject({ claimed: 0 });
+
+      const res = await decide('reject', 'Coordinator', oid());
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toBe('This request was decided or withdrawn a moment ago.');
+    });
+
+    it('re-checks the workflow status when a conflicting status change forces a retry', async () => {
+      // First attempt: the student is in review, but committing conflicts with a
+      // concurrent status change; the retry re-reads the now-Processed student.
+      const spies = stubReject();
+      spies.studentById
+        .mockReturnValueOnce(txQuery({ workflowStatus: REVIEW }))
+        .mockReturnValueOnce(txQuery({ workflowStatus: 'Processed' }));
+      spies.findById.mockReset();
+      spies.findById.mockReturnValue(txQuery({ _id: oid(), student: oid(), status: 'Pending' }));
+      spies.session.withTransaction.mockImplementation(async (fn) => {
+        await fn(); // would have committed, but MongoDB reports a write conflict
+        await fn(); // withTransaction runs the whole callback again
+      });
+
+      const res = await decide('reject', 'Coordinator', oid());
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toMatch(/it is now Processed\.$/);
+    });
+
+    it('answers 503 and writes nothing when the database cannot run transactions', async () => {
+      supportsTransactions.mockResolvedValue(false);
+      const spies = stubReject();
+
+      const res = await decide('reject', 'Coordinator', oid());
+
+      expect(res.status).toBe(503);
+      expect(res.body.message).toMatch(/supports transactions \(a replica set\).*Nothing was changed/);
+      expect(spies.session.withTransaction).not.toHaveBeenCalled();
+      spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    });
+
+    it.each([
+      ['an invalid id', 'abc', {}],
+      ['a note over 500 characters', String(oid()), { responseNote: 'x'.repeat(501) }],
+    ])('answers 400 for %s', async (_label, id, body) => {
+      const spies = stubReject();
+
+      const res = await decide('reject', 'Coordinator', id, body);
+
+      expect(res.status).toBe(400);
+      expect(spies.session.withTransaction).not.toHaveBeenCalled();
+    });
+
+    it('requires a session and refuses other roles', async () => {
+      expect((await request(app).patch(`/api/slot-change-requests/${oid()}/reject`)).status).toBe(401);
+      const spies = stubReject();
+      expect((await decide('reject', 'Student', oid())).status).toBe(403);
+      expect((await decide('reject', 'Administrator', oid())).status).toBe(403);
+      expect(spies.session.withTransaction).not.toHaveBeenCalled();
+    });
+
+    it('answers 500 when a lookup fails, without the internal message', async () => {
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+      const spies = stubReject();
+      spies.findById.mockReset();
+      spies.findById.mockImplementation(() => {
+        throw new Error('db down');
+      });
+
+      const res = await decide('reject', 'Coordinator', oid());
+
+      expect(res.status).toBe(500);
+      expect(res.body).toEqual({ message: 'Could not reject the slot-change request. Nothing was changed.' });
     });
   });
 });

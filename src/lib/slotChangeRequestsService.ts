@@ -1,6 +1,7 @@
 import { apiFetch } from './api';
 import type {
   SlotChangeComparison,
+  SlotChangeDecisionResult,
   SlotChangeEligibility,
   SlotChangeRequestInput,
   SlotChangeRequestItem,
@@ -75,6 +76,30 @@ export const fetchStaffSlotChangeRequest = async (id: string): Promise<StaffSlot
  */
 export const fetchSlotChangeAlternatives = async (id: string): Promise<SlotChangeComparison> =>
   apiFetch<SlotChangeComparison>(`/api/slot-change-requests/${encodeURIComponent(id)}/alternatives`);
+
+/**
+ * Req 48: approve a Pending request into the exact replacement group. The
+ * server re-checks seats and clashes and moves the student in one
+ * transaction; a 409 means it changed meanwhile (e.g. the last seat went).
+ */
+export const approveSlotChangeRequest = async (
+  id: string,
+  input: { replacementSlotId: string; responseNote?: string }
+): Promise<SlotChangeDecisionResult> =>
+  apiFetch<SlotChangeDecisionResult>(`/api/slot-change-requests/${encodeURIComponent(id)}/approve`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
+
+/** Req 48: reject a Pending request; the student keeps their current group. */
+export const rejectSlotChangeRequest = async (
+  id: string,
+  input: { responseNote?: string }
+): Promise<SlotChangeDecisionResult> =>
+  apiFetch<SlotChangeDecisionResult>(`/api/slot-change-requests/${encodeURIComponent(id)}/reject`, {
+    method: 'PATCH',
+    body: JSON.stringify(input),
+  });
 
 /** Req 45: Advisor and course choices for the filters, within the caller's scope. */
 export const fetchStaffSlotChangeFilterOptions = async (): Promise<StaffSlotChangeFilterOptions> =>
