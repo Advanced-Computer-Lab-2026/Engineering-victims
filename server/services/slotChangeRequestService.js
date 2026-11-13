@@ -1,9 +1,11 @@
 const mongoose = require('mongoose');
 const AcademicTerm = require('../models/AcademicTerm');
 const Student = require('../models/Student');
+const Course = require('../models/Course');
 const StudentSchedule = require('../models/StudentSchedule');
 const SlotChangeRequest = require('../models/SlotChangeRequest');
 const { deadlineEnd } = require('./schedulingPreferenceService');
+const { escapeRegex, studentIdVariants } = require('./studentQueryService');
 
 const { SLOT_TYPES, NOTE_LIMIT } = SlotChangeRequest;
 
@@ -103,4 +105,92 @@ const staffRequestScope = async (user) => {
   };
 };
 
-module.exports = { reviewWindowFor, validateRequestInput, staffRequestScope, REVIEW_STATUS };
+/** The longest search term the staff list accepts. */
+const SEARCH_LIMIT = 100;
+
+/**
+ * Req 44: reads the `search` query parameter. A missing or blank term means
+ * "no search". Anything that is not a single string (?search=a&search=b, or
+ * ?search[$ne]=x) is refused rather than guessed at, so it can never become
+ * a query operator. Returns { term } or { error }.
+ */
+const parseStaffSearch = (raw) => {
+  if (raw === undefined) return { term: '' };
+  if (typeof raw !== 'string') return { error: 'Search must be a single text value.' };
+  const term = raw.trim();
+  if (term.length > SEARCH_LIMIT) return { error: `Search can be at most ${SEARCH_LIMIT} characters.` };
+  return { term };
+};
+
+/**
+ * A partial, case-insensitive course-code pattern that ignores spaces, so
+ * "csen501", "CSEN 501" and "sen 50" all find "CSEN 501". Every character is
+ * escaped first, then optional whitespace is allowed between characters.
+ */
+const courseCodePattern = (term) =>
+  Array.from(term.replace(/\s+/g, ''))
+    .map(escapeRegex)
+    .join('\\s*');
+
+/**
+ * Req 44: the request condition for one search term, matching a student ID
+ * (exact, with or without the hyphen), a student name (partial,
+ * case-insensitive) or a course code (partial, case-insensitive, spaces
+ * ignored). Course names are deliberately not searched.
+ *
+ * Returns {} for no search, null when no student or course matches (so the
+ * caller can skip the request query), or an { $or } on request fields.
+ */
+const staffSearchCondition = async (term) => {
+  if (!term) return {};
+
+  const [students, courses] = await Promise.all([
+    Student.find({
+      $or: [
+        { fullName: { $regex: escapeRegex(term), $options: 'i' } },
+        { studentId: { $in: studentIdVariants(term) } },
+      ],
+    })
+      .select('_id')
+      .lean(),
+    Course.find({ code: { $regex: courseCodePattern(term), $options: 'i' } })
+      .select('_id')
+      .lean(),
+  ]);
+
+  const or = [];
+  if (students.length) or.push({ student: { $in: students.map((student) => student._id) } });
+  if (courses.length) or.push({ course: { $in: courses.map((course) => course._id) } });
+  return or.length ? { $or: or } : null;
+};
+
+/**
+ * Req 44: the final request filter for a staff list: the caller's access
+ * scope (req 43) AND every requested condition. The scope is always the first
+ * `$and` clause and is never replaced, so no condition can widen it. Later
+ * list conditions (req 45 filters) belong in `conditions` the same way.
+ *
+ * Returns null when nothing can match (no scope, or a search that matched no
+ * student or course), meaning the request query can be skipped.
+ */
+const buildStaffRequestFilter = async (scopeFilter, { search = '' } = {}) => {
+  if (!scopeFilter) return null;
+
+  const conditions = [];
+  const searchCondition = await staffSearchCondition(search);
+  if (searchCondition === null) return null;
+  if (Object.keys(searchCondition).length) conditions.push(searchCondition);
+
+  return conditions.length ? { $and: [scopeFilter, ...conditions] } : scopeFilter;
+};
+
+module.exports = {
+  reviewWindowFor,
+  validateRequestInput,
+  staffRequestScope,
+  parseStaffSearch,
+  courseCodePattern,
+  buildStaffRequestFilter,
+  REVIEW_STATUS,
+  SEARCH_LIMIT,
+};

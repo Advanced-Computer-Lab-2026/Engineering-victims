@@ -1407,6 +1407,454 @@ describe('GET /api/slot-change-requests (req 43)', () => {
   });
 });
 
+describe('GET /api/slot-change-requests?search= (req 44)', () => {
+  const {
+    parseStaffSearch,
+    courseCodePattern,
+    buildStaffRequestFilter,
+    SEARCH_LIMIT,
+  } = require('../services/slotChangeRequestService');
+
+  const listAs = (role, userId = oid(), search, extra = '') => {
+    const params = search === undefined ? '' : `search=${encodeURIComponent(search)}`;
+    const qs = [params, extra].filter(Boolean).join('&');
+    return request(app)
+      .get(`/api/slot-change-requests${qs ? `?${qs}` : ''}`)
+      .set('Authorization', tokenFor(role, userId));
+  };
+
+  const stored = (overrides = {}) => ({
+    _id: oid(),
+    student: { _id: oid(), fullName: 'Salma Ibrahim', studentId: '64-30010', assignedAdvisor: null },
+    term: { _id: oid(), academicYear: '2026/2027', season: 'Winter' },
+    course: { _id: oid(), code: 'CSEN 501', name: 'Databases I' },
+    slotType: 'Lab',
+    currentSlot: oid(),
+    currentSlotSnapshot: { groupNumber: 3, dayOfWeek: 'Monday', startTime: '12:00', endTime: '13:30', room: 'C3.110' },
+    preferenceNote: '',
+    status: 'Pending',
+    replacementSlot: null,
+    responseNote: '',
+    respondedBy: null,
+    respondedAt: null,
+    withdrawnAt: null,
+    createdAt: new Date('2026-11-12T09:00:00Z'),
+    ...overrides,
+  });
+
+  /**
+   * `roster` answers the Advisor-scope lookup (a filter on assignedAdvisor);
+   * `students` answers the search lookup; `courses` answers the course-code
+   * lookup; `requests` answers the request query. Writes are spied so every
+   * test can prove the search changes nothing.
+   */
+  const stubSearch = ({ roster = [], students = [], courses = [], requests = [] } = {}) => {
+    const spies = {};
+    spies.studentFind = jest
+      .spyOn(Student, 'find')
+      .mockImplementation((filter) => query('assignedAdvisor' in filter ? roster : students));
+    spies.courseFind = jest.spyOn(Course, 'find').mockReturnValue(query(courses));
+    spies.requestQuery = query(requests);
+    spies.find = jest.spyOn(SlotChangeRequest, 'find').mockReturnValue(spies.requestQuery);
+    spies.writes = [
+      jest.spyOn(SlotChangeRequest, 'create'),
+      jest.spyOn(SlotChangeRequest, 'updateOne'),
+      jest.spyOn(SlotChangeRequest, 'updateMany'),
+      jest.spyOn(SlotChangeRequest, 'findOneAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'findByIdAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'deleteMany'),
+      jest.spyOn(SlotChangeRequest.prototype, 'save'),
+      jest.spyOn(Student, 'updateOne'),
+      jest.spyOn(Student, 'findByIdAndUpdate'),
+      jest.spyOn(Course, 'updateOne'),
+      jest.spyOn(StudentSchedule, 'updateOne'),
+      jest.spyOn(CourseSlot, 'updateOne'),
+      jest.spyOn(Notification, 'create'),
+    ];
+    return spies;
+  };
+
+  /** The filter the student-search lookup ran with (not the roster lookup). */
+  const studentSearchFilter = (spies) =>
+    spies.studentFind.mock.calls.map(([filter]) => filter).find((filter) => !('assignedAdvisor' in filter));
+  const courseSearchFilter = (spies) => spies.courseFind.mock.calls[0][0];
+  const asRegExp = ({ $regex, $options }) => new RegExp($regex, $options);
+  const nameRegex = (spies) =>
+    asRegExp(studentSearchFilter(spies).$or.find((clause) => clause.fullName).fullName);
+  const idVariants = (spies) => studentSearchFilter(spies).$or.find((clause) => clause.studentId).studentId.$in;
+  const codeRegex = (spies) => asRegExp(courseSearchFilter(spies).code);
+
+  describe('student name', () => {
+    it.each(['Salma', 'salma ibr', 'IBRAHIM', 'lma Ib'])('matches "%s" partially and case-insensitively', async (term) => {
+      const spies = stubSearch({ students: [{ _id: oid() }] });
+
+      const res = await listAs('Coordinator', oid(), term);
+
+      expect(res.status).toBe(200);
+      expect(nameRegex(spies).test('Salma Ibrahim')).toBe(true);
+    });
+
+    it('does not match a different name', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), 'Omar');
+
+      expect(nameRegex(spies).test('Salma Ibrahim')).toBe(false);
+    });
+  });
+
+  describe('student ID', () => {
+    it('matches the hyphenated ID exactly', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), '64-30010');
+
+      expect(idVariants(spies)).toEqual(['64-30010']);
+    });
+
+    it('accepts the ID without the hyphen', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), '6430010');
+
+      expect(idVariants(spies)).toEqual(['6430010', '64-30010']);
+    });
+
+    it('is exact, not partial: a fragment is not turned into a pattern', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), '64-300');
+
+      expect(idVariants(spies)).toEqual(['64-300']);
+      const idClause = studentSearchFilter(spies).$or.find((clause) => clause.studentId);
+      expect(idClause.studentId.$regex).toBeUndefined();
+    });
+
+    it('trims surrounding whitespace before matching', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), '  64-30010  ');
+
+      expect(idVariants(spies)).toEqual(['64-30010']);
+    });
+  });
+
+  describe('course code', () => {
+    it.each(['CSEN 501', 'csen501', 'csen 501', 'SEN5', '501', 'c s e n 5 0 1'])(
+      'matches "%s" against CSEN 501 (partial, case-insensitive, spaces ignored)',
+      async (term) => {
+        const spies = stubSearch({ courses: [{ _id: oid() }] });
+
+        await listAs('Coordinator', oid(), term);
+
+        expect(codeRegex(spies).test('CSEN 501')).toBe(true);
+      }
+    );
+
+    it('does not match a different code', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), 'CSEN502');
+
+      expect(codeRegex(spies).test('CSEN 501')).toBe(false);
+    });
+
+    it('searches the course code only, never the course name', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), 'Databases');
+
+      expect(Object.keys(courseSearchFilter(spies))).toEqual(['code']);
+      expect(spies.courseFind.mock.calls[0][0].name).toBeUndefined();
+    });
+  });
+
+  describe('combining with the access scope', () => {
+    it('gives a Coordinator every request matching a student or a course', async () => {
+      const student = { _id: oid() };
+      const course = { _id: oid() };
+      const spies = stubSearch({ students: [student], courses: [course], requests: [stored()] });
+
+      const res = await listAs('Coordinator', oid(), 'CSEN');
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('all');
+      expect(spies.find).toHaveBeenCalledWith({
+        $and: [{}, { $or: [{ student: { $in: [student._id] } }, { course: { $in: [course._id] } }] }],
+      });
+      expect(res.body.requests).toHaveLength(1);
+    });
+
+    it('only adds the clauses that matched something', async () => {
+      const student = { _id: oid() };
+      const spies = stubSearch({ students: [student] });
+
+      await listAs('Coordinator', oid(), 'Salma');
+
+      expect(spies.find).toHaveBeenCalledWith({ $and: [{}, { $or: [{ student: { $in: [student._id] } }] }] });
+    });
+
+    it('keeps the Advisor roster as the first $and clause, untouched', async () => {
+      const advisorId = oid();
+      const roster = [{ _id: oid() }, { _id: oid() }];
+      const outsider = { _id: oid() };
+      const spies = stubSearch({ roster, students: [roster[0], outsider] });
+
+      const res = await listAs('Advisor', advisorId, 'Salma');
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('assigned');
+      expect(spies.studentFind).toHaveBeenCalledWith({
+        assignedAdvisor: String(advisorId),
+        studentType: 'Advising Student',
+      });
+      const [filter] = spies.find.mock.calls[0];
+      expect(Object.keys(filter)).toEqual(['$and']);
+      expect(filter.$and[0]).toEqual({ student: { $in: roster.map((s) => s._id) } });
+      // An outside student matched by name only narrows further; the roster
+      // clause above still has to hold, so their requests cannot be returned.
+      expect(filter.$and[1]).toEqual({ $or: [{ student: { $in: [roster[0]._id, outsider._id] } }] });
+    });
+
+    it('keeps the Advisor roster when searching by course code', async () => {
+      const roster = [{ _id: oid() }];
+      const course = { _id: oid() };
+      const spies = stubSearch({ roster, courses: [course] });
+
+      await listAs('Advisor', oid(), 'CSEN 501');
+
+      expect(spies.find).toHaveBeenCalledWith({
+        $and: [{ student: { $in: [roster[0]._id] } }, { $or: [{ course: { $in: [course._id] } }] }],
+      });
+    });
+
+    it.each([
+      ['advisor', () => String(oid())],
+      ['student', () => String(oid())],
+      ['scope', () => 'all'],
+      ['role', () => 'Coordinator'],
+    ])('ignores ?%s= alongside a search from an Advisor', async (param, value) => {
+      const roster = [{ _id: oid() }];
+      const spies = stubSearch({ roster, students: [{ _id: oid() }] });
+
+      const res = await listAs('Advisor', oid(), 'Salma', `${param}=${encodeURIComponent(value())}`);
+
+      expect(res.body.scope).toBe('assigned');
+      expect(spies.find.mock.calls[0][0].$and[0]).toEqual({ student: { $in: [roster[0]._id] } });
+    });
+
+    it('answers an Advisor with nobody assigned with nothing, without running the search', async () => {
+      const spies = stubSearch({ roster: [], students: [{ _id: oid() }], courses: [{ _id: oid() }] });
+
+      const res = await listAs('Advisor', oid(), 'Salma');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ scope: 'assigned', requests: [] });
+      expect(studentSearchFilter(spies)).toBeUndefined();
+      expect(spies.courseFind).not.toHaveBeenCalled();
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('keeps the req 43 sort, population and response format', async () => {
+      const doc = stored();
+      const spies = stubSearch({ students: [{ _id: doc.student._id }], requests: [doc] });
+
+      const res = await listAs('Coordinator', oid(), 'Salma');
+
+      expect(spies.requestQuery.sort).toHaveBeenCalledWith({ createdAt: -1, _id: -1 });
+      const paths = spies.requestQuery.populate.mock.calls.map(([arg]) => (typeof arg === 'string' ? arg : arg.path));
+      expect(paths).toEqual(expect.arrayContaining(['student', 'course', 'term', 'replacementSlot', 'respondedBy']));
+      expect(Object.keys(res.body)).toEqual(['scope', 'requests']);
+      expect(res.body.requests[0]).toMatchObject({
+        id: String(doc._id),
+        student: { id: String(doc.student._id), studentId: '64-30010', fullName: 'Salma Ibrahim' },
+        course: { code: 'CSEN 501' },
+        status: 'Pending',
+      });
+    });
+  });
+
+  describe('empty search keeps req 43 behaviour', () => {
+    it.each([
+      ['missing', undefined],
+      ['empty', ''],
+      ['whitespace', '   '],
+    ])('a %s search lists the Coordinator scope unchanged', async (_label, term) => {
+      const spies = stubSearch({ requests: [stored()] });
+
+      const res = await listAs('Coordinator', oid(), term);
+
+      expect(res.status).toBe(200);
+      expect(spies.find).toHaveBeenCalledWith({});
+      expect(spies.studentFind).not.toHaveBeenCalled();
+      expect(spies.courseFind).not.toHaveBeenCalled();
+      expect(res.body.requests).toHaveLength(1);
+    });
+
+    it('a blank search lists the Advisor roster unchanged', async () => {
+      const roster = [{ _id: oid() }];
+      const spies = stubSearch({ roster });
+
+      await listAs('Advisor', oid(), '  ');
+
+      expect(spies.find).toHaveBeenCalledWith({ student: { $in: [roster[0]._id] } });
+      expect(spies.studentFind).toHaveBeenCalledTimes(1);
+      expect(spies.courseFind).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('no matches', () => {
+    it('returns an empty list without querying requests', async () => {
+      const spies = stubSearch({ students: [], courses: [] });
+
+      const res = await listAs('Coordinator', oid(), 'nobody');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ scope: 'all', requests: [] });
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('does the same for an Advisor', async () => {
+      const spies = stubSearch({ roster: [{ _id: oid() }] });
+
+      const res = await listAs('Advisor', oid(), 'nobody');
+
+      expect(res.body).toEqual({ scope: 'assigned', requests: [] });
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('regex escaping', () => {
+    it.each(['a.*', '(', '[x', 'CSEN+501', '^$', 'a|b', '\\'])('treats "%s" literally without failing', async (term) => {
+      const spies = stubSearch();
+
+      const res = await listAs('Coordinator', oid(), term);
+
+      expect(res.status).toBe(200);
+      expect(() => nameRegex(spies)).not.toThrow();
+      expect(() => codeRegex(spies)).not.toThrow();
+      expect(nameRegex(spies).test(term)).toBe(true);
+    });
+
+    it('does not let ".*" match every name or code', async () => {
+      const spies = stubSearch();
+
+      await listAs('Coordinator', oid(), '.*');
+
+      expect(nameRegex(spies).test('Salma Ibrahim')).toBe(false);
+      expect(codeRegex(spies).test('CSEN 501')).toBe(false);
+    });
+  });
+
+  describe('input validation', () => {
+    it('refuses a repeated search parameter', async () => {
+      const spies = stubSearch();
+
+      const res = await request(app)
+        .get('/api/slot-change-requests?search=a&search=b')
+        .set('Authorization', tokenFor('Coordinator'));
+
+      expect(res.status).toBe(400);
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('refuses an operator object such as ?search[$ne]=x', async () => {
+      const spies = stubSearch();
+
+      const res = await request(app)
+        .get('/api/slot-change-requests?search[$ne]=x')
+        .set('Authorization', tokenFor('Advisor'));
+
+      expect(res.status).toBe(400);
+      expect(spies.find).not.toHaveBeenCalled();
+      expect(spies.courseFind).not.toHaveBeenCalled();
+    });
+
+    it(`accepts ${SEARCH_LIMIT} characters and refuses more`, async () => {
+      stubSearch();
+
+      const ok = await listAs('Coordinator', oid(), 'a'.repeat(SEARCH_LIMIT));
+      const tooLong = await listAs('Coordinator', oid(), 'a'.repeat(SEARCH_LIMIT + 1));
+
+      expect(ok.status).toBe(200);
+      expect(tooLong.status).toBe(400);
+      expect(tooLong.body.message).toBe(`Search can be at most ${SEARCH_LIMIT} characters.`);
+    });
+  });
+
+  describe('access', () => {
+    it('requires a session', async () => {
+      const res = await request(app).get('/api/slot-change-requests?search=Salma');
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Student', 'Administrator'])('refuses %s accounts before any lookup', async (role) => {
+      const spies = stubSearch();
+
+      const res = await listAs(role, oid(), 'Salma');
+
+      expect(res.status).toBe(403);
+      expect(spies.studentFind).not.toHaveBeenCalled();
+      expect(spies.courseFind).not.toHaveBeenCalled();
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+  });
+
+  it('never writes anything', async () => {
+    const spies = stubSearch({ roster: [{ _id: oid() }], students: [{ _id: oid() }], courses: [{ _id: oid() }] });
+
+    await listAs('Advisor', oid(), 'Salma');
+    await listAs('Coordinator', oid(), 'CSEN 501');
+    await listAs('Coordinator', oid(), 'nobody');
+
+    spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  it('answers 500 with a message when a search lookup fails', async () => {
+    const spies = stubSearch();
+    spies.courseFind.mockImplementation(() => {
+      throw new Error('db down');
+    });
+
+    const res = await listAs('Coordinator', oid(), 'CSEN');
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Could not load slot-change requests');
+  });
+
+  describe('service helpers', () => {
+    it.each([
+      [undefined, { term: '' }],
+      ['', { term: '' }],
+      ['  Salma  ', { term: 'Salma' }],
+      [['a', 'b'], { error: 'Search must be a single text value.' }],
+      [{ $ne: 'x' }, { error: 'Search must be a single text value.' }],
+      [42, { error: 'Search must be a single text value.' }],
+    ])('parseStaffSearch(%p)', (raw, expected) => {
+      expect(parseStaffSearch(raw)).toEqual(expected);
+    });
+
+    it('courseCodePattern escapes each character and allows spaces between them', () => {
+      expect(courseCodePattern('C+ 1')).toBe('C\\s*\\+\\s*1');
+    });
+
+    it('buildStaffRequestFilter returns the scope itself for no search', async () => {
+      const scope = { student: { $in: [oid()] } };
+      await expect(buildStaffRequestFilter(scope)).resolves.toBe(scope);
+      await expect(buildStaffRequestFilter(scope, { search: '' })).resolves.toBe(scope);
+    });
+
+    it('buildStaffRequestFilter returns null for no scope, without searching', async () => {
+      const find = jest.spyOn(Student, 'find');
+      const courseFind = jest.spyOn(Course, 'find');
+
+      await expect(buildStaffRequestFilter(null, { search: 'Salma' })).resolves.toBeNull();
+      expect(find).not.toHaveBeenCalled();
+      expect(courseFind).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe('SlotChangeRequest model', () => {
   const valid = () => ({
     student: oid(),

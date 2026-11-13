@@ -43,7 +43,26 @@ export const withdrawSlotChangeRequest = async (
 /**
  * Req 43: the requests the signed-in Advisor (assigned students only) or
  * Coordinator (all) may see, every status, newest first. The API derives the
- * scope from the session alone.
+ * scope from the session alone. Req 44 adds an optional search.
  */
-export const fetchStaffSlotChangeRequests = async (): Promise<StaffSlotChangeRequestList> =>
-  apiFetch<StaffSlotChangeRequestList>('/api/slot-change-requests');
+export const fetchStaffSlotChangeRequests = async (
+  options: StaffSlotChangeRequestQuery = {}
+): Promise<StaffSlotChangeRequestList> => {
+  const params = new URLSearchParams();
+  const search = options.search?.trim();
+  if (search) params.set('search', search);
+  const query = params.toString();
+  return apiFetch<StaffSlotChangeRequestList>(`/api/slot-change-requests${query ? `?${query}` : ''}`);
+};
+
+/** The longest search term the staff list accepts (req 44). */
+export const STAFF_SEARCH_LIMIT = 100;
+
+/**
+ * Req 44: optional narrowing of the staff list. `search` matches a student ID
+ * (with or without the hyphen), a student name or a course code; the API
+ * always applies it inside the caller's own scope.
+ */
+export interface StaffSlotChangeRequestQuery {
+  search?: string;
+}

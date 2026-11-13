@@ -6,7 +6,13 @@ const CourseSlot = require('../models/CourseSlot');
 const Course = require('../models/Course');
 const SlotChangeRequest = require('../models/SlotChangeRequest');
 const { deadlineEnd } = require('../services/schedulingPreferenceService');
-const { reviewWindowFor, validateRequestInput, staffRequestScope } = require('../services/slotChangeRequestService');
+const {
+  reviewWindowFor,
+  validateRequestInput,
+  staffRequestScope,
+  parseStaffSearch,
+  buildStaffRequestFilter,
+} = require('../services/slotChangeRequestService');
 const { notify, notifyRole } = require('../services/notificationService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
 
@@ -214,6 +220,10 @@ const serializeStaffItem = (doc) => {
  * Req 43: the slot-change requests an Advisor or Coordinator may see, every
  * status, newest first. The scope comes only from the token (see
  * staffRequestScope); nothing in the query string can widen it.
+ *
+ * Req 44: `?search=` narrows the list by student ID, student name or course
+ * code, always ANDed with that scope (see buildStaffRequestFilter). A blank
+ * search lists exactly what req 43 lists.
  */
 exports.listStaffRequests = async (req, res) => {
   try {
@@ -222,9 +232,13 @@ exports.listStaffRequests = async (req, res) => {
       return res.status(403).json({ message: 'Only Advisors and Coordinators can view slot-change requests.' });
     }
 
-    const requests = access.filter
+    const search = parseStaffSearch(req.query.search);
+    if (search.error) return res.status(400).json({ message: search.error });
+
+    const filter = await buildStaffRequestFilter(access.filter, { search: search.term });
+    const requests = filter
       ? await withListDetails(
-          SlotChangeRequest.find(access.filter)
+          SlotChangeRequest.find(filter)
             .sort({ createdAt: -1, _id: -1 })
             .populate({
               path: 'student',
