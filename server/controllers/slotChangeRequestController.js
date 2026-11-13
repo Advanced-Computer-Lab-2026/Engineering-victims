@@ -54,6 +54,72 @@ const serializeRequest = (doc, course) => ({
   submittedAt: doc.createdAt,
 });
 
+/** A populated CourseSlot as the student sees it, or null when it is gone. */
+const serializeSlot = (slot) =>
+  slot
+    ? {
+        id: slot._id,
+        groupNumber: slot.groupNumber,
+        dayOfWeek: slot.dayOfWeek,
+        startTime: slot.startTime,
+        endTime: slot.endTime,
+        room: slot.roomId,
+      }
+    : null;
+
+/** Only an Advisor or Coordinator decision (req 48) carries a response. */
+const RESOLVED_STATUSES = ['Approved', 'Rejected'];
+
+/**
+ * Req 41: one of the student's own requests with the staff response, if any.
+ * The response identifies the approved replacement slot; it is null while the
+ * request is Pending or after the student withdrew it.
+ */
+const serializeListItem = (doc) => ({
+  id: doc._id,
+  status: doc.status,
+  course: doc.course ? { id: doc.course._id, code: doc.course.code, name: doc.course.name } : null,
+  term: doc.term ? { id: doc.term._id, label: `${doc.term.academicYear} ${doc.term.season}` } : null,
+  slotType: doc.slotType,
+  currentSlot: { id: doc.currentSlot, ...doc.currentSlotSnapshot },
+  preferenceNote: doc.preferenceNote ?? '',
+  submittedAt: doc.createdAt,
+  withdrawnAt: doc.withdrawnAt ?? null,
+  response: RESOLVED_STATUSES.includes(doc.status)
+    ? {
+        note: doc.responseNote ?? '',
+        respondedBy: doc.respondedBy ? { name: doc.respondedBy.fullName, role: doc.respondedBy.role } : null,
+        respondedAt: doc.respondedAt ?? null,
+        replacementSlot: doc.status === 'Approved' ? serializeSlot(doc.replacementSlot) : null,
+      }
+    : null,
+});
+
+/**
+ * Req 41: the signed-in Advising Student's own slot-change requests from every
+ * term, newest first, with their statuses and any Advisor or Coordinator
+ * response. The student comes from the token only, so no one can list another
+ * student's requests.
+ */
+exports.listMyRequests = async (req, res) => {
+  try {
+    const student = await resolveStudent(req, res);
+    if (!student) return;
+
+    const requests = await SlotChangeRequest.find({ student: student._id })
+      .sort({ createdAt: -1, _id: -1 })
+      .populate('course', 'code name')
+      .populate('term', 'academicYear season')
+      .populate('replacementSlot', 'groupNumber dayOfWeek startTime endTime roomId')
+      .populate('respondedBy', 'fullName role')
+      .lean();
+
+    res.status(200).json({ requests: requests.map(serializeListItem) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load your slot-change requests', error: error.message });
+  }
+};
+
 /**
  * Req 40: whether the signed-in Advising Student may request a slot change
  * right now, and which of their slots already have a pending request, so the

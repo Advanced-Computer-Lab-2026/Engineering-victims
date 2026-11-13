@@ -4,6 +4,7 @@ import {
   BookOpen,
   CalendarDays,
   CalendarRange,
+  ClipboardList,
   Contact,
   FileText,
   GraduationCap,
@@ -198,6 +199,15 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Student'],
     studentTypes: ['Normal Student'],
     description: 'Submit a whole-schedule swap request, complete an open peer swap, or withdraw your request.',
+  },
+  // Req 41: Advising Students follow their slot-change requests and responses.
+  {
+    to: '/slot-change-requests',
+    label: 'My Slot-Change Requests',
+    icon: ClipboardList,
+    roles: ['Student'],
+    studentTypes: ['Advising Student'],
+    description: 'Your slot-change requests, their statuses and the Advisor or Coordinator response.',
   },
   // Req 54: staff reach a student's history from the student lists instead.
   {

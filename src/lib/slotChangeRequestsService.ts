@@ -1,5 +1,10 @@
 import { apiFetch } from './api';
-import type { SlotChangeEligibility, SlotChangeRequestInput, SlotChangeRequestSummary } from './types';
+import type {
+  SlotChangeEligibility,
+  SlotChangeRequestInput,
+  SlotChangeRequestItem,
+  SlotChangeRequestSummary,
+} from './types';
 
 /** The longest preference note the API accepts. */
 export const SLOT_CHANGE_NOTE_LIMIT = 500;
@@ -16,3 +21,10 @@ export const submitSlotChangeRequest = async (
   input: SlotChangeRequestInput
 ): Promise<{ message: string; request: SlotChangeRequestSummary }> =>
   apiFetch('/api/slot-change-requests/me', { method: 'POST', body: JSON.stringify(input) });
+
+/**
+ * Req 41: the signed-in Advising Student's own requests from every term,
+ * newest first, with any Advisor or Coordinator response.
+ */
+export const fetchMySlotChangeRequests = async (): Promise<SlotChangeRequestItem[]> =>
+  (await apiFetch<{ requests: SlotChangeRequestItem[] }>('/api/slot-change-requests/me')).requests;

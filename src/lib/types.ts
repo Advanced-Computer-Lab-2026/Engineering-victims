@@ -615,6 +615,26 @@ export interface SlotChangeRequestSummary {
   submittedAt: string;
 }
 
+/** Req 41 — the Advisor or Coordinator decision on a request. */
+export interface SlotChangeResponse {
+  note: string;
+  /** Null when the responder's account no longer exists. */
+  respondedBy: { name: string; role: Role } | null;
+  respondedAt: string | null;
+  /** The approved replacement slot; null for a rejection. */
+  replacementSlot: SlotChangeRequestSummary['currentSlot'] | null;
+}
+
+/** Req 41 — one of the student's own slot-change requests. */
+export interface SlotChangeRequestItem extends Omit<SlotChangeRequestSummary, 'course'> {
+  /** Null when the course has since been deleted. */
+  course: SlotChangeRequestSummary['course'] | null;
+  term: { id: string; label: string } | null;
+  withdrawnAt: string | null;
+  /** Present only once the request is Approved or Rejected. */
+  response: SlotChangeResponse | null;
+}
+
 /** Req 34 — eligible groups for whole-schedule swap. */
 export interface EligibleSwapGroup {
   studyGroup: string;
