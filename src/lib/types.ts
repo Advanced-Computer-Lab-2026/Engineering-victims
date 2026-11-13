@@ -649,6 +649,12 @@ export interface StaffSlotChangeRequestList {
   requests: StaffSlotChangeRequestItem[];
 }
 
+/** Req 46 — one request opened from the staff list; `request` has the list row's shape. */
+export interface StaffSlotChangeRequestDetails {
+  scope: 'assigned' | 'all';
+  request: StaffSlotChangeRequestItem;
+}
+
 /**
  * Req 45 — choices for the staff list filters, limited to the caller's scope:
  * a Coordinator gets every Advisor plus "Unassigned", an Advisor only

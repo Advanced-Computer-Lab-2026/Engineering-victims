@@ -207,6 +207,19 @@ exports.withdrawMyRequest = async (req, res) => {
  * (req 41) plus who asked and their current Advisor. A request whose student
  * record was deleted keeps `student: null` so it stays visible.
  */
+/**
+ * Req 43/46: the references a staff row shows (the req 41 ones plus the
+ * student and their current Advisor), shared by the list and the details.
+ */
+const withStaffDetails = (query) =>
+  withListDetails(
+    query.populate({
+      path: 'student',
+      select: 'fullName studentId assignedAdvisor',
+      populate: { path: 'assignedAdvisor', select: 'fullName' },
+    })
+  );
+
 const serializeStaffItem = (doc) => {
   const student = doc.student && typeof doc.student === 'object' && doc.student._id ? doc.student : null;
   const advisor = student?.assignedAdvisor?._id ? student.assignedAdvisor : null;
@@ -242,20 +255,45 @@ exports.listStaffRequests = async (req, res) => {
 
     const filter = await buildStaffRequestFilter(access.filter, parsed.values);
     const requests = filter
-      ? await withListDetails(
-          SlotChangeRequest.find(filter)
-            .sort({ createdAt: -1, _id: -1 })
-            .populate({
-              path: 'student',
-              select: 'fullName studentId assignedAdvisor',
-              populate: { path: 'assignedAdvisor', select: 'fullName' },
-            })
-        )
+      ? await withStaffDetails(SlotChangeRequest.find(filter).sort({ createdAt: -1, _id: -1 }))
       : [];
 
     res.status(200).json({ scope: access.scope, requests: requests.map(serializeStaffItem) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load slot-change requests', error: error.message });
+  }
+};
+
+/**
+ * Req 46: one request, opened from the staff list (plain, searched or
+ * filtered). The id comes from the client, so it is only ever looked up
+ * inside the caller's req 43 scope: an Advisor asking for a request from a
+ * student who is not currently assigned to them gets the same 404 as a
+ * request that does not exist, so its existence is not revealed. The body is
+ * exactly a staff list row (serializeStaffItem), read fresh from the database.
+ */
+exports.getStaffRequest = async (req, res) => {
+  try {
+    const access = await staffRequestScope(req.user);
+    if (!access) {
+      return res.status(403).json({ message: 'Only Advisors and Coordinators can view slot-change requests.' });
+    }
+
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'That slot-change request id is not valid.' });
+    }
+
+    const doc = access.filter
+      ? await withStaffDetails(
+          SlotChangeRequest.findOne({ $and: [access.filter, { _id: new mongoose.Types.ObjectId(id) }] })
+        )
+      : null;
+    if (!doc) return res.status(404).json({ message: 'Slot-change request not found.' });
+
+    res.status(200).json({ scope: access.scope, request: serializeStaffItem(doc) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load the slot-change request', error: error.message });
   }
 };
 

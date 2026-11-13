@@ -5,6 +5,7 @@ import type {
   SlotChangeRequestItem,
   SlotChangeRequestSummary,
   StaffSlotChangeFilterOptions,
+  StaffSlotChangeRequestDetails,
   StaffSlotChangeRequestList,
 } from './types';
 
@@ -58,6 +59,13 @@ export const fetchStaffSlotChangeRequests = async (
   const query = params.toString();
   return apiFetch<StaffSlotChangeRequestList>(`/api/slot-change-requests${query ? `?${query}` : ''}`);
 };
+
+/**
+ * Req 46: one request's details, read fresh. The API only finds it inside the
+ * caller's scope, so a request from another Advisor's student answers 404.
+ */
+export const fetchStaffSlotChangeRequest = async (id: string): Promise<StaffSlotChangeRequestDetails> =>
+  apiFetch<StaffSlotChangeRequestDetails>(`/api/slot-change-requests/${encodeURIComponent(id)}`);
 
 /** Req 45: Advisor and course choices for the filters, within the caller's scope. */
 export const fetchStaffSlotChangeFilterOptions = async (): Promise<StaffSlotChangeFilterOptions> =>

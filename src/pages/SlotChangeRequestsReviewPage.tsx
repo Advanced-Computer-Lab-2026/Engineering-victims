@@ -15,33 +15,18 @@ import {
   type StaffSlotChangeRequestQuery,
 } from '../lib/slotChangeRequestsService';
 import { formatDate } from '../lib/studentsService';
+import { SLOT_TONE, STATUS_TONE, slotLabel } from '../lib/slotChangeDisplay';
 import { useSession } from '../hooks/useSession';
 import PageHeader from '../components/PageHeader';
+import SlotChangeRequestDetailDrawer from '../components/SlotChangeRequestDetailDrawer';
 import AlertBanner from '../components/ui/AlertBanner';
-import Badge, { type BadgeTone } from '../components/ui/Badge';
+import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 
-const STATUS_TONE: Record<SlotChangeRequestStatus, BadgeTone> = {
-  Pending: 'amber',
-  Approved: 'emerald',
-  Rejected: 'rose',
-  Withdrawn: 'neutral',
-};
-
-const SLOT_TONE: Record<StaffSlotChangeRequestItem['slotType'], BadgeTone> = {
-  Lecture: 'indigo',
-  Tutorial: 'sky',
-  Lab: 'emerald',
-};
-
 const STATUSES: SlotChangeRequestStatus[] = ['Pending', 'Approved', 'Rejected', 'Withdrawn'];
-
-type Slot = StaffSlotChangeRequestItem['currentSlot'];
-
-const slotLabel = (slot: Slot) => `Group ${slot.groupNumber} · ${slot.dayOfWeek} ${slot.startTime}–${slot.endTime}`;
 
 /** Req 45: the filter values; '' means "not filtered". */
 interface Filters {
@@ -97,7 +82,11 @@ const outcomeSummary = (item: StaffSlotChangeRequestItem): React.ReactNode => {
  * Req 45: status, Advisor, course and submission-date filters combine with
  * each other and with the search. Everything runs on the server, inside the
  * same scope, so no combination lets an Advisor see another Advisor's
- * students. Details are a later requirement.
+ * students.
+ *
+ * Req 46: selecting a row (from the plain list, search or filter results)
+ * opens its details in a drawer over the list, so closing it returns to the
+ * same results with the same search and filters.
  */
 const SlotChangeRequestsReviewPage: React.FC = () => {
   const { user } = useSession();
@@ -113,6 +102,8 @@ const SlotChangeRequestsReviewPage: React.FC = () => {
   const [optionsError, setOptionsError] = useState<string | null>(null);
   /** The search and filters the shown list belongs to, for the summary and no-match messages. */
   const [shownQuery, setShownQuery] = useState<StaffSlotChangeRequestQuery>({});
+  /** Req 46: the row whose details are open, or null. */
+  const [selected, setSelected] = useState<StaffSlotChangeRequestItem | null>(null);
   // Only the newest request may update the page, so a slow answer to an
   // earlier search or filter can never overwrite the results of a later one.
   const latestRequest = useRef(0);
@@ -174,6 +165,10 @@ const SlotChangeRequestsReviewPage: React.FC = () => {
     setFilters(NO_FILTERS);
   };
 
+  const closeDetails = useCallback(() => setSelected(null), []);
+  // The drawer found the request gone or out of scope: refresh the same results.
+  const refreshAfterStale = useCallback(() => load(true), [load]);
+
   const showsAll = data ? data.scope === 'all' : user?.role === 'Coordinator';
   const requests = data?.requests ?? [];
   // Still typing (debounce pending) or waiting on the server.
@@ -222,8 +217,8 @@ const SlotChangeRequestsReviewPage: React.FC = () => {
         title="Slot-Change Requests"
         description={
           showsAll
-            ? 'Every advising-student slot-change request, newest first.'
-            : 'Slot-change requests from the advising students assigned to you, newest first.'
+            ? 'Every advising-student slot-change request, newest first. Select a request to see its details.'
+            : 'Slot-change requests from the advising students assigned to you, newest first. Select a request to see its details.'
         }
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
@@ -434,16 +429,38 @@ const SlotChangeRequestsReviewPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-slate-800/60">
                 {requests.map((item) => (
-                  <tr key={item.id} className="transition-colors hover:bg-slate-800/40">
+                  <tr
+                    key={item.id}
+                    onClick={() => setSelected(item)}
+                    className={`cursor-pointer transition-colors hover:bg-slate-800/40 ${
+                      selected?.id === item.id ? 'bg-indigo-500/10' : ''
+                    }`}
+                  >
                     <td className="px-4 py-3">
-                      {item.student ? (
-                        <>
-                          <p className="font-medium text-slate-100">{item.student.fullName}</p>
-                          <p className="font-mono text-xs text-slate-500">{item.student.studentId}</p>
-                        </>
-                      ) : (
-                        <span className="text-slate-500">Student record removed</span>
-                      )}
+                      {/* Req 46: the keyboard-reachable way to open the details; the row click is a mouse shortcut. */}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelected(item);
+                        }}
+                        aria-haspopup="dialog"
+                        aria-label={`Open request details for ${item.student?.fullName ?? 'a removed student'}, ${
+                          item.course?.code ?? 'removed course'
+                        } ${item.slotType}`}
+                        className="text-left underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                      >
+                        {item.student ? (
+                          <>
+                            <span className="block font-medium text-slate-100 hover:text-indigo-300">
+                              {item.student.fullName}
+                            </span>
+                            <span className="block font-mono text-xs text-slate-500">{item.student.studentId}</span>
+                          </>
+                        ) : (
+                          <span className="text-slate-500">Student record removed</span>
+                        )}
+                      </button>
                     </td>
                     {showsAll && (
                       <td className="px-4 py-3">
@@ -478,6 +495,13 @@ const SlotChangeRequestsReviewPage: React.FC = () => {
           </div>
         </Card>
       )}
+
+      <SlotChangeRequestDetailDrawer
+        selected={selected}
+        showsAll={showsAll}
+        onClose={closeDetails}
+        onStale={refreshAfterStale}
+      />
     </>
   );
 };

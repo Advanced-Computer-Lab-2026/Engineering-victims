@@ -763,13 +763,18 @@ describe('GET /api/slot-change-requests/me (req 41)', () => {
       expect(spies.find).not.toHaveBeenCalled();
     });
 
-    it('has no route that takes a request or student id', async () => {
+    // Req 46 added a staff-only details route by id; a student is still
+    // refused before any lookup, so no request can be read by id.
+    it('cannot read a request by id', async () => {
       const world = makeWorld();
       stubWorld(world);
+      const findOne = jest.spyOn(SlotChangeRequest, 'findOne');
 
       const res = await list(world, `/api/slot-change-requests/${oid()}`);
 
-      expect(res.status).toBe(404);
+      expect(res.status).toBe(403);
+      expect(res.body.request).toBeUndefined();
+      expect(findOne).not.toHaveBeenCalled();
     });
   });
 });
@@ -2376,6 +2381,341 @@ describe('GET /api/slot-change-requests/filter-options (req 45)', () => {
 
     expect(res.status).toBe(500);
     expect(res.body.message).toBe('Could not load the slot-change filters');
+  });
+});
+
+describe('GET /api/slot-change-requests/:id (req 46)', () => {
+  const advisor = { _id: oid(), fullName: 'Dr. Karim Fahmy' };
+  const course = { _id: oid(), code: 'CSEN 501', name: 'Data Base I' };
+  const term = { _id: oid(), academicYear: '2026/2027', season: 'Winter' };
+
+  const stored = (overrides = {}) => ({
+    _id: oid(),
+    student: { _id: oid(), fullName: 'Salma Ibrahim', studentId: '64-30010', assignedAdvisor: advisor },
+    term,
+    course,
+    slotType: 'Lecture',
+    currentSlot: oid(),
+    currentSlotSnapshot: { groupNumber: 1, dayOfWeek: 'Monday', startTime: '13:15', endTime: '14:45', room: 'H1-01' },
+    preferenceNote: 'Another lecture day please',
+    status: 'Pending',
+    replacementSlot: null,
+    responseNote: '',
+    respondedBy: null,
+    respondedAt: null,
+    withdrawnAt: null,
+    createdAt: new Date('2026-11-13T12:21:11.588Z'),
+    ...overrides,
+  });
+
+  const as = (role, path, userId = oid()) => request(app).get(path).set('Authorization', tokenFor(role, userId));
+  const detailsOf = (role, id, userId) => as(role, `/api/slot-change-requests/${id}`, userId);
+
+  /**
+   * `roster` answers the Advisor scope lookup, `searchStudents` the req 44
+   * search, `listed` the list query and `found` the details lookup.
+   */
+  const stubDetails = ({ roster = [], searchStudents = [], courses = [], listed = [], found = null } = {}) => {
+    const spies = {};
+    spies.studentFind = jest
+      .spyOn(Student, 'find')
+      .mockImplementation((filter) => query('studentType' in filter ? roster : searchStudents));
+    spies.courseFind = jest.spyOn(Course, 'find').mockReturnValue(query(courses));
+    spies.find = jest.spyOn(SlotChangeRequest, 'find').mockReturnValue(query(listed));
+    spies.detailsQuery = query(found);
+    spies.findOne = jest.spyOn(SlotChangeRequest, 'findOne').mockReturnValue(spies.detailsQuery);
+    spies.findById = jest.spyOn(SlotChangeRequest, 'findById');
+    spies.writes = [
+      jest.spyOn(SlotChangeRequest, 'create'),
+      jest.spyOn(SlotChangeRequest, 'updateOne'),
+      jest.spyOn(SlotChangeRequest, 'updateMany'),
+      jest.spyOn(SlotChangeRequest, 'findOneAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'findByIdAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'deleteOne'),
+      jest.spyOn(SlotChangeRequest.prototype, 'save'),
+      jest.spyOn(Student, 'updateOne'),
+      jest.spyOn(StudentSchedule, 'updateOne'),
+      jest.spyOn(CourseSlot, 'updateOne'),
+      jest.spyOn(Notification, 'create'),
+    ];
+    return spies;
+  };
+  const lookupOf = (spies) => spies.findOne.mock.calls[0][0];
+
+  describe('Coordinator', () => {
+    it('opens any request, looked up inside the "all" scope', async () => {
+      const doc = stored();
+      const spies = stubDetails({ found: doc });
+
+      const res = await detailsOf('Coordinator', doc._id);
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('all');
+      const lookup = lookupOf(spies);
+      expect(lookup.$and[0]).toEqual({});
+      expect(String(lookup.$and[1]._id)).toBe(String(doc._id));
+      expect(spies.findById).not.toHaveBeenCalled();
+    });
+
+    it('returns exactly the selected list row', async () => {
+      const doc = stored();
+      stubDetails({ listed: [doc], found: doc });
+
+      const list = await as('Coordinator', '/api/slot-change-requests');
+      const details = await detailsOf('Coordinator', doc._id);
+
+      expect(details.body.request).toEqual(list.body.requests[0]);
+      expect(details.body.request).toEqual({
+        id: String(doc._id),
+        status: 'Pending',
+        student: { id: String(doc.student._id), studentId: '64-30010', fullName: 'Salma Ibrahim' },
+        advisor: { id: String(advisor._id), fullName: 'Dr. Karim Fahmy' },
+        course: { id: String(course._id), code: 'CSEN 501', name: 'Data Base I' },
+        term: { id: String(term._id), label: '2026/2027 Winter' },
+        slotType: 'Lecture',
+        currentSlot: {
+          id: String(doc.currentSlot),
+          groupNumber: 1,
+          dayOfWeek: 'Monday',
+          startTime: '13:15',
+          endTime: '14:45',
+          room: 'H1-01',
+        },
+        preferenceNote: 'Another lecture day please',
+        submittedAt: '2026-11-13T12:21:11.588Z',
+        withdrawnAt: null,
+        response: null,
+      });
+    });
+
+    it('loads the same references as the list', async () => {
+      const spies = stubDetails({ found: stored() });
+
+      await detailsOf('Coordinator', oid());
+
+      const paths = spies.detailsQuery.populate.mock.calls.map(([arg]) => (typeof arg === 'string' ? arg : arg.path));
+      expect(paths).toEqual(['student', 'course', 'term', 'replacementSlot', 'respondedBy']);
+      expect(spies.detailsQuery.lean).toHaveBeenCalled();
+    });
+
+    it('shows the response and replacement of a decided request', async () => {
+      const replacement = { _id: oid(), groupNumber: 2, dayOfWeek: 'Sunday', startTime: '08:00', endTime: '09:30', roomId: 'H1-02' };
+      const doc = stored({
+        status: 'Approved',
+        replacementSlot: replacement,
+        responseNote: 'Moved to group 2.',
+        respondedBy: { _id: oid(), fullName: 'Dr. Karim Fahmy', role: 'Advisor' },
+        respondedAt: new Date('2026-11-14T09:00:00Z'),
+      });
+      stubDetails({ found: doc });
+
+      const res = await detailsOf('Coordinator', doc._id);
+
+      expect(res.body.request.response).toEqual({
+        note: 'Moved to group 2.',
+        respondedBy: { name: 'Dr. Karim Fahmy', role: 'Advisor' },
+        respondedAt: '2026-11-14T09:00:00.000Z',
+        replacementSlot: { id: String(replacement._id), groupNumber: 2, dayOfWeek: 'Sunday', startTime: '08:00', endTime: '09:30', room: 'H1-02' },
+      });
+    });
+
+    it('shows a withdrawn request with its withdrawal date and no response', async () => {
+      const doc = stored({ status: 'Withdrawn', withdrawnAt: new Date('2026-11-13T15:00:00Z') });
+      stubDetails({ found: doc });
+
+      const res = await detailsOf('Coordinator', doc._id);
+
+      expect(res.body.request).toMatchObject({ status: 'Withdrawn', withdrawnAt: '2026-11-13T15:00:00.000Z', response: null });
+    });
+
+    it('keeps a request whose student record was deleted readable', async () => {
+      const doc = stored({ student: null });
+      stubDetails({ found: doc });
+
+      const res = await detailsOf('Coordinator', doc._id);
+
+      expect(res.status).toBe(200);
+      expect(res.body.request).toMatchObject({ student: null, advisor: null });
+    });
+  });
+
+  describe('Advisor', () => {
+    it("opens a request from a currently assigned student, inside the Advisor's roster", async () => {
+      const me = oid();
+      const doc = stored();
+      const roster = [{ _id: doc.student._id }];
+      const spies = stubDetails({ roster, found: doc });
+
+      const res = await detailsOf('Advisor', doc._id, me);
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('assigned');
+      expect(spies.studentFind).toHaveBeenCalledWith({ assignedAdvisor: String(me), studentType: 'Advising Student' });
+      expect(lookupOf(spies).$and[0]).toEqual({ student: { $in: [doc.student._id] } });
+      expect(res.body.request.id).toBe(String(doc._id));
+    });
+
+    it("gets the same 404 for another Advisor's request as for a missing one", async () => {
+      // The roster clause keeps another Advisor's request out of the lookup, so Mongo finds nothing.
+      const roster = [{ _id: oid() }];
+      const spies = stubDetails({ roster, found: null });
+      const othersRequest = oid();
+
+      const denied = await detailsOf('Advisor', othersRequest);
+      const missing = await detailsOf('Advisor', oid());
+
+      expect(denied.status).toBe(404);
+      expect(denied.body).toEqual({ message: 'Slot-change request not found.' });
+      expect(missing.body).toEqual(denied.body);
+      const lookup = lookupOf(spies);
+      expect(lookup.$and[0]).toEqual({ student: { $in: [roster[0]._id] } });
+      expect(String(lookup.$and[1]._id)).toBe(String(othersRequest));
+    });
+
+    it('answers 404 without a lookup when nobody is assigned', async () => {
+      const spies = stubDetails({ roster: [], found: stored() });
+
+      const res = await detailsOf('Advisor', oid());
+
+      expect(res.status).toBe(404);
+      expect(spies.findOne).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      'advisor=' + String(oid()),
+      'scope=all',
+      'role=Coordinator',
+      'student=' + String(oid()),
+    ])('ignores ?%s on the details route', async (qs) => {
+      const roster = [{ _id: oid() }];
+      const spies = stubDetails({ roster, found: null });
+
+      await as('Advisor', `/api/slot-change-requests/${oid()}?${qs}`);
+
+      expect(lookupOf(spies).$and[0]).toEqual({ student: { $in: [roster[0]._id] } });
+      expect(lookupOf(spies).$and).toHaveLength(2);
+    });
+  });
+
+  describe('selecting from search and filter results', () => {
+    it('opens a request picked from req 44 search results', async () => {
+      const doc = stored();
+      stubDetails({ searchStudents: [{ _id: doc.student._id }], listed: [doc], found: doc });
+
+      const list = await as('Coordinator', '/api/slot-change-requests?search=64-30010');
+      const details = await detailsOf('Coordinator', list.body.requests[0].id);
+
+      expect(details.status).toBe(200);
+      expect(details.body.request).toEqual(list.body.requests[0]);
+    });
+
+    it('opens a request picked from req 45 filtered results', async () => {
+      const doc = stored();
+      stubDetails({ listed: [doc], found: doc });
+
+      const list = await as('Coordinator', `/api/slot-change-requests?status=Pending&course=${course._id}&submittedFrom=2026-11-13`);
+      const details = await detailsOf('Coordinator', list.body.requests[0].id);
+
+      expect(details.body.request).toEqual(list.body.requests[0]);
+    });
+
+    it('opens a request picked from combined search and filters, as an Advisor', async () => {
+      const me = oid();
+      const doc = stored();
+      const roster = [{ _id: doc.student._id }];
+      stubDetails({ roster, searchStudents: [{ _id: doc.student._id }], listed: [doc], found: doc });
+
+      const list = await as('Advisor', '/api/slot-change-requests?search=Salma&status=Pending', me);
+      const details = await detailsOf('Advisor', list.body.requests[0].id, me);
+
+      expect(details.body.request).toEqual(list.body.requests[0]);
+    });
+
+    it('is not narrowed by the list filters, so a selected row always opens', async () => {
+      const doc = stored({ status: 'Pending' });
+      const spies = stubDetails({ found: doc });
+
+      const res = await as('Coordinator', `/api/slot-change-requests/${doc._id}?status=Rejected&search=nobody`);
+
+      expect(res.status).toBe(200);
+      expect(lookupOf(spies).$and).toHaveLength(2);
+      expect(spies.studentFind).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('invalid ids', () => {
+    it.each(['abc', '123', 'not-an-object-id', '6af700b7085d0877da8b343'])('refuses "%s" without a lookup', async (id) => {
+      const spies = stubDetails();
+
+      const res = await detailsOf('Coordinator', id);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('That slot-change request id is not valid.');
+      expect(spies.findOne).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 for a well-formed id that does not exist', async () => {
+      stubDetails({ found: null });
+
+      const res = await detailsOf('Coordinator', oid());
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toBe('Slot-change request not found.');
+    });
+
+    it('still serves /filter-options, not a request named "filter-options"', async () => {
+      const spies = stubDetails();
+      jest.spyOn(User, 'find').mockReturnValue(query([]));
+      jest.spyOn(SlotChangeRequest, 'distinct').mockResolvedValue([]);
+
+      const res = await as('Coordinator', '/api/slot-change-requests/filter-options');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toHaveProperty('statuses');
+      expect(spies.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('access', () => {
+    it('requires a session', async () => {
+      const res = await request(app).get(`/api/slot-change-requests/${oid()}`);
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Student', 'Administrator'])('refuses %s accounts before any lookup', async (role) => {
+      const spies = stubDetails({ found: stored() });
+
+      const res = await detailsOf(role, oid());
+
+      expect(res.status).toBe(403);
+      expect(res.body.request).toBeUndefined();
+      expect(spies.studentFind).not.toHaveBeenCalled();
+      expect(spies.findOne).not.toHaveBeenCalled();
+    });
+  });
+
+  it('never writes anything', async () => {
+    const doc = stored();
+    const spies = stubDetails({ roster: [{ _id: doc.student._id }], found: doc });
+
+    await detailsOf('Coordinator', doc._id);
+    await detailsOf('Advisor', doc._id);
+    await detailsOf('Advisor', 'abc');
+    await detailsOf('Student', doc._id);
+
+    spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  it('answers 500 with a message when the lookup fails', async () => {
+    const spies = stubDetails();
+    spies.findOne.mockImplementation(() => {
+      throw new Error('db down');
+    });
+
+    const res = await detailsOf('Coordinator', oid());
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Could not load the slot-change request');
   });
 });
 

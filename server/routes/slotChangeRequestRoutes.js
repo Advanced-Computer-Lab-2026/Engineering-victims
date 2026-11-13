@@ -24,5 +24,8 @@ router.get(
   requireRole('Advisor', 'Coordinator'),
   slotChangeRequestController.listStaffFilterOptions
 );
+// Req 46: one request's details, looked up inside the caller's scope. Kept
+// after the fixed paths above so "/filter-options" never reads as an id.
+router.get('/:id', authenticate, requireRole('Advisor', 'Coordinator'), slotChangeRequestController.getStaffRequest);
 
 module.exports = router;
