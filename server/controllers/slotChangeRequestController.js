@@ -10,8 +10,9 @@ const {
   reviewWindowFor,
   validateRequestInput,
   staffRequestScope,
-  parseStaffSearch,
+  parseStaffListQuery,
   buildStaffRequestFilter,
+  staffFilterOptions,
 } = require('../services/slotChangeRequestService');
 const { notify, notifyRole } = require('../services/notificationService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
@@ -224,6 +225,10 @@ const serializeStaffItem = (doc) => {
  * Req 44: `?search=` narrows the list by student ID, student name or course
  * code, always ANDed with that scope (see buildStaffRequestFilter). A blank
  * search lists exactly what req 43 lists.
+ *
+ * Req 45: `?status=`, `?advisor=` (an Advisor id, or "none"), `?course=` and
+ * `?submittedFrom=` / `?submittedTo=` narrow it further. Every filter and the
+ * search combine with AND, inside the same scope.
  */
 exports.listStaffRequests = async (req, res) => {
   try {
@@ -232,10 +237,10 @@ exports.listStaffRequests = async (req, res) => {
       return res.status(403).json({ message: 'Only Advisors and Coordinators can view slot-change requests.' });
     }
 
-    const search = parseStaffSearch(req.query.search);
-    if (search.error) return res.status(400).json({ message: search.error });
+    const parsed = parseStaffListQuery(req.query);
+    if (parsed.error) return res.status(400).json({ message: parsed.error });
 
-    const filter = await buildStaffRequestFilter(access.filter, { search: search.term });
+    const filter = await buildStaffRequestFilter(access.filter, parsed.values);
     const requests = filter
       ? await withListDetails(
           SlotChangeRequest.find(filter)
@@ -251,6 +256,23 @@ exports.listStaffRequests = async (req, res) => {
     res.status(200).json({ scope: access.scope, requests: requests.map(serializeStaffItem) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load slot-change requests', error: error.message });
+  }
+};
+
+/**
+ * Req 45: the choices for the Advisor and course filters, within the same
+ * token-derived scope as the list, so an Advisor is never shown other
+ * Advisors or courses only other students requested.
+ */
+exports.listStaffFilterOptions = async (req, res) => {
+  try {
+    const access = await staffRequestScope(req.user);
+    if (!access) {
+      return res.status(403).json({ message: 'Only Advisors and Coordinators can view slot-change requests.' });
+    }
+    res.status(200).json(await staffFilterOptions(access, req.user));
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load the slot-change filters', error: error.message });
   }
 };
 

@@ -4,6 +4,7 @@ import type {
   SlotChangeRequestInput,
   SlotChangeRequestItem,
   SlotChangeRequestSummary,
+  StaffSlotChangeFilterOptions,
   StaffSlotChangeRequestList,
 } from './types';
 
@@ -43,26 +44,43 @@ export const withdrawSlotChangeRequest = async (
 /**
  * Req 43: the requests the signed-in Advisor (assigned students only) or
  * Coordinator (all) may see, every status, newest first. The API derives the
- * scope from the session alone. Req 44 adds an optional search.
+ * scope from the session alone. Req 44 adds an optional search and req 45
+ * the filters; blank values are left out of the URL.
  */
 export const fetchStaffSlotChangeRequests = async (
   options: StaffSlotChangeRequestQuery = {}
 ): Promise<StaffSlotChangeRequestList> => {
   const params = new URLSearchParams();
-  const search = options.search?.trim();
-  if (search) params.set('search', search);
+  Object.entries(options).forEach(([key, value]) => {
+    const trimmed = String(value ?? '').trim();
+    if (trimmed) params.set(key, trimmed);
+  });
   const query = params.toString();
   return apiFetch<StaffSlotChangeRequestList>(`/api/slot-change-requests${query ? `?${query}` : ''}`);
 };
 
+/** Req 45: Advisor and course choices for the filters, within the caller's scope. */
+export const fetchStaffSlotChangeFilterOptions = async (): Promise<StaffSlotChangeFilterOptions> =>
+  apiFetch<StaffSlotChangeFilterOptions>('/api/slot-change-requests/filter-options');
+
 /** The longest search term the staff list accepts (req 44). */
 export const STAFF_SEARCH_LIMIT = 100;
 
+/** Req 45: the Advisor filter value for students with no Advisor. */
+export const UNASSIGNED_ADVISOR = 'none';
+
 /**
- * Req 44: optional narrowing of the staff list. `search` matches a student ID
- * (with or without the hyphen), a student name or a course code; the API
- * always applies it inside the caller's own scope.
+ * Req 44/45: optional narrowing of the staff list. `search` matches a student
+ * ID (with or without the hyphen), a student name or a course code. `status`,
+ * `advisor` (an Advisor id or UNASSIGNED_ADVISOR), `course` (a course id) and
+ * the submission dates (YYYY-MM-DD, inclusive) filter further. The API always
+ * applies all of them inside the caller's own scope.
  */
 export interface StaffSlotChangeRequestQuery {
   search?: string;
+  status?: string;
+  advisor?: string;
+  course?: string;
+  submittedFrom?: string;
+  submittedTo?: string;
 }

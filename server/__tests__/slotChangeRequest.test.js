@@ -1161,8 +1161,8 @@ describe('GET /api/slot-change-requests (req 43)', () => {
       expect(res.body.requests).toHaveLength(1);
     });
 
+    // ?advisor= became a real filter in req 45; its can't-widen checks live there.
     it.each([
-      ['advisor', () => String(oid())],
       ['assignedAdvisor', () => String(oid())],
       ['student', () => String(oid())],
       ['studentId', () => '64-99999'],
@@ -1217,7 +1217,8 @@ describe('GET /api/slot-change-requests (req 43)', () => {
       expect(res.body.requests).toHaveLength(2);
     });
 
-    it.each(['advisor', 'student'])('is not narrowed or changed by ?%s=', async (param) => {
+    // ?advisor= narrows the list since req 45 (tested there); unknown keys still do nothing.
+    it.each(['student', 'assignedAdvisor'])('is not narrowed or changed by ?%s=', async (param) => {
       const spies = stubStaff();
 
       await listAs('Coordinator', oid(), `/api/slot-change-requests?${param}=${oid()}`);
@@ -1852,6 +1853,529 @@ describe('GET /api/slot-change-requests?search= (req 44)', () => {
       expect(find).not.toHaveBeenCalled();
       expect(courseFind).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('GET /api/slot-change-requests filters (req 45)', () => {
+  const { parseStaffListQuery, buildStaffRequestFilter, UNASSIGNED_ADVISOR } = require('../services/slotChangeRequestService');
+
+  const get = (role, qs = '', userId = oid()) =>
+    request(app).get(`/api/slot-change-requests${qs ? `?${qs}` : ''}`).set('Authorization', tokenFor(role, userId));
+
+  /**
+   * Student.find serves three lookups, told apart by their filter:
+   * the req 43 roster ({ assignedAdvisor, studentType }), the req 44 search
+   * ({ $or }) and the req 45 Advisor filter ({ assignedAdvisor } only).
+   */
+  const stubFilters = ({ roster = [], byAdvisor = [], searchStudents = [], courses = [], requests = [] } = {}) => {
+    const spies = {};
+    spies.studentFind = jest.spyOn(Student, 'find').mockImplementation((filter) => {
+      if ('studentType' in filter) return query(roster);
+      if ('$or' in filter) return query(searchStudents);
+      return query(byAdvisor);
+    });
+    spies.courseFind = jest.spyOn(Course, 'find').mockReturnValue(query(courses));
+    spies.requestQuery = query(requests);
+    spies.find = jest.spyOn(SlotChangeRequest, 'find').mockReturnValue(spies.requestQuery);
+    spies.writes = [
+      jest.spyOn(SlotChangeRequest, 'create'),
+      jest.spyOn(SlotChangeRequest, 'updateOne'),
+      jest.spyOn(SlotChangeRequest, 'updateMany'),
+      jest.spyOn(SlotChangeRequest, 'findOneAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'findByIdAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'deleteMany'),
+      jest.spyOn(SlotChangeRequest.prototype, 'save'),
+      jest.spyOn(Student, 'updateOne'),
+      jest.spyOn(Course, 'updateOne'),
+      jest.spyOn(StudentSchedule, 'updateOne'),
+      jest.spyOn(CourseSlot, 'updateOne'),
+      jest.spyOn(Notification, 'create'),
+    ];
+    return spies;
+  };
+
+  /** The Advisor-filter lookups (not the roster or search lookups). */
+  const advisorLookups = (spies) =>
+    spies.studentFind.mock.calls.map(([f]) => f).filter((f) => !('studentType' in f) && !('$or' in f));
+  const filterOf = (spies) => spies.find.mock.calls[0][0];
+
+  describe('status', () => {
+    it.each(['Pending', 'Approved', 'Rejected', 'Withdrawn'])('filters by %s', async (status) => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', `status=${status}`);
+
+      expect(res.status).toBe(200);
+      expect(filterOf(spies)).toEqual({ $and: [{}, { status }] });
+    });
+
+    it.each(['Open', 'pending', 'All', 'Pending,Approved'])('refuses the unknown status "%s"', async (status) => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', `status=${encodeURIComponent(status)}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('Status must be one of Pending, Approved, Rejected, Withdrawn.');
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('course', () => {
+    it('filters by course id', async () => {
+      const courseId = oid();
+      const spies = stubFilters();
+
+      await get('Coordinator', `course=${courseId}`);
+
+      const [, condition] = filterOf(spies).$and;
+      expect(Object.keys(condition)).toEqual(['course']);
+      expect(String(condition.course)).toBe(String(courseId));
+    });
+
+    it.each(['CSEN501', 'abc', '123'])('refuses the invalid course "%s"', async (course) => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', `course=${course}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('That course filter is not valid.');
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Advisor', () => {
+    it("filters by the student's current Advisor", async () => {
+      const advisorId = oid();
+      const students = [{ _id: oid() }, { _id: oid() }];
+      const spies = stubFilters({ byAdvisor: students });
+
+      const res = await get('Coordinator', `advisor=${advisorId}`);
+
+      expect(res.status).toBe(200);
+      expect(advisorLookups(spies)).toEqual([{ assignedAdvisor: String(advisorId) }]);
+      expect(filterOf(spies)).toEqual({ $and: [{}, { student: { $in: students.map((s) => s._id) } }] });
+    });
+
+    it('filters requests from students with no Advisor using "none"', async () => {
+      const students = [{ _id: oid() }];
+      const spies = stubFilters({ byAdvisor: students });
+
+      await get('Coordinator', `advisor=${UNASSIGNED_ADVISOR}`);
+
+      expect(advisorLookups(spies)).toEqual([{ assignedAdvisor: null }]);
+      expect(filterOf(spies)).toEqual({ $and: [{}, { student: { $in: [students[0]._id] } }] });
+    });
+
+    it('returns an empty list without querying requests when the Advisor has no students', async () => {
+      const spies = stubFilters({ byAdvisor: [] });
+
+      const res = await get('Coordinator', `advisor=${oid()}`);
+
+      expect(res.body).toEqual({ scope: 'all', requests: [] });
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it.each(['abc', 'mine', 'null'])('refuses the invalid Advisor "%s"', async (advisor) => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', `advisor=${advisor}`);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('That Advisor filter is not valid.');
+      expect(spies.studentFind).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Advisor scope cannot be bypassed', () => {
+    it("filtering by another Advisor keeps the caller's roster as the first $and clause", async () => {
+      const me = oid();
+      const roster = [{ _id: oid() }];
+      const otherStudents = [{ _id: oid() }, { _id: oid() }];
+      const spies = stubFilters({ roster, byAdvisor: otherStudents });
+
+      const res = await get('Advisor', `advisor=${oid()}`, me);
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('assigned');
+      const filter = filterOf(spies);
+      expect(filter.$and[0]).toEqual({ student: { $in: [roster[0]._id] } });
+      // Both clauses must hold, so the other Advisor's students can never be returned.
+      expect(filter.$and[1]).toEqual({ student: { $in: otherStudents.map((s) => s._id) } });
+    });
+
+    it('filtering by "none" still keeps the roster', async () => {
+      const roster = [{ _id: oid() }];
+      const spies = stubFilters({ roster, byAdvisor: [{ _id: oid() }] });
+
+      await get('Advisor', `advisor=${UNASSIGNED_ADVISOR}`);
+
+      expect(filterOf(spies).$and[0]).toEqual({ student: { $in: [roster[0]._id] } });
+    });
+
+    it('every filter at once still starts from the roster', async () => {
+      const roster = [{ _id: oid() }];
+      const spies = stubFilters({ roster, byAdvisor: [{ _id: oid() }], searchStudents: [{ _id: oid() }] });
+
+      await get(
+        'Advisor',
+        `search=Salma&status=Pending&advisor=${oid()}&course=${oid()}&submittedFrom=2026-11-01&submittedTo=2026-11-30`
+      );
+
+      const filter = filterOf(spies);
+      expect(filter.$and[0]).toEqual({ student: { $in: [roster[0]._id] } });
+      expect(filter.$and).toHaveLength(6);
+    });
+
+    it('an Advisor with nobody assigned gets nothing, whatever the filters', async () => {
+      const spies = stubFilters({ roster: [], byAdvisor: [{ _id: oid() }] });
+
+      const res = await get('Advisor', `status=Pending&advisor=${oid()}`);
+
+      expect(res.body).toEqual({ scope: 'assigned', requests: [] });
+      expect(advisorLookups(spies)).toHaveLength(0);
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('submission date', () => {
+    it('includes the whole "from" day onward', async () => {
+      const spies = stubFilters();
+
+      await get('Coordinator', 'submittedFrom=2026-11-13');
+
+      expect(filterOf(spies)).toEqual({ $and: [{}, { createdAt: { $gte: new Date('2026-11-13T00:00:00.000Z') } }] });
+    });
+
+    it('includes the whole "to" day for a date-only bound', async () => {
+      const spies = stubFilters();
+
+      await get('Coordinator', 'submittedTo=2026-11-13');
+
+      expect(filterOf(spies)).toEqual({ $and: [{}, { createdAt: { $lt: new Date('2026-11-14T00:00:00.000Z') } }] });
+    });
+
+    it('accepts the same day as both bounds', async () => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', 'submittedFrom=2026-11-13&submittedTo=2026-11-13');
+
+      expect(res.status).toBe(200);
+      expect(filterOf(spies).$and[1]).toEqual({
+        createdAt: { $gte: new Date('2026-11-13T00:00:00.000Z'), $lt: new Date('2026-11-14T00:00:00.000Z') },
+      });
+    });
+
+    it('uses an exact upper bound for a full timestamp', async () => {
+      const spies = stubFilters();
+
+      await get('Coordinator', `submittedTo=${encodeURIComponent('2026-11-13T12:00:00.000Z')}`);
+
+      expect(filterOf(spies).$and[1]).toEqual({ createdAt: { $lte: new Date('2026-11-13T12:00:00.000Z') } });
+    });
+
+    it.each([
+      ['submittedFrom=2026-02-30', 'Enter a valid submission date.'],
+      ['submittedTo=yesterday', 'Enter a valid submission date.'],
+      ['submittedFrom=2026-13-01', 'Enter a valid submission date.'],
+      ['submittedFrom=2026-11-14&submittedTo=2026-11-13', 'The submission start date must be on or before the end date.'],
+    ])('refuses %s', async (qs, message) => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', qs);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe(message);
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('combined filters', () => {
+    it('ANDs search, status and course inside the scope', async () => {
+      const courseId = oid();
+      const student = { _id: oid() };
+      const spies = stubFilters({ searchStudents: [student] });
+
+      const res = await get('Coordinator', `search=Salma&status=Pending&course=${courseId}`);
+
+      expect(res.status).toBe(200);
+      const filter = filterOf(spies);
+      expect(filter.$and).toHaveLength(4);
+      expect(filter.$and[0]).toEqual({});
+      expect(filter.$and[1]).toEqual({ status: 'Pending' });
+      expect(String(filter.$and[2].course)).toBe(String(courseId));
+      expect(filter.$and[3]).toEqual({ $or: [{ student: { $in: [student._id] } }] });
+    });
+
+    it('ANDs every filter and the search', async () => {
+      const advisorId = oid();
+      const byAdvisor = [{ _id: oid() }];
+      const course = { _id: oid() };
+      const spies = stubFilters({ byAdvisor, courses: [course] });
+
+      await get(
+        'Coordinator',
+        `search=CSEN&status=Approved&advisor=${advisorId}&course=${course._id}&submittedFrom=2026-11-01&submittedTo=2026-11-30`
+      );
+
+      const filter = filterOf(spies);
+      expect(filter.$and).toHaveLength(6);
+      expect(filter.$and).toEqual(
+        expect.arrayContaining([
+          {},
+          { status: 'Approved' },
+          { createdAt: { $gte: new Date('2026-11-01T00:00:00.000Z'), $lt: new Date('2026-12-01T00:00:00.000Z') } },
+          { student: { $in: [byAdvisor[0]._id] } },
+          { $or: [{ course: { $in: [course._id] } }] },
+        ])
+      );
+    });
+
+    it('skips the request query when the search matches nothing, even with filters', async () => {
+      const spies = stubFilters({ byAdvisor: [{ _id: oid() }] });
+
+      const res = await get('Coordinator', `search=nobody&status=Pending&advisor=${oid()}`);
+
+      expect(res.body).toEqual({ scope: 'all', requests: [] });
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('keeps the sort, population and response format', async () => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', 'status=Pending&submittedFrom=2026-11-01');
+
+      expect(spies.requestQuery.sort).toHaveBeenCalledWith({ createdAt: -1, _id: -1 });
+      expect(Object.keys(res.body)).toEqual(['scope', 'requests']);
+    });
+  });
+
+  describe('cleared and blank filters keep req 43/44 behaviour', () => {
+    it('no parameters lists the whole scope', async () => {
+      const spies = stubFilters();
+
+      await get('Coordinator');
+
+      expect(filterOf(spies)).toEqual({});
+    });
+
+    it('blank parameters are the same as none', async () => {
+      const spies = stubFilters();
+
+      await get('Coordinator', 'search=&status=&advisor=&course=&submittedFrom=&submittedTo=');
+
+      expect(filterOf(spies)).toEqual({});
+      expect(spies.studentFind).not.toHaveBeenCalled();
+      expect(spies.courseFind).not.toHaveBeenCalled();
+    });
+
+    it('whitespace-only parameters are the same as none', async () => {
+      const roster = [{ _id: oid() }];
+      const spies = stubFilters({ roster });
+
+      await get('Advisor', 'status=%20&advisor=%20%20&course=%20');
+
+      expect(filterOf(spies)).toEqual({ student: { $in: [roster[0]._id] } });
+    });
+  });
+
+  describe('malformed parameters', () => {
+    it.each([
+      'status=Pending&status=Approved',
+      `course[$ne]=${'x'}`,
+      'advisor[$exists]=true',
+      'submittedFrom=2026-11-01&submittedFrom=2026-11-02',
+    ])('refuses %s before any lookup', async (qs) => {
+      const spies = stubFilters();
+
+      const res = await get('Coordinator', qs);
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('Each filter must be a single value.');
+      expect(spies.studentFind).not.toHaveBeenCalled();
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('still reports a bad search with its own message', async () => {
+      stubFilters();
+
+      const res = await get('Coordinator', 'search=a&search=b&status=Pending');
+
+      expect(res.status).toBe(400);
+      expect(res.body.message).toBe('Search must be a single text value.');
+    });
+  });
+
+  describe('access', () => {
+    it('requires a session', async () => {
+      const res = await request(app).get('/api/slot-change-requests?status=Pending');
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Student', 'Administrator'])('refuses %s accounts before any lookup', async (role) => {
+      const spies = stubFilters();
+
+      const res = await get(role, `status=Pending&advisor=${oid()}`);
+
+      expect(res.status).toBe(403);
+      expect(spies.studentFind).not.toHaveBeenCalled();
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+  });
+
+  it('never writes anything', async () => {
+    const spies = stubFilters({ roster: [{ _id: oid() }], byAdvisor: [{ _id: oid() }] });
+
+    await get('Coordinator', `status=Pending&advisor=${oid()}&course=${oid()}&submittedFrom=2026-11-01`);
+    await get('Advisor', `advisor=${UNASSIGNED_ADVISOR}&status=Withdrawn`);
+    await get('Coordinator', 'status=Bogus');
+
+    spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  it('answers 500 with a message when the Advisor lookup fails', async () => {
+    const spies = stubFilters();
+    spies.studentFind.mockImplementation(() => {
+      throw new Error('db down');
+    });
+
+    const res = await get('Coordinator', `advisor=${oid()}`);
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Could not load slot-change requests');
+  });
+
+  describe('service helpers', () => {
+    it('parseStaffListQuery trims values and fills missing ones with ""', () => {
+      expect(parseStaffListQuery({ status: ' Pending ', search: ' Salma ' })).toEqual({
+        values: { search: 'Salma', status: 'Pending', advisor: '', course: '', submittedFrom: '', submittedTo: '' },
+      });
+    });
+
+    it('parseStaffListQuery accepts the "none" Advisor', () => {
+      expect(parseStaffListQuery({ advisor: 'none' }).values.advisor).toBe('none');
+    });
+
+    it('buildStaffRequestFilter still returns the scope itself with no conditions', async () => {
+      const scope = { student: { $in: [oid()] } };
+      await expect(buildStaffRequestFilter(scope, parseStaffListQuery({}).values)).resolves.toBe(scope);
+    });
+
+    it('buildStaffRequestFilter returns null for no scope without any lookup', async () => {
+      const find = jest.spyOn(Student, 'find');
+      await expect(buildStaffRequestFilter(null, { advisor: String(oid()), status: 'Pending' })).resolves.toBeNull();
+      expect(find).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe('GET /api/slot-change-requests/filter-options (req 45)', () => {
+  const get = (role, userId = oid()) =>
+    request(app).get('/api/slot-change-requests/filter-options').set('Authorization', tokenFor(role, userId));
+
+  const advisors = [
+    { _id: oid(), fullName: 'Dr. Karim Fahmy', email: 'karim.fahmy@guc.edu.eg' },
+    { _id: oid(), fullName: 'Dr. Mona Adel', email: 'mona.adel@guc.edu.eg' },
+  ];
+  const courses = [{ _id: oid(), code: 'CSEN 501', name: 'Data Base I' }];
+
+  const stubOptions = ({ roster = [], users = advisors, courseIds = courses.map((c) => c._id) } = {}) => {
+    const spies = {};
+    spies.studentFind = jest.spyOn(Student, 'find').mockReturnValue(query(roster));
+    spies.userFind = jest.spyOn(User, 'find').mockReturnValue(query(users));
+    spies.distinct = jest.spyOn(SlotChangeRequest, 'distinct').mockResolvedValue(courseIds);
+    spies.courseFind = jest.spyOn(Course, 'find').mockReturnValue(query(courses));
+    spies.writes = [
+      jest.spyOn(SlotChangeRequest, 'updateOne'),
+      jest.spyOn(SlotChangeRequest, 'create'),
+      jest.spyOn(User, 'updateOne'),
+      jest.spyOn(Student, 'updateOne'),
+    ];
+    return spies;
+  };
+
+  it('gives a Coordinator every Advisor, "Unassigned" and the courses that have requests', async () => {
+    const spies = stubOptions();
+
+    const res = await get('Coordinator');
+
+    expect(res.status).toBe(200);
+    expect(spies.userFind).toHaveBeenCalledWith({ role: 'Advisor' });
+    expect(spies.distinct).toHaveBeenCalledWith('course', {});
+    expect(spies.courseFind).toHaveBeenCalledWith({ _id: { $in: courses.map((c) => c._id) } });
+    expect(res.body).toEqual({
+      statuses: ['Pending', 'Approved', 'Rejected', 'Withdrawn'],
+      advisors: advisors.map((a) => ({ id: String(a._id), fullName: a.fullName, email: a.email })),
+      includesUnassigned: true,
+      courses: [{ id: String(courses[0]._id), code: 'CSEN 501', name: 'Data Base I' }],
+    });
+  });
+
+  it('gives an Advisor only themselves and only courses their own students requested', async () => {
+    const me = oid();
+    const roster = [{ _id: oid() }];
+    const spies = stubOptions({ roster, users: [advisors[0]] });
+
+    const res = await get('Advisor', me);
+
+    expect(res.status).toBe(200);
+    expect(spies.userFind).toHaveBeenCalledWith({ _id: String(me), role: 'Advisor' });
+    expect(spies.distinct).toHaveBeenCalledWith('course', { student: { $in: [roster[0]._id] } });
+    expect(res.body.includesUnassigned).toBe(false);
+    expect(res.body.advisors).toHaveLength(1);
+  });
+
+  it('gives an Advisor with nobody assigned no courses, without a request lookup', async () => {
+    const spies = stubOptions({ roster: [], users: [advisors[0]] });
+
+    const res = await get('Advisor');
+
+    expect(res.body.courses).toEqual([]);
+    expect(spies.distinct).not.toHaveBeenCalled();
+    expect(spies.courseFind).not.toHaveBeenCalled();
+  });
+
+  it('copes with a token whose user id is not an ObjectId', async () => {
+    const spies = stubOptions();
+
+    const res = await get('Advisor', 'not-an-id');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ advisors: [], courses: [], includesUnassigned: false });
+    expect(spies.userFind).not.toHaveBeenCalled();
+  });
+
+  it('requires a session', async () => {
+    const res = await request(app).get('/api/slot-change-requests/filter-options');
+    expect(res.status).toBe(401);
+  });
+
+  it.each(['Student', 'Administrator'])('refuses %s accounts', async (role) => {
+    const spies = stubOptions();
+
+    const res = await get(role);
+
+    expect(res.status).toBe(403);
+    expect(spies.userFind).not.toHaveBeenCalled();
+    expect(spies.distinct).not.toHaveBeenCalled();
+  });
+
+  it('never writes anything', async () => {
+    const spies = stubOptions({ roster: [{ _id: oid() }] });
+
+    await get('Coordinator');
+    await get('Advisor');
+
+    spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  it('answers 500 with a message when a lookup fails', async () => {
+    const spies = stubOptions();
+    spies.distinct.mockRejectedValue(new Error('db down'));
+
+    const res = await get('Coordinator');
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Could not load the slot-change filters');
   });
 });
 

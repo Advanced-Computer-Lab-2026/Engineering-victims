@@ -649,6 +649,18 @@ export interface StaffSlotChangeRequestList {
   requests: StaffSlotChangeRequestItem[];
 }
 
+/**
+ * Req 45 — choices for the staff list filters, limited to the caller's scope:
+ * a Coordinator gets every Advisor plus "Unassigned", an Advisor only
+ * themselves; courses are those that appear in visible requests.
+ */
+export interface StaffSlotChangeFilterOptions {
+  statuses: SlotChangeRequestStatus[];
+  advisors: { id: string; fullName: string; email: string }[];
+  includesUnassigned: boolean;
+  courses: { id: string; code: string; name: string }[];
+}
+
 /** Req 34 — eligible groups for whole-schedule swap. */
 export interface EligibleSwapGroup {
   studyGroup: string;

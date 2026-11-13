@@ -17,5 +17,12 @@ router.patch('/me/:id/withdraw', authenticate, requireRole('Student'), slotChang
 // Req 43: Advisors list their assigned students' requests, Coordinators all of
 // them. Same path, scope decided from the token by the controller.
 router.get('/', authenticate, requireRole('Advisor', 'Coordinator'), slotChangeRequestController.listStaffRequests);
+// Req 45: Advisor and course choices for the filters, in the caller's scope.
+router.get(
+  '/filter-options',
+  authenticate,
+  requireRole('Advisor', 'Coordinator'),
+  slotChangeRequestController.listStaffFilterOptions
+);
 
 module.exports = router;
