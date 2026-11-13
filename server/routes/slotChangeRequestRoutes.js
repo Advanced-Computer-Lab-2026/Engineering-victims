@@ -10,5 +10,8 @@ router.get('/me/eligibility', authenticate, requireRole('Student'), slotChangeRe
 router.post('/me', authenticate, requireRole('Student'), slotChangeRequestController.createMyRequest);
 // Req 41: the caller's own requests, statuses and staff responses.
 router.get('/me', authenticate, requireRole('Student'), slotChangeRequestController.listMyRequests);
+// Req 42: withdraw one of the caller's own Pending requests. The id names the
+// request; ownership is still checked against the student from the token.
+router.patch('/me/:id/withdraw', authenticate, requireRole('Student'), slotChangeRequestController.withdrawMyRequest);
 
 module.exports = router;

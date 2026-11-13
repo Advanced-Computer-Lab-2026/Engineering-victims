@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const StudentSchedule = require('../models/StudentSchedule');
@@ -95,6 +96,15 @@ const serializeListItem = (doc) => ({
     : null,
 });
 
+/** The references the Req 41 list shows, loaded onto a request query. */
+const withListDetails = (query) =>
+  query
+    .populate('course', 'code name')
+    .populate('term', 'academicYear season')
+    .populate('replacementSlot', 'groupNumber dayOfWeek startTime endTime roomId')
+    .populate('respondedBy', 'fullName role')
+    .lean();
+
 /**
  * Req 41: the signed-in Advising Student's own slot-change requests from every
  * term, newest first, with their statuses and any Advisor or Coordinator
@@ -106,17 +116,82 @@ exports.listMyRequests = async (req, res) => {
     const student = await resolveStudent(req, res);
     if (!student) return;
 
-    const requests = await SlotChangeRequest.find({ student: student._id })
-      .sort({ createdAt: -1, _id: -1 })
-      .populate('course', 'code name')
-      .populate('term', 'academicYear season')
-      .populate('replacementSlot', 'groupNumber dayOfWeek startTime endTime roomId')
-      .populate('respondedBy', 'fullName role')
-      .lean();
+    const requests = await withListDetails(
+      SlotChangeRequest.find({ student: student._id }).sort({ createdAt: -1, _id: -1 })
+    );
 
     res.status(200).json({ requests: requests.map(serializeListItem) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load your slot-change requests', error: error.message });
+  }
+};
+
+/** Side effect only: a failed notification must never fail the withdrawal. */
+const notifyRequestWithdrawn = async (student, doc) => {
+  // Req 119 names the assigned Advisor only; with no Advisor nobody is told.
+  if (!student.assignedAdvisor) return;
+  try {
+    const snapshot = doc.currentSlotSnapshot;
+    const slotLabel = `${doc.course?.code ?? 'a course'} ${doc.slotType} group ${snapshot.groupNumber} (${snapshot.dayOfWeek} ${snapshot.startTime}-${snapshot.endTime})`;
+    await publishNotificationEvent({
+      name: 'slot_change.withdrawn',
+      entityId: doc._id,
+      occurrence: 'withdrawn',
+      studentId: student._id,
+      title: 'Slot-change request withdrawn',
+      message: `${student.fullName} (${student.studentId}) withdrew their request to change ${slotLabel}.`,
+      link: `/schedule/${student._id}`,
+    });
+  } catch (error) {
+    console.error('[slot-change] Could not send withdrawal notification:', error.message);
+  }
+};
+
+/**
+ * Req 42: withdraw one of the signed-in Advising Student's own Pending
+ * requests. Ownership and the Pending status are part of the update filter, so
+ * the check and the change happen in one atomic step: a second withdrawal, or
+ * one racing an Advisor or Coordinator decision, cannot both succeed.
+ *
+ * Only the status and withdrawal time change. The schedule, seat counts,
+ * workflow status and response fields are left alone — a request never
+ * reserved anything, so there is nothing to release.
+ */
+exports.withdrawMyRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: 'Invalid slot-change request id.' });
+    }
+
+    const student = await resolveStudent(req, res);
+    if (!student) return;
+
+    const withdrawn = await withListDetails(
+      SlotChangeRequest.findOneAndUpdate(
+        { _id: id, student: student._id, status: 'Pending' },
+        { $set: { status: 'Withdrawn', withdrawnAt: new Date() } },
+        { new: true }
+      )
+    );
+
+    if (!withdrawn) {
+      // Another student's request is reported as not found, so its existence is not revealed.
+      const existing = await SlotChangeRequest.findOne({ _id: id, student: student._id }).select('status').lean();
+      if (!existing) return res.status(404).json({ message: 'Slot-change request not found.' });
+      return res.status(409).json({
+        message: `This request is already ${existing.status} and cannot be withdrawn. Only a Pending request can be withdrawn.`,
+      });
+    }
+
+    await notifyRequestWithdrawn(student, withdrawn);
+
+    res.status(200).json({
+      message: 'Your slot-change request was withdrawn.',
+      request: serializeListItem(withdrawn),
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not withdraw your slot-change request', error: error.message });
   }
 };
 

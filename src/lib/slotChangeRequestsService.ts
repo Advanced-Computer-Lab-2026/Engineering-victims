@@ -28,3 +28,13 @@ export const submitSlotChangeRequest = async (
  */
 export const fetchMySlotChangeRequests = async (): Promise<SlotChangeRequestItem[]> =>
   (await apiFetch<{ requests: SlotChangeRequestItem[] }>('/api/slot-change-requests/me')).requests;
+
+/**
+ * Req 42: withdraw one of the signed-in student's own Pending requests. The
+ * API checks ownership and the Pending status atomically and returns the
+ * updated request in the Req 41 list format.
+ */
+export const withdrawSlotChangeRequest = async (
+  id: string
+): Promise<{ message: string; request: SlotChangeRequestItem }> =>
+  apiFetch(`/api/slot-change-requests/me/${encodeURIComponent(id)}/withdraw`, { method: 'PATCH' });

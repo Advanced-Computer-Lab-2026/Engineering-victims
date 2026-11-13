@@ -774,6 +774,319 @@ describe('GET /api/slot-change-requests/me (req 41)', () => {
   });
 });
 
+describe('PATCH /api/slot-change-requests/me/:id/withdraw (req 42)', () => {
+  const withdraw = (world, id, body = {}) =>
+    request(app)
+      .patch(`/api/slot-change-requests/me/${id}/withdraw`)
+      .set('Authorization', tokenFor('Student', world.userId))
+      .send(body);
+
+  /** The request as the atomic update returns it once withdrawn (populated, lean). */
+  const withdrawnDoc = (world, overrides = {}) => ({
+    _id: oid(),
+    student: world.student._id,
+    term: { _id: world.term._id, academicYear: world.term.academicYear, season: world.term.season },
+    course: world.course,
+    slotType: 'Tutorial',
+    currentSlot: world.slot._id,
+    currentSlotSnapshot: { groupNumber: 4, dayOfWeek: 'Tuesday', startTime: '10:00', endTime: '11:30', room: 'C7.201' },
+    preferenceNote: 'Group 2 please',
+    status: 'Withdrawn',
+    replacementSlot: null,
+    responseNote: '',
+    respondedBy: null,
+    respondedAt: null,
+    withdrawnAt: new Date('2026-11-13T10:00:00Z'),
+    createdAt: new Date('2026-11-10T09:00:00Z'),
+    ...overrides,
+  });
+
+  /**
+   * Stubs the atomic update and the follow-up lookup. `updated` is what the
+   * conditional update returns (null when nothing matched); `existing` is the
+   * caller's own request when it exists but is no longer Pending.
+   */
+  const stubWithdraw = (world, { updated, existing = null } = {}) => {
+    const spies = stubWorld(world);
+    const updateQuery = query(updated === undefined ? withdrawnDoc(world) : updated);
+    spies.update = jest.spyOn(SlotChangeRequest, 'findOneAndUpdate').mockReturnValue(updateQuery);
+    spies.updateQuery = updateQuery;
+    spies.findOne = jest.spyOn(SlotChangeRequest, 'findOne').mockReturnValue(query(existing));
+    spies.requestWrites = [
+      jest.spyOn(SlotChangeRequest, 'updateOne'),
+      jest.spyOn(SlotChangeRequest, 'updateMany'),
+      jest.spyOn(SlotChangeRequest, 'findByIdAndUpdate'),
+      jest.spyOn(SlotChangeRequest.prototype, 'save'),
+    ];
+    spies.studentWrites = [
+      jest.spyOn(Student, 'updateOne'),
+      jest.spyOn(Student, 'findByIdAndUpdate'),
+      jest.spyOn(Student, 'findOneAndUpdate'),
+      jest.spyOn(Student.prototype, 'save'),
+    ];
+    return spies;
+  };
+
+  beforeEach(() => {
+    publishNotificationEvent.mockReset();
+    publishNotificationEvent.mockResolvedValue({});
+  });
+
+  it('withdraws a Pending request and returns it in the list format', async () => {
+    const world = makeWorld();
+    const doc = withdrawnDoc(world);
+    stubWithdraw(world, { updated: doc });
+
+    const res = await withdraw(world, doc._id);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toMatch(/withdrawn/);
+    expect(res.body.request).toMatchObject({
+      id: String(doc._id),
+      status: 'Withdrawn',
+      withdrawnAt: '2026-11-13T10:00:00.000Z',
+      course: { code: 'CSEN 501' },
+      term: { label: '2026/2027 Winter' },
+      response: null,
+    });
+  });
+
+  describe('atomic update', () => {
+    it('filters by request id, the token student and Pending status in a single update', async () => {
+      const world = makeWorld();
+      const spies = stubWithdraw(world);
+      const id = oid();
+      const before = Date.now();
+
+      await withdraw(world, id);
+
+      expect(spies.update).toHaveBeenCalledTimes(1);
+      const [filter, update, options] = spies.update.mock.calls[0];
+      expect(filter).toEqual({ _id: String(id), student: world.student._id, status: 'Pending' });
+      expect(Object.keys(update)).toEqual(['$set']);
+      expect(Object.keys(update.$set).sort()).toEqual(['status', 'withdrawnAt']);
+      expect(update.$set.status).toBe('Withdrawn');
+      expect(update.$set.withdrawnAt).toBeInstanceOf(Date);
+      expect(update.$set.withdrawnAt.getTime()).toBeGreaterThanOrEqual(before);
+      expect(options).toEqual({ new: true });
+    });
+
+    it('never reads then saves the request', async () => {
+      const world = makeWorld();
+      const spies = stubWithdraw(world);
+
+      await withdraw(world, oid());
+
+      spies.requestWrites.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+      expect(spies.findOne).not.toHaveBeenCalled();
+    });
+
+    it('answers 409 when a decision lands between the request and the update (race)', async () => {
+      const world = makeWorld();
+      // The conditional update matched nothing because the request was approved meanwhile.
+      const spies = stubWithdraw(world, { updated: null, existing: { status: 'Approved' } });
+      const id = oid();
+
+      const res = await withdraw(world, id);
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toMatch(/already Approved/);
+      expect(spies.findOne).toHaveBeenCalledWith({ _id: String(id), student: world.student._id });
+      expect(publishNotificationEvent).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('only a Pending request can be withdrawn', () => {
+    it.each(['Approved', 'Rejected', 'Withdrawn'])('refuses a %s request with 409', async (status) => {
+      const world = makeWorld();
+      stubWithdraw(world, { updated: null, existing: { status } });
+
+      const res = await withdraw(world, oid());
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toContain(`already ${status}`);
+      expect(publishNotificationEvent).not.toHaveBeenCalled();
+    });
+
+    it('refuses a second withdrawal of the same request', async () => {
+      const world = makeWorld();
+      const doc = withdrawnDoc(world);
+      const spies = stubWithdraw(world, { updated: doc });
+
+      const first = await withdraw(world, doc._id);
+      spies.update.mockReturnValue(query(null));
+      spies.findOne.mockReturnValue(query({ status: 'Withdrawn' }));
+      const second = await withdraw(world, doc._id);
+
+      expect(first.status).toBe(200);
+      expect(second.status).toBe(409);
+      expect(publishNotificationEvent).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('ownership', () => {
+    it("answers 404 for another student's request without revealing it", async () => {
+      const world = makeWorld();
+      // The request exists but belongs to someone else, so neither query matches the caller.
+      const spies = stubWithdraw(world, { updated: null, existing: null });
+
+      const res = await withdraw(world, oid());
+
+      expect(res.status).toBe(404);
+      expect(res.body.message).toBe('Slot-change request not found.');
+      expect(spies.update.mock.calls[0][0].student).toBe(world.student._id);
+      expect(spies.findOne.mock.calls[0][0].student).toBe(world.student._id);
+    });
+
+    it('answers 404 for an unknown id', async () => {
+      const world = makeWorld();
+      stubWithdraw(world, { updated: null, existing: null });
+
+      const res = await withdraw(world, oid());
+
+      expect(res.status).toBe(404);
+    });
+
+    it('answers 400 for an invalid id without querying', async () => {
+      const world = makeWorld();
+      const spies = stubWithdraw(world);
+
+      const res = await withdraw(world, 'not-an-id');
+
+      expect(res.status).toBe(400);
+      expect(spies.update).not.toHaveBeenCalled();
+    });
+
+    it('ignores body fields that try to pick the status, time, owner or response', async () => {
+      const world = makeWorld();
+      const spies = stubWithdraw(world);
+
+      const res = await withdraw(world, oid(), {
+        status: 'Approved',
+        withdrawnAt: '2000-01-01T00:00:00Z',
+        student: String(oid()),
+        responseNote: 'self-approved',
+        replacementSlot: String(oid()),
+        respondedBy: String(oid()),
+      });
+
+      expect(res.status).toBe(200);
+      const [filter, update] = spies.update.mock.calls[0];
+      expect(filter.student).toBe(world.student._id);
+      expect(update.$set.status).toBe('Withdrawn');
+      expect(update.$set.withdrawnAt.getFullYear()).not.toBe(2000);
+      expect(Object.keys(update.$set).sort()).toEqual(['status', 'withdrawnAt']);
+    });
+  });
+
+  describe('side effects', () => {
+    it('never touches the schedule, seat counts or workflow status', async () => {
+      const world = makeWorld();
+      const spies = stubWithdraw(world);
+
+      await withdraw(world, oid());
+
+      spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+      spies.studentWrites.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+      expect(world.student.save).not.toHaveBeenCalled();
+      expect(world.student.workflowStatus).toBe('Ready for Student Review');
+    });
+
+    it('notifies the assigned Advisor through slot_change.withdrawn', async () => {
+      const world = makeWorld();
+      const doc = withdrawnDoc(world);
+      const spies = stubWithdraw(world, { updated: doc });
+
+      await withdraw(world, doc._id);
+
+      expect(publishNotificationEvent).toHaveBeenCalledTimes(1);
+      expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'slot_change.withdrawn',
+        entityId: doc._id,
+        occurrence: 'withdrawn',
+        studentId: world.student._id,
+        link: `/schedule/${world.student._id}`,
+      }));
+      expect(publishNotificationEvent.mock.calls[0][0].message).toContain('CSEN 501 Tutorial group 4');
+      // No direct or Coordinator notifications.
+      expect(spies.insertMany).not.toHaveBeenCalled();
+      expect(spies.userFind).not.toHaveBeenCalled();
+    });
+
+    it('notifies nobody when the student has no Advisor', async () => {
+      const world = makeWorld({ student: { assignedAdvisor: null } });
+      const spies = stubWithdraw(world);
+
+      const res = await withdraw(world, oid());
+
+      expect(res.status).toBe(200);
+      expect(publishNotificationEvent).not.toHaveBeenCalled();
+      expect(spies.insertMany).not.toHaveBeenCalled();
+      expect(spies.userFind).not.toHaveBeenCalled();
+    });
+
+    it('still withdraws when the notification fails', async () => {
+      const world = makeWorld();
+      const spies = stubWithdraw(world);
+      publishNotificationEvent.mockRejectedValue(new Error('notifications down'));
+      const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const res = await withdraw(world, oid());
+
+      expect(res.status).toBe(200);
+      expect(res.body.request.status).toBe('Withdrawn');
+      expect(spies.update).toHaveBeenCalledTimes(1);
+      expect(consoleError).toHaveBeenCalled();
+    });
+  });
+
+  describe('access', () => {
+    it('requires a session', async () => {
+      const res = await request(app).patch(`/api/slot-change-requests/me/${oid()}/withdraw`);
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Advisor', 'Coordinator', 'Administrator'])('is closed to %s accounts', async (role) => {
+      const update = jest.spyOn(SlotChangeRequest, 'findOneAndUpdate');
+
+      const res = await request(app)
+        .patch(`/api/slot-change-requests/me/${oid()}/withdraw`)
+        .set('Authorization', tokenFor(role));
+
+      expect(res.status).toBe(403);
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('refuses a Normal Student', async () => {
+      const world = makeWorld({ student: { studentType: 'Normal Student' } });
+      const spies = stubWithdraw(world);
+
+      const res = await withdraw(world, oid());
+
+      expect(res.status).toBe(403);
+      expect(spies.update).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 when the account has no student record', async () => {
+      const world = makeWorld();
+      const spies = stubWithdraw(world);
+      spies.studentFindOne.mockReturnValue(query(null));
+
+      const res = await withdraw(world, oid());
+
+      expect(res.status).toBe(404);
+      expect(spies.update).not.toHaveBeenCalled();
+    });
+
+    it.each(['get', 'post', 'put', 'delete'])('has no %s route for withdrawal', async (method) => {
+      const res = await request(app)
+        [method](`/api/slot-change-requests/me/${oid()}/withdraw`)
+        .set('Authorization', tokenFor('Student'));
+      expect(res.status).toBe(404);
+    });
+  });
+});
+
 describe('SlotChangeRequest model', () => {
   const valid = () => ({
     student: oid(),
