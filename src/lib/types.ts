@@ -635,6 +635,20 @@ export interface SlotChangeRequestItem extends Omit<SlotChangeRequestSummary, 'c
   response: SlotChangeResponse | null;
 }
 
+/** Req 43 — a request as an Advisor or Coordinator sees it in the list. */
+export interface StaffSlotChangeRequestItem extends SlotChangeRequestItem {
+  /** Null when the student record was deleted. */
+  student: { id: string; studentId: string; fullName: string } | null;
+  /** The student's current Advisor; null when unassigned. */
+  advisor: { id: string; fullName: string } | null;
+}
+
+/** Req 43 — 'assigned' for an Advisor's own students, 'all' for a Coordinator. */
+export interface StaffSlotChangeRequestList {
+  scope: 'assigned' | 'all';
+  requests: StaffSlotChangeRequestItem[];
+}
+
 /** Req 34 — eligible groups for whole-schedule swap. */
 export interface EligibleSwapGroup {
   studyGroup: string;

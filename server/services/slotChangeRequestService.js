@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const AcademicTerm = require('../models/AcademicTerm');
+const Student = require('../models/Student');
 const StudentSchedule = require('../models/StudentSchedule');
 const SlotChangeRequest = require('../models/SlotChangeRequest');
 const { deadlineEnd } = require('./schedulingPreferenceService');
@@ -76,4 +77,30 @@ const validateRequestInput = (body) => {
   return { courseId: String(courseId), slotType, slotId: String(slotId), preferenceNote: note };
 };
 
-module.exports = { reviewWindowFor, validateRequestInput, REVIEW_STATUS };
+/**
+ * Req 43: which slot-change requests a staff member may see, derived only from
+ * the authenticated user (never from query parameters), so later search,
+ * filter, details and decision routes (44-48) can combine it with their own
+ * conditions without ever widening it.
+ *
+ * - A Coordinator sees every request: { scope: 'all', filter: {} }.
+ * - An Advisor sees requests from the Advising Students currently assigned to
+ *   them; a reassigned student's requests follow the new Advisor. `filter` is
+ *   null when they have nobody assigned, meaning there is nothing to query.
+ * - Anyone else gets null.
+ */
+const staffRequestScope = async (user) => {
+  if (user?.role === 'Coordinator') return { scope: 'all', filter: {} };
+  if (user?.role !== 'Advisor') return null;
+
+  if (!mongoose.isValidObjectId(user.userId)) return { scope: 'assigned', filter: null };
+  const assigned = await Student.find({ assignedAdvisor: user.userId, studentType: 'Advising Student' })
+    .select('_id')
+    .lean();
+  return {
+    scope: 'assigned',
+    filter: assigned.length ? { student: { $in: assigned.map((student) => student._id) } } : null,
+  };
+};
+
+module.exports = { reviewWindowFor, validateRequestInput, staffRequestScope, REVIEW_STATUS };

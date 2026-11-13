@@ -6,7 +6,7 @@ const CourseSlot = require('../models/CourseSlot');
 const Course = require('../models/Course');
 const SlotChangeRequest = require('../models/SlotChangeRequest');
 const { deadlineEnd } = require('../services/schedulingPreferenceService');
-const { reviewWindowFor, validateRequestInput } = require('../services/slotChangeRequestService');
+const { reviewWindowFor, validateRequestInput, staffRequestScope } = require('../services/slotChangeRequestService');
 const { notify, notifyRole } = require('../services/notificationService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
 
@@ -192,6 +192,51 @@ exports.withdrawMyRequest = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Could not withdraw your slot-change request', error: error.message });
+  }
+};
+
+/**
+ * Req 43: a request as staff see it in the list: the student's own view
+ * (req 41) plus who asked and their current Advisor. A request whose student
+ * record was deleted keeps `student: null` so it stays visible.
+ */
+const serializeStaffItem = (doc) => {
+  const student = doc.student && typeof doc.student === 'object' && doc.student._id ? doc.student : null;
+  const advisor = student?.assignedAdvisor?._id ? student.assignedAdvisor : null;
+  return {
+    ...serializeListItem(doc),
+    student: student ? { id: student._id, studentId: student.studentId, fullName: student.fullName } : null,
+    advisor: advisor ? { id: advisor._id, fullName: advisor.fullName } : null,
+  };
+};
+
+/**
+ * Req 43: the slot-change requests an Advisor or Coordinator may see, every
+ * status, newest first. The scope comes only from the token (see
+ * staffRequestScope); nothing in the query string can widen it.
+ */
+exports.listStaffRequests = async (req, res) => {
+  try {
+    const access = await staffRequestScope(req.user);
+    if (!access) {
+      return res.status(403).json({ message: 'Only Advisors and Coordinators can view slot-change requests.' });
+    }
+
+    const requests = access.filter
+      ? await withListDetails(
+          SlotChangeRequest.find(access.filter)
+            .sort({ createdAt: -1, _id: -1 })
+            .populate({
+              path: 'student',
+              select: 'fullName studentId assignedAdvisor',
+              populate: { path: 'assignedAdvisor', select: 'fullName' },
+            })
+        )
+      : [];
+
+    res.status(200).json({ scope: access.scope, requests: requests.map(serializeStaffItem) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load slot-change requests', error: error.message });
   }
 };
 

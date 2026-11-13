@@ -111,6 +111,14 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Advisor', 'Coordinator'],
     description: 'Advisors build plans; Coordinators review submissions and track decisions.',
   },
+  // Req 43: Advisors see their assigned students' requests; Coordinators see all.
+  {
+    to: '/slot-change-review',
+    label: 'Slot-Change Requests',
+    icon: ClipboardList,
+    roles: ['Advisor', 'Coordinator'],
+    description: 'Advising-student slot-change requests, their statuses and outcomes.',
+  },
   {
     to: '/exit-exam-requests',
     label: 'Exit-exam Requests',

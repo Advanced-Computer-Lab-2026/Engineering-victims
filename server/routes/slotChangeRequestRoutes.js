@@ -14,4 +14,8 @@ router.get('/me', authenticate, requireRole('Student'), slotChangeRequestControl
 // request; ownership is still checked against the student from the token.
 router.patch('/me/:id/withdraw', authenticate, requireRole('Student'), slotChangeRequestController.withdrawMyRequest);
 
+// Req 43: Advisors list their assigned students' requests, Coordinators all of
+// them. Same path, scope decided from the token by the controller.
+router.get('/', authenticate, requireRole('Advisor', 'Coordinator'), slotChangeRequestController.listStaffRequests);
+
 module.exports = router;

@@ -4,6 +4,7 @@ import type {
   SlotChangeRequestInput,
   SlotChangeRequestItem,
   SlotChangeRequestSummary,
+  StaffSlotChangeRequestList,
 } from './types';
 
 /** The longest preference note the API accepts. */
@@ -38,3 +39,11 @@ export const withdrawSlotChangeRequest = async (
   id: string
 ): Promise<{ message: string; request: SlotChangeRequestItem }> =>
   apiFetch(`/api/slot-change-requests/me/${encodeURIComponent(id)}/withdraw`, { method: 'PATCH' });
+
+/**
+ * Req 43: the requests the signed-in Advisor (assigned students only) or
+ * Coordinator (all) may see, every status, newest first. The API derives the
+ * scope from the session alone.
+ */
+export const fetchStaffSlotChangeRequests = async (): Promise<StaffSlotChangeRequestList> =>
+  apiFetch<StaffSlotChangeRequestList>('/api/slot-change-requests');

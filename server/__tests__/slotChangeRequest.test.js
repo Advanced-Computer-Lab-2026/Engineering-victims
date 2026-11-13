@@ -1087,6 +1087,326 @@ describe('PATCH /api/slot-change-requests/me/:id/withdraw (req 42)', () => {
   });
 });
 
+describe('GET /api/slot-change-requests (req 43)', () => {
+  const listAs = (role, userId = oid(), path = '/api/slot-change-requests') =>
+    request(app).get(path).set('Authorization', tokenFor(role, userId));
+
+  const advisor = { _id: oid(), fullName: 'Mona Adel' };
+  const course = { _id: oid(), code: 'CSEN 501', name: 'Databases I' };
+  const term = { _id: oid(), academicYear: '2026/2027', season: 'Winter' };
+
+  /** A stored request as the populated, lean query returns it. */
+  const stored = (overrides = {}) => ({
+    _id: oid(),
+    student: { _id: oid(), fullName: 'Salma Ibrahim', studentId: '64-30010', assignedAdvisor: advisor },
+    term,
+    course,
+    slotType: 'Lab',
+    currentSlot: oid(),
+    currentSlotSnapshot: { groupNumber: 3, dayOfWeek: 'Monday', startTime: '12:00', endTime: '13:30', room: 'C3.110' },
+    preferenceNote: 'Any Wednesday group',
+    status: 'Pending',
+    replacementSlot: null,
+    responseNote: '',
+    respondedBy: null,
+    respondedAt: null,
+    withdrawnAt: null,
+    createdAt: new Date('2026-11-12T09:00:00Z'),
+    ...overrides,
+  });
+
+  /**
+   * `assigned` is what the Advisor-roster lookup returns; `requests` is what
+   * the request query returns. Every write path is spied so tests can prove
+   * the list never changes anything.
+   */
+  const stubStaff = ({ assigned = [], requests = [] } = {}) => {
+    const spies = {};
+    spies.studentFind = jest.spyOn(Student, 'find').mockReturnValue(query(assigned));
+    spies.requestQuery = query(requests);
+    spies.find = jest.spyOn(SlotChangeRequest, 'find').mockReturnValue(spies.requestQuery);
+    spies.userFindById = jest.spyOn(User, 'findById');
+    spies.studentFindOne = jest.spyOn(Student, 'findOne');
+    spies.writes = [
+      jest.spyOn(SlotChangeRequest, 'create'),
+      jest.spyOn(SlotChangeRequest, 'updateOne'),
+      jest.spyOn(SlotChangeRequest, 'updateMany'),
+      jest.spyOn(SlotChangeRequest, 'findOneAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'findByIdAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'deleteMany'),
+      jest.spyOn(SlotChangeRequest.prototype, 'save'),
+      jest.spyOn(Student, 'updateOne'),
+      jest.spyOn(Student, 'findByIdAndUpdate'),
+      jest.spyOn(StudentSchedule, 'updateOne'),
+      jest.spyOn(CourseSlot, 'updateOne'),
+    ];
+    return spies;
+  };
+
+  describe('Advisor scope', () => {
+    it('lists only requests from Advising Students currently assigned to the signed-in Advisor', async () => {
+      const advisorId = oid();
+      const mine = [{ _id: oid() }, { _id: oid() }];
+      const spies = stubStaff({ assigned: mine, requests: [stored()] });
+
+      const res = await listAs('Advisor', advisorId);
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('assigned');
+      expect(spies.studentFind).toHaveBeenCalledWith({
+        assignedAdvisor: String(advisorId),
+        studentType: 'Advising Student',
+      });
+      expect(spies.find).toHaveBeenCalledWith({ student: { $in: mine.map((s) => s._id) } });
+      expect(res.body.requests).toHaveLength(1);
+    });
+
+    it.each([
+      ['advisor', () => String(oid())],
+      ['assignedAdvisor', () => String(oid())],
+      ['student', () => String(oid())],
+      ['studentId', () => '64-99999'],
+      ['scope', () => 'all'],
+      ['role', () => 'Coordinator'],
+    ])('ignores a ?%s= query parameter that tries to widen the scope', async (param, value) => {
+      const advisorId = oid();
+      const mine = [{ _id: oid() }];
+      const spies = stubStaff({ assigned: mine });
+
+      const res = await listAs('Advisor', advisorId, `/api/slot-change-requests?${param}=${encodeURIComponent(value())}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('assigned');
+      expect(spies.studentFind).toHaveBeenCalledWith({
+        assignedAdvisor: String(advisorId),
+        studentType: 'Advising Student',
+      });
+      expect(spies.find).toHaveBeenCalledWith({ student: { $in: [mine[0]._id] } });
+    });
+
+    it('returns an empty list without querying requests when nobody is assigned', async () => {
+      const spies = stubStaff({ assigned: [] });
+
+      const res = await listAs('Advisor');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ scope: 'assigned', requests: [] });
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('never resolves a student record from the token', async () => {
+      const spies = stubStaff({ assigned: [{ _id: oid() }] });
+
+      await listAs('Advisor');
+
+      expect(spies.userFindById).not.toHaveBeenCalled();
+      expect(spies.studentFindOne).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Coordinator scope', () => {
+    it('lists every request without an Advisor lookup', async () => {
+      const spies = stubStaff({ requests: [stored(), stored()] });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.status).toBe(200);
+      expect(res.body.scope).toBe('all');
+      expect(spies.find).toHaveBeenCalledWith({});
+      expect(spies.studentFind).not.toHaveBeenCalled();
+      expect(res.body.requests).toHaveLength(2);
+    });
+
+    it.each(['advisor', 'student'])('is not narrowed or changed by ?%s=', async (param) => {
+      const spies = stubStaff();
+
+      await listAs('Coordinator', oid(), `/api/slot-change-requests?${param}=${oid()}`);
+
+      expect(spies.find).toHaveBeenCalledWith({});
+    });
+  });
+
+  describe('listing', () => {
+    it('sorts newest first', async () => {
+      const spies = stubStaff();
+
+      await listAs('Coordinator');
+
+      expect(spies.requestQuery.sort).toHaveBeenCalledWith({ createdAt: -1, _id: -1 });
+    });
+
+    it('loads the student and their current Advisor with the request details', async () => {
+      const spies = stubStaff();
+
+      await listAs('Coordinator');
+
+      const paths = spies.requestQuery.populate.mock.calls.map(([arg]) => (typeof arg === 'string' ? arg : arg.path));
+      expect(paths).toEqual(expect.arrayContaining(['student', 'course', 'term', 'replacementSlot', 'respondedBy']));
+      const studentPopulate = spies.requestQuery.populate.mock.calls.find(([arg]) => arg.path === 'student')[0];
+      expect(studentPopulate.populate).toEqual({ path: 'assignedAdvisor', select: 'fullName' });
+      expect(spies.requestQuery.lean).toHaveBeenCalled();
+    });
+
+    it.each(['Pending', 'Approved', 'Rejected', 'Withdrawn'])('includes %s requests', async (status) => {
+      stubStaff({ requests: [stored({ status })] });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.body.requests[0].status).toBe(status);
+    });
+
+    it('serializes the student, current Advisor, course, slot and request details', async () => {
+      const doc = stored();
+      stubStaff({ requests: [doc] });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.body.requests[0]).toEqual({
+        id: String(doc._id),
+        status: 'Pending',
+        student: { id: String(doc.student._id), studentId: '64-30010', fullName: 'Salma Ibrahim' },
+        advisor: { id: String(advisor._id), fullName: 'Mona Adel' },
+        course: { id: String(course._id), code: 'CSEN 501', name: 'Databases I' },
+        term: { id: String(term._id), label: '2026/2027 Winter' },
+        slotType: 'Lab',
+        currentSlot: {
+          id: String(doc.currentSlot),
+          groupNumber: 3,
+          dayOfWeek: 'Monday',
+          startTime: '12:00',
+          endTime: '13:30',
+          room: 'C3.110',
+        },
+        preferenceNote: 'Any Wednesday group',
+        submittedAt: '2026-11-12T09:00:00.000Z',
+        withdrawnAt: null,
+        response: null,
+      });
+    });
+
+    it('includes the decision and approved replacement slot', async () => {
+      const replacement = { _id: oid(), groupNumber: 1, dayOfWeek: 'Sunday', startTime: '08:30', endTime: '10:00', roomId: 'C6.101' };
+      stubStaff({
+        requests: [
+          stored({
+            status: 'Approved',
+            replacementSlot: replacement,
+            responseNote: 'Moved to group 1.',
+            respondedBy: { _id: oid(), fullName: 'Coordinator One', role: 'Coordinator' },
+            respondedAt: new Date('2026-11-12T12:00:00Z'),
+          }),
+        ],
+      });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.body.requests[0].response).toMatchObject({
+        note: 'Moved to group 1.',
+        respondedBy: { name: 'Coordinator One', role: 'Coordinator' },
+        replacementSlot: { id: String(replacement._id), groupNumber: 1, room: 'C6.101' },
+      });
+    });
+
+    it('shows advisor null for a student with no Advisor', async () => {
+      const doc = stored();
+      doc.student.assignedAdvisor = null;
+      stubStaff({ requests: [doc] });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.body.requests[0].advisor).toBeNull();
+      expect(res.body.requests[0].student).not.toBeNull();
+    });
+
+    it('keeps a request whose student record was deleted visible to Coordinators', async () => {
+      stubStaff({ requests: [stored({ student: null })] });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.status).toBe(200);
+      expect(res.body.requests).toHaveLength(1);
+      expect(res.body.requests[0]).toMatchObject({ student: null, advisor: null, status: 'Pending' });
+    });
+
+    it('copes with a deleted course, term, replacement slot or responder', async () => {
+      stubStaff({
+        requests: [stored({ status: 'Approved', course: null, term: null, replacementSlot: null, respondedBy: null })],
+      });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.status).toBe(200);
+      expect(res.body.requests[0]).toMatchObject({
+        course: null,
+        term: null,
+        response: { respondedBy: null, replacementSlot: null },
+      });
+    });
+
+    it('never writes anything', async () => {
+      const spies = stubStaff({ assigned: [{ _id: oid() }], requests: [stored()] });
+
+      await listAs('Advisor');
+      await listAs('Coordinator');
+
+      spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+    });
+
+    it('answers 500 with a message when the query fails', async () => {
+      const spies = stubStaff();
+      spies.find.mockImplementation(() => {
+        throw new Error('db down');
+      });
+
+      const res = await listAs('Coordinator');
+
+      expect(res.status).toBe(500);
+      expect(res.body.message).toBe('Could not load slot-change requests');
+    });
+  });
+
+  describe('access', () => {
+    it('requires a session', async () => {
+      const res = await request(app).get('/api/slot-change-requests');
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Student', 'Administrator'])('refuses %s accounts before any query', async (role) => {
+      const spies = stubStaff();
+
+      const res = await listAs(role);
+
+      expect(res.status).toBe(403);
+      expect(spies.find).not.toHaveBeenCalled();
+      expect(spies.studentFind).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('staffRequestScope', () => {
+    const { staffRequestScope } = require('../services/slotChangeRequestService');
+
+    it('gives a Coordinator every request', async () => {
+      await expect(staffRequestScope({ role: 'Coordinator', userId: String(oid()) })).resolves.toEqual({
+        scope: 'all',
+        filter: {},
+      });
+    });
+
+    it.each(['Student', 'Administrator', undefined])('gives %s no scope', async (role) => {
+      await expect(staffRequestScope({ role, userId: String(oid()) })).resolves.toBeNull();
+    });
+
+    it('gives an Advisor with an invalid id nothing, without querying', async () => {
+      const find = jest.spyOn(Student, 'find');
+      await expect(staffRequestScope({ role: 'Advisor', userId: 'nope' })).resolves.toEqual({
+        scope: 'assigned',
+        filter: null,
+      });
+      expect(find).not.toHaveBeenCalled();
+    });
+  });
+});
+
 describe('SlotChangeRequest model', () => {
   const valid = () => ({
     student: oid(),
