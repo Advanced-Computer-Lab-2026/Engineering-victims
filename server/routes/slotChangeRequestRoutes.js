@@ -27,5 +27,12 @@ router.get(
 // Req 46: one request's details, looked up inside the caller's scope. Kept
 // after the fixed paths above so "/filter-options" never reads as an id.
 router.get('/:id', authenticate, requireRole('Advisor', 'Coordinator'), slotChangeRequestController.getStaffRequest);
+// Req 47: compare the current slot with the other groups of the same component.
+router.get(
+  '/:id/alternatives',
+  authenticate,
+  requireRole('Advisor', 'Coordinator'),
+  slotChangeRequestController.getRequestAlternatives
+);
 
 module.exports = router;

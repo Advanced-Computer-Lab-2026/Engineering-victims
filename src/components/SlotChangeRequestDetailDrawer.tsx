@@ -17,6 +17,7 @@ import { fetchStaffSlotChangeRequest } from '../lib/slotChangeRequestsService';
 import { SLOT_TONE, STATUS_TONE, slotLabel } from '../lib/slotChangeDisplay';
 import { formatDate, formatRelative } from '../lib/studentsService';
 import type { StaffSlotChangeRequestItem } from '../lib/types';
+import SlotAlternativesComparison from './SlotAlternativesComparison';
 import AlertBanner from './ui/AlertBanner';
 import Badge from './ui/Badge';
 import CustomButton from './ui/CustomButton';
@@ -66,8 +67,8 @@ const when = (value: string) => (
  * request that was withdrawn, decided or moved to another Advisor since the
  * list loaded is shown as it is now, or not at all.
  *
- * Read-only: comparing alternatives (req 47) and deciding (req 48) are later
- * requirements.
+ * Req 47 adds a read-only comparison of the current slot with the other
+ * groups of the same component. Deciding the request (req 48) is later.
  */
 const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps> = ({
   selected,
@@ -224,6 +225,9 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                   </DetailRow>
                 </dl>
               </section>
+
+              {/* Req 47: current slot vs. the other groups of this component. Read-only. */}
+              <SlotAlternativesComparison requestId={request.id} courseCode={request.course?.code ?? null} />
 
               <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</h3>

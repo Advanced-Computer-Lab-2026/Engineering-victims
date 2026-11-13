@@ -649,6 +649,55 @@ export interface StaffSlotChangeRequestList {
   requests: StaffSlotChangeRequestItem[];
 }
 
+/** Req 47 — one slot as compared in the details drawer. */
+export interface SlotComparisonTimes {
+  groupNumber: number;
+  dayOfWeek: WeekDay;
+  startTime: string;
+  endTime: string;
+  room: string;
+}
+
+/** Req 47 — why an alternative cannot be offered. */
+export type SlotAlternativeReason = 'full' | 'clash' | 'already-assigned' | 'timetable-unavailable';
+
+/** Req 47 — another group of the same course offering and component. */
+export interface SlotAlternative extends SlotComparisonTimes {
+  id: string;
+  maxCapacity: number;
+  assignedCount: number;
+  /** maxCapacity - assignedCount, never negative. */
+  remainingSeats: number;
+  isFull: boolean;
+  /** The student's other assigned slots this group overlaps. */
+  clashes: (SlotComparisonTimes & {
+    slotId: string;
+    course: { code: string; name: string } | null;
+    slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  })[];
+  isEligible: boolean;
+  reasons: SlotAlternativeReason[];
+}
+
+/** Req 47 — the current slot beside its alternatives, read-only. */
+export interface SlotChangeComparison {
+  requestId: string;
+  status: SlotChangeRequestStatus;
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  /** False when the student record is gone, so clashes could not be checked. */
+  timetableChecked: boolean;
+  current: SlotComparisonTimes & {
+    id: string;
+    /** True when the slot was deleted; times then come from the request. */
+    missing: boolean;
+    maxCapacity: number | null;
+    assignedCount: number | null;
+    remainingSeats: number | null;
+  };
+  alternatives: SlotAlternative[];
+  summary: { total: number; eligible: number; full: number; clashing: number };
+}
+
 /** Req 46 — one request opened from the staff list; `request` has the list row's shape. */
 export interface StaffSlotChangeRequestDetails {
   scope: 'assigned' | 'all';

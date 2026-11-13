@@ -53,6 +53,18 @@ exports.checkSlotConflict = async (slotData, excludeSlotId = null) => {
   return true;
 };
 
+exports.timesOverlap = timesOverlap;
+
+/**
+ * Req 47: whether two slots occupy the same time on the same day, using the
+ * same rule as the room and instructor checks above. The bounds are strict,
+ * so a slot ending exactly when another starts (13:15 and 13:15) is not a
+ * clash. Times are the schema-validated, zero-padded "HH:mm" strings, which
+ * order correctly as text.
+ */
+exports.slotsOverlap = (a, b) =>
+  Boolean(a && b) && a.dayOfWeek === b.dayOfWeek && timesOverlap(a.startTime, a.endTime, b.startTime, b.endTime);
+
 exports.validateCapacity = (newMaxCapacity, currentAssignedCount) => {
   if (newMaxCapacity < currentAssignedCount) {
     throw conflictError(

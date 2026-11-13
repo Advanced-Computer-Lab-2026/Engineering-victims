@@ -1,5 +1,6 @@
 import { apiFetch } from './api';
 import type {
+  SlotChangeComparison,
   SlotChangeEligibility,
   SlotChangeRequestInput,
   SlotChangeRequestItem,
@@ -66,6 +67,14 @@ export const fetchStaffSlotChangeRequests = async (
  */
 export const fetchStaffSlotChangeRequest = async (id: string): Promise<StaffSlotChangeRequestDetails> =>
   apiFetch<StaffSlotChangeRequestDetails>(`/api/slot-change-requests/${encodeURIComponent(id)}`);
+
+/**
+ * Req 47: the request's current slot beside the other groups of the same
+ * course offering and component, with remaining seats and timetable clashes.
+ * Scoped like the details: another Advisor's request answers 404.
+ */
+export const fetchSlotChangeAlternatives = async (id: string): Promise<SlotChangeComparison> =>
+  apiFetch<SlotChangeComparison>(`/api/slot-change-requests/${encodeURIComponent(id)}/alternatives`);
 
 /** Req 45: Advisor and course choices for the filters, within the caller's scope. */
 export const fetchStaffSlotChangeFilterOptions = async (): Promise<StaffSlotChangeFilterOptions> =>

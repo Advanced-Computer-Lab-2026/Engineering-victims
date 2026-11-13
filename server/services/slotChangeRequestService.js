@@ -3,10 +3,12 @@ const AcademicTerm = require('../models/AcademicTerm');
 const Student = require('../models/Student');
 const Course = require('../models/Course');
 const User = require('../models/User');
+const CourseSlot = require('../models/CourseSlot');
 const StudentSchedule = require('../models/StudentSchedule');
 const SlotChangeRequest = require('../models/SlotChangeRequest');
 const { deadlineEnd } = require('./schedulingPreferenceService');
 const { escapeRegex, studentIdVariants } = require('./studentQueryService');
+const { slotsOverlap } = require('./conflictService');
 
 const { SLOT_TYPES, NOTE_LIMIT, STATUSES } = SlotChangeRequest;
 
@@ -321,7 +323,144 @@ const staffFilterOptions = async (access, user) => {
   };
 };
 
+/** Schedule rows that count as the student's assigned timetable (not an unfinished draft). */
+const ASSIGNED_ROW_STATUSES = ['Active', 'Processed'];
+
+/**
+ * Seats left in a slot: maxCapacity - assignedCount, never negative (an
+ * over-assigned slot is simply full) and never above capacity (a negative
+ * or missing assigned count is treated as 0).
+ */
+const remainingSeats = (slot) => {
+  const capacity = Math.max(0, Number(slot.maxCapacity) || 0);
+  const assigned = Math.max(0, Number(slot.assignedCount) || 0);
+  return Math.max(0, capacity - assigned);
+};
+
+const slotTimes = (slot) => ({
+  groupNumber: slot.groupNumber,
+  dayOfWeek: slot.dayOfWeek,
+  startTime: slot.startTime,
+  endTime: slot.endTime,
+  room: slot.roomId ?? slot.room,
+});
+
+/**
+ * Req 47: the student's current slot beside every other group of the same
+ * course offering (so the same course and term) and the same component, with
+ * remaining seats and clashes against the rest of the student's timetable.
+ *
+ * `request` is a lean SlotChangeRequest the caller has already found inside
+ * the staff scope; nothing here takes a course, student or slot from the
+ * client. Read-only: no schedule row, capacity or request is touched.
+ *
+ * Clashes use the student's Active/Processed rows in the request's term,
+ * excluding the current slot (which the change would replace). A slot the
+ * student already holds is never offered. When the student record is gone
+ * the timetable cannot be checked, so no alternative is marked eligible.
+ */
+const compareSlotAlternatives = async (request) => {
+  const studentId = request.student?._id ?? request.student;
+  const currentSlotId = String(request.currentSlot);
+
+  // One query for every group of this component in this offering (current included).
+  const [groupSlots, studentExists] = await Promise.all([
+    CourseSlot.find({ offeringId: request.offering, slotType: request.slotType })
+      .select('offeringId slotType groupNumber dayOfWeek startTime endTime roomId maxCapacity assignedCount')
+      .sort({ groupNumber: 1, _id: 1 })
+      .lean(),
+    studentId ? Student.exists({ _id: studentId }) : Promise.resolve(null),
+  ]);
+
+  // The rest of the student's timetable in this term, with course labels for the clash list.
+  const rows = studentExists
+    ? await StudentSchedule.find({
+        studentId,
+        termId: request.term,
+        status: { $in: ASSIGNED_ROW_STATUSES },
+        slotId: { $ne: request.currentSlot },
+      })
+        .select('slotId')
+        .lean()
+    : [];
+  const assignedSlots = rows.length
+    ? await CourseSlot.find({ _id: { $in: rows.map((row) => row.slotId) } })
+        .select('offeringId slotType groupNumber dayOfWeek startTime endTime')
+        .populate({ path: 'offeringId', select: 'courseId', populate: { path: 'courseId', select: 'code name' } })
+        .lean()
+    : [];
+  const assignedIds = new Set(assignedSlots.map((slot) => String(slot._id)));
+
+  const current = groupSlots.find((slot) => String(slot._id) === currentSlotId);
+  const alternatives = groupSlots
+    .filter((slot) => String(slot._id) !== currentSlotId)
+    .map((slot) => {
+      const clashes = assignedSlots
+        .filter((other) => String(other._id) !== String(slot._id) && slotsOverlap(slot, other))
+        .map((other) => ({
+          slotId: other._id,
+          course: other.offeringId?.courseId
+            ? { code: other.offeringId.courseId.code, name: other.offeringId.courseId.name }
+            : null,
+          slotType: other.slotType,
+          ...slotTimes(other),
+        }));
+      const seats = remainingSeats(slot);
+      const alreadyAssigned = assignedIds.has(String(slot._id));
+      const reasons = [];
+      if (seats === 0) reasons.push('full');
+      if (clashes.length) reasons.push('clash');
+      if (alreadyAssigned) reasons.push('already-assigned');
+      if (!studentExists) reasons.push('timetable-unavailable');
+      return {
+        id: slot._id,
+        ...slotTimes(slot),
+        maxCapacity: slot.maxCapacity,
+        assignedCount: slot.assignedCount,
+        remainingSeats: seats,
+        isFull: seats === 0,
+        clashes,
+        isEligible: reasons.length === 0,
+        reasons,
+      };
+    });
+
+  return {
+    requestId: request._id,
+    status: request.status,
+    slotType: request.slotType,
+    timetableChecked: Boolean(studentExists),
+    current: current
+      ? {
+          id: current._id,
+          missing: false,
+          ...slotTimes(current),
+          maxCapacity: current.maxCapacity,
+          assignedCount: current.assignedCount,
+          remainingSeats: remainingSeats(current),
+        }
+      : {
+          // The slot was deleted since the request was made; show what was asked about.
+          id: request.currentSlot,
+          missing: true,
+          ...slotTimes(request.currentSlotSnapshot ?? {}),
+          maxCapacity: null,
+          assignedCount: null,
+          remainingSeats: null,
+        },
+    alternatives,
+    summary: {
+      total: alternatives.length,
+      eligible: alternatives.filter((alt) => alt.isEligible).length,
+      full: alternatives.filter((alt) => alt.isFull).length,
+      clashing: alternatives.filter((alt) => alt.clashes.length > 0).length,
+    },
+  };
+};
+
 module.exports = {
+  compareSlotAlternatives,
+  remainingSeats,
   reviewWindowFor,
   validateRequestInput,
   staffRequestScope,

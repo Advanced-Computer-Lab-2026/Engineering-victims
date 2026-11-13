@@ -13,6 +13,7 @@ const {
   parseStaffListQuery,
   buildStaffRequestFilter,
   staffFilterOptions,
+  compareSlotAlternatives,
 } = require('../services/slotChangeRequestService');
 const { notify, notifyRole } = require('../services/notificationService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
@@ -272,28 +273,61 @@ exports.listStaffRequests = async (req, res) => {
  * request that does not exist, so its existence is not revealed. The body is
  * exactly a staff list row (serializeStaffItem), read fresh from the database.
  */
+/**
+ * Req 46/47: finds the request named by `:id` inside the caller's req 43
+ * scope, or answers the error itself and returns null. `load` turns the
+ * scoped query into the document (populated for details, plain for the
+ * comparison). Out-of-scope and missing requests share one 404.
+ */
+const findScopedRequest = async (req, res, load) => {
+  const access = await staffRequestScope(req.user);
+  if (!access) {
+    res.status(403).json({ message: 'Only Advisors and Coordinators can view slot-change requests.' });
+    return null;
+  }
+
+  const { id } = req.params;
+  if (!mongoose.isValidObjectId(id)) {
+    res.status(400).json({ message: 'That slot-change request id is not valid.' });
+    return null;
+  }
+
+  const doc = access.filter
+    ? await load(SlotChangeRequest.findOne({ $and: [access.filter, { _id: new mongoose.Types.ObjectId(id) }] }))
+    : null;
+  if (!doc) {
+    res.status(404).json({ message: 'Slot-change request not found.' });
+    return null;
+  }
+  return { access, doc };
+};
+
 exports.getStaffRequest = async (req, res) => {
   try {
-    const access = await staffRequestScope(req.user);
-    if (!access) {
-      return res.status(403).json({ message: 'Only Advisors and Coordinators can view slot-change requests.' });
-    }
-
-    const { id } = req.params;
-    if (!mongoose.isValidObjectId(id)) {
-      return res.status(400).json({ message: 'That slot-change request id is not valid.' });
-    }
-
-    const doc = access.filter
-      ? await withStaffDetails(
-          SlotChangeRequest.findOne({ $and: [access.filter, { _id: new mongoose.Types.ObjectId(id) }] })
-        )
-      : null;
-    if (!doc) return res.status(404).json({ message: 'Slot-change request not found.' });
-
-    res.status(200).json({ scope: access.scope, request: serializeStaffItem(doc) });
+    const found = await findScopedRequest(req, res, withStaffDetails);
+    if (!found) return;
+    res.status(200).json({ scope: found.access.scope, request: serializeStaffItem(found.doc) });
   } catch (error) {
     res.status(500).json({ message: 'Could not load the slot-change request', error: error.message });
+  }
+};
+
+/**
+ * Req 47: the request's current slot beside the other groups of the same
+ * course offering and component, with remaining seats and clashes against
+ * the student's timetable. The request is found inside the caller's scope
+ * first; the course, term, component, slot and student all come from it,
+ * never from the client. Comparison only: nothing is written.
+ */
+exports.getRequestAlternatives = async (req, res) => {
+  try {
+    const found = await findScopedRequest(req, res, (query) =>
+      query.select('student offering course term slotType currentSlot currentSlotSnapshot status').lean()
+    );
+    if (!found) return;
+    res.status(200).json(await compareSlotAlternatives(found.doc));
+  } catch (error) {
+    res.status(500).json({ message: 'Could not compare the alternative slots', error: error.message });
   }
 };
 

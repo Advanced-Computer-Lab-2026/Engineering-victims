@@ -2719,6 +2719,551 @@ describe('GET /api/slot-change-requests/:id (req 46)', () => {
   });
 });
 
+describe('GET /api/slot-change-requests/:id/alternatives (req 47)', () => {
+  const { remainingSeats } = require('../services/slotChangeRequestService');
+  const { slotsOverlap } = require('../services/conflictService');
+
+  const winter = oid();
+  const spring = oid();
+  const offering = oid(); // CSEN 501, Winter
+  const otherTermOffering = oid(); // CSEN 501, Spring
+  const otherCourseOffering = oid(); // CSEN 301, Winter
+  const csen501 = { _id: oid(), code: 'CSEN 501', name: 'Data Base I' };
+  const csen301 = { _id: oid(), code: 'CSEN 301', name: 'Data Structures and Algorithms' };
+
+  const slot = (offeringId, slotType, groupNumber, dayOfWeek, startTime, endTime, extra = {}) => ({
+    _id: oid(),
+    offeringId,
+    slotType,
+    groupNumber,
+    dayOfWeek,
+    startTime,
+    endTime,
+    roomId: `R-${slotType[0]}${groupNumber}`,
+    maxCapacity: 60,
+    assignedCount: 10,
+    ...extra,
+  });
+
+  /**
+   * A small in-memory world shaped like Salma Ibrahim's: a pending request
+   * for CSEN 501 Lecture G1 (Mon 13:15-14:45), the other CSEN 501 groups,
+   * and slots that must never be offered (another component, term or course).
+   */
+  const makeWorld = () => {
+    const current = slot(offering, 'Lecture', 1, 'Monday', '13:15', '14:45', { assignedCount: 52 });
+    const free = slot(offering, 'Lecture', 2, 'Sunday', '08:00', '09:30');
+    const clashing = slot(offering, 'Lecture', 3, 'Wednesday', '09:45', '11:15', { assignedCount: 5 });
+    const full = slot(offering, 'Lecture', 4, 'Sunday', '11:30', '13:00', { maxCapacity: 40, assignedCount: 40 });
+    const adjacent = slot(offering, 'Lecture', 5, 'Tuesday', '11:30', '13:15', { assignedCount: 59 });
+    const tutorial = slot(offering, 'Tutorial', 1, 'Tuesday', '13:15', '14:45');
+    const springLecture = slot(otherTermOffering, 'Lecture', 2, 'Sunday', '08:00', '09:30');
+    const csen301Lecture = slot(otherCourseOffering, 'Lecture', 1, 'Wednesday', '09:45', '11:15');
+    const csen301Lab = slot(otherCourseOffering, 'Lab', 1, 'Friday', '09:45', '11:15');
+    const studentId = oid();
+    const request = {
+      _id: oid(),
+      student: studentId,
+      offering,
+      course: csen501._id,
+      term: winter,
+      slotType: 'Lecture',
+      currentSlot: current._id,
+      currentSlotSnapshot: { groupNumber: 1, dayOfWeek: 'Monday', startTime: '13:15', endTime: '14:45', room: 'H1-01' },
+      status: 'Pending',
+    };
+    const row = (s, extra = {}) => ({ _id: oid(), studentId, slotId: s._id, termId: winter, status: 'Active', ...extra });
+    return {
+      request,
+      studentExists: true,
+      slots: { current, free, clashing, full, adjacent, tutorial, springLecture, csen301Lecture, csen301Lab },
+      courseOf: new Map([
+        [String(offering), csen501],
+        [String(otherTermOffering), csen501],
+        [String(otherCourseOffering), csen301],
+      ]),
+      rows: [
+        row(current),
+        row(tutorial),
+        row(csen301Lecture),
+        row(csen301Lab),
+        // Neither of these is part of the assigned timetable: a draft row and another term.
+        row(free, { status: 'Draft' }),
+        row(full, { termId: spring }),
+      ],
+    };
+  };
+
+  /** Stubs that actually evaluate the filters the service sends, over the world above. */
+  const stubCompare = (world, { roster = null } = {}) => {
+    const all = Object.values(world.slots);
+    const spies = {};
+    spies.studentFind = jest.spyOn(Student, 'find').mockReturnValue(query(roster ?? [{ _id: world.request.student }]));
+    spies.findOneQuery = query(world.request);
+    spies.findOne = jest.spyOn(SlotChangeRequest, 'findOne').mockReturnValue(spies.findOneQuery);
+    spies.exists = jest.spyOn(Student, 'exists').mockResolvedValue(world.studentExists ? { _id: world.request.student } : null);
+    spies.slotFind = jest.spyOn(CourseSlot, 'find').mockImplementation((filter) => {
+      if (filter.offeringId) {
+        return query(all.filter((s) => String(s.offeringId) === String(filter.offeringId) && s.slotType === filter.slotType));
+      }
+      const ids = filter._id.$in.map(String);
+      // The assigned-slot lookup populates offering -> course for clash labels.
+      return query(
+        all
+          .filter((s) => ids.includes(String(s._id)))
+          .map((s) => ({ ...s, offeringId: { _id: s.offeringId, courseId: world.courseOf.get(String(s.offeringId)) } }))
+      );
+    });
+    spies.scheduleFind = jest.spyOn(StudentSchedule, 'find').mockImplementation((filter) =>
+      query(
+        world.rows.filter(
+          (r) =>
+            String(r.studentId) === String(filter.studentId) &&
+            String(r.termId) === String(filter.termId) &&
+            filter.status.$in.includes(r.status) &&
+            String(r.slotId) !== String(filter.slotId.$ne)
+        )
+      )
+    );
+    spies.writes = [
+      jest.spyOn(CourseSlot, 'updateOne'),
+      jest.spyOn(CourseSlot, 'updateMany'),
+      jest.spyOn(CourseSlot, 'findOneAndUpdate'),
+      jest.spyOn(CourseSlot, 'findByIdAndUpdate'),
+      jest.spyOn(CourseSlot, 'bulkWrite'),
+      jest.spyOn(CourseSlot.prototype, 'save'),
+      jest.spyOn(StudentSchedule, 'updateOne'),
+      jest.spyOn(StudentSchedule, 'updateMany'),
+      jest.spyOn(StudentSchedule, 'insertMany'),
+      jest.spyOn(StudentSchedule, 'deleteOne'),
+      jest.spyOn(StudentSchedule, 'deleteMany'),
+      jest.spyOn(StudentSchedule, 'findOneAndUpdate'),
+      jest.spyOn(StudentSchedule.prototype, 'save'),
+      jest.spyOn(SlotChangeRequest, 'updateOne'),
+      jest.spyOn(SlotChangeRequest, 'findOneAndUpdate'),
+      jest.spyOn(SlotChangeRequest, 'findByIdAndUpdate'),
+      jest.spyOn(SlotChangeRequest.prototype, 'save'),
+      jest.spyOn(Student, 'updateOne'),
+      jest.spyOn(Notification, 'create'),
+    ];
+    return spies;
+  };
+
+  const compare = (role, id, userId = oid(), qs = '') =>
+    request(app)
+      .get(`/api/slot-change-requests/${id}/alternatives${qs ? `?${qs}` : ''}`)
+      .set('Authorization', tokenFor(role, userId));
+  const byGroup = (res, group) => res.body.alternatives.find((alt) => alt.groupNumber === group);
+
+  describe('access', () => {
+    it("lets an Advisor compare a request from a currently assigned student, inside the roster", async () => {
+      const world = makeWorld();
+      const me = oid();
+      const spies = stubCompare(world);
+
+      const res = await compare('Advisor', world.request._id, me);
+
+      expect(res.status).toBe(200);
+      expect(spies.studentFind).toHaveBeenCalledWith({ assignedAdvisor: String(me), studentType: 'Advising Student' });
+      const lookup = spies.findOne.mock.calls[0][0];
+      expect(lookup.$and[0]).toEqual({ student: { $in: [world.request.student] } });
+      expect(String(lookup.$and[1]._id)).toBe(String(world.request._id));
+    });
+
+    it("gives an Advisor the same 404 for another Advisor's request as for a missing one, without comparing", async () => {
+      const world = makeWorld();
+      const spies = stubCompare(world, { roster: [{ _id: oid() }] });
+      spies.findOne.mockReturnValue(query(null)); // the roster clause keeps it out
+
+      const denied = await compare('Advisor', world.request._id);
+      const missing = await compare('Advisor', oid());
+
+      expect(denied.status).toBe(404);
+      expect(denied.body).toEqual({ message: 'Slot-change request not found.' });
+      expect(missing.body).toEqual(denied.body);
+      expect(spies.slotFind).not.toHaveBeenCalled();
+      expect(spies.scheduleFind).not.toHaveBeenCalled();
+    });
+
+    it('lets a Coordinator compare any request', async () => {
+      const world = makeWorld();
+      const spies = stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.status).toBe(200);
+      expect(spies.findOne.mock.calls[0][0].$and[0]).toEqual({});
+      expect(spies.studentFind).not.toHaveBeenCalled();
+    });
+
+    it('requires a session', async () => {
+      const res = await request(app).get(`/api/slot-change-requests/${oid()}/alternatives`);
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Student', 'Administrator'])('refuses %s accounts before any lookup', async (role) => {
+      const world = makeWorld();
+      const spies = stubCompare(world);
+
+      const res = await compare(role, world.request._id);
+
+      expect(res.status).toBe(403);
+      expect(spies.findOne).not.toHaveBeenCalled();
+      expect(spies.slotFind).not.toHaveBeenCalled();
+    });
+
+    it.each(['abc', '123', 'filter-options-x'])('refuses the invalid id "%s"', async (id) => {
+      const spies = stubCompare(makeWorld());
+
+      const res = await compare('Coordinator', id);
+
+      expect(res.status).toBe(400);
+      expect(spies.findOne).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 without comparing when the request does not exist', async () => {
+      const spies = stubCompare(makeWorld());
+      spies.findOne.mockReturnValue(query(null));
+
+      const res = await compare('Coordinator', oid());
+
+      expect(res.status).toBe(404);
+      expect(spies.slotFind).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('which slots are alternatives', () => {
+    it('returns only other groups of the same offering (course and term) and component', async () => {
+      const world = makeWorld();
+      const spies = stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(spies.slotFind.mock.calls[0][0]).toEqual({ offeringId: offering, slotType: 'Lecture' });
+      expect(res.body.alternatives.map((alt) => alt.groupNumber)).toEqual([2, 3, 4, 5]);
+      const ids = res.body.alternatives.map((alt) => alt.id);
+      [world.slots.tutorial, world.slots.springLecture, world.slots.csen301Lecture].forEach((s) =>
+        expect(ids).not.toContain(String(s._id))
+      );
+    });
+
+    it('never offers the current slot', async () => {
+      const world = makeWorld();
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.body.alternatives.map((alt) => alt.id)).not.toContain(String(world.slots.current._id));
+      expect(res.body.current).toMatchObject({ id: String(world.slots.current._id), groupNumber: 1, missing: false });
+    });
+
+    it('takes course, term, component and student from the stored request, not the query string', async () => {
+      const world = makeWorld();
+      const spies = stubCompare(world);
+
+      await compare('Coordinator', world.request._id, oid(), `offering=${otherCourseOffering}&slotType=Lab&student=${oid()}&term=${spring}`);
+
+      expect(spies.slotFind.mock.calls[0][0]).toEqual({ offeringId: offering, slotType: 'Lecture' });
+      const scheduleFilter = spies.scheduleFind.mock.calls[0][0];
+      expect(String(scheduleFilter.studentId)).toBe(String(world.request.student));
+      expect(String(scheduleFilter.termId)).toBe(String(winter));
+    });
+
+    it('shows the current slot with its live capacity', async () => {
+      const world = makeWorld();
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.body.current).toEqual({
+        id: String(world.slots.current._id),
+        missing: false,
+        groupNumber: 1,
+        dayOfWeek: 'Monday',
+        startTime: '13:15',
+        endTime: '14:45',
+        room: 'R-L1',
+        maxCapacity: 60,
+        assignedCount: 52,
+        remainingSeats: 8,
+      });
+    });
+  });
+
+  describe('seats and clashes', () => {
+    it('marks a free, non-clashing group eligible', async () => {
+      const world = makeWorld();
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(byGroup(res, 2)).toEqual({
+        id: String(world.slots.free._id),
+        groupNumber: 2,
+        dayOfWeek: 'Sunday',
+        startTime: '08:00',
+        endTime: '09:30',
+        room: 'R-L2',
+        maxCapacity: 60,
+        assignedCount: 10,
+        remainingSeats: 50,
+        isFull: false,
+        clashes: [],
+        isEligible: true,
+        reasons: [],
+      });
+    });
+
+    it('flags a group that clashes with another assigned course', async () => {
+      const world = makeWorld();
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      const alt = byGroup(res, 3);
+      expect(alt.isEligible).toBe(false);
+      expect(alt.reasons).toEqual(['clash']);
+      expect(alt.remainingSeats).toBe(55);
+      expect(alt.clashes).toEqual([
+        {
+          slotId: String(world.slots.csen301Lecture._id),
+          course: { code: 'CSEN 301', name: 'Data Structures and Algorithms' },
+          slotType: 'Lecture',
+          groupNumber: 1,
+          dayOfWeek: 'Wednesday',
+          startTime: '09:45',
+          endTime: '11:15',
+          room: 'R-L1',
+        },
+      ]);
+    });
+
+    it('flags a full group with zero remaining seats', async () => {
+      const world = makeWorld();
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(byGroup(res, 4)).toMatchObject({ remainingSeats: 0, isFull: true, isEligible: false, reasons: ['full'], clashes: [] });
+    });
+
+    it('does not treat a slot ending exactly when another starts as a clash', async () => {
+      const world = makeWorld();
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      // G5 is Tuesday 11:30-13:15; the student's tutorial starts Tuesday 13:15.
+      expect(byGroup(res, 5)).toMatchObject({ clashes: [], remainingSeats: 1, isEligible: true });
+    });
+
+    it('ignores the current slot, draft rows and other terms when checking clashes', async () => {
+      const world = makeWorld();
+      const spies = stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      const filter = spies.scheduleFind.mock.calls[0][0];
+      expect(filter.status).toEqual({ $in: ['Active', 'Processed'] });
+      expect(String(filter.slotId.$ne)).toBe(String(world.slots.current._id));
+      // G2 (Sun 08:00) would clash with the Draft row, G4 (Sun 11:30) has a Spring row: neither counts.
+      expect(byGroup(res, 2).clashes).toEqual([]);
+      expect(byGroup(res, 4).clashes).toEqual([]);
+    });
+
+    it('lists every clash when a group overlaps several assigned slots, and can be full and clashing', async () => {
+      const world = makeWorld();
+      world.slots.long = slot(offering, 'Lecture', 6, 'Friday', '09:00', '14:00', { maxCapacity: 30, assignedCount: 35 });
+      world.slots.fridayTut = slot(otherCourseOffering, 'Tutorial', 1, 'Friday', '13:15', '14:45');
+      world.rows.push({ _id: oid(), studentId: world.request.student, slotId: world.slots.fridayTut._id, termId: winter, status: 'Active' });
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      const alt = byGroup(res, 6);
+      expect(alt.clashes.map((c) => `${c.course.code} ${c.slotType}`).sort()).toEqual(['CSEN 301 Lab', 'CSEN 301 Tutorial']);
+      expect(alt).toMatchObject({ remainingSeats: 0, isFull: true, isEligible: false });
+      expect(alt.reasons).toEqual(['full', 'clash']);
+    });
+
+    it('summarises eligible, full and clashing groups', async () => {
+      const world = makeWorld();
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.body.summary).toEqual({ total: 4, eligible: 2, full: 1, clashing: 1 });
+      expect(res.body.timetableChecked).toBe(true);
+    });
+
+    it('never offers a group the student already holds', async () => {
+      const world = makeWorld();
+      // e.g. after an approval moved the student to G2 while the request still names G1.
+      world.rows.push({ _id: oid(), studentId: world.request.student, slotId: world.slots.free._id, termId: winter, status: 'Active' });
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(byGroup(res, 2)).toMatchObject({ isEligible: false, reasons: ['already-assigned'], clashes: [] });
+    });
+  });
+
+  describe('remaining seats', () => {
+    it.each([
+      [{ maxCapacity: 60, assignedCount: 52 }, 8],
+      [{ maxCapacity: 20, assignedCount: 20 }, 0],
+      [{ maxCapacity: 20, assignedCount: 25 }, 0],
+      [{ maxCapacity: 20, assignedCount: -3 }, 20],
+      [{ maxCapacity: 20 }, 20],
+      [{ maxCapacity: null, assignedCount: 4 }, 0],
+    ])('remainingSeats(%p) is %i', (s, expected) => {
+      expect(remainingSeats(s)).toBe(expected);
+    });
+
+    it('reports an over-assigned group as full with 0 seats, never negative', async () => {
+      const world = makeWorld();
+      world.slots.free.assignedCount = 70;
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(byGroup(res, 2)).toMatchObject({ remainingSeats: 0, isFull: true, isEligible: false });
+    });
+  });
+
+  describe('missing data', () => {
+    it('returns an empty list when the component has no other group', async () => {
+      const world = makeWorld();
+      ['free', 'clashing', 'full', 'adjacent'].forEach((key) => delete world.slots[key]);
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.status).toBe(200);
+      expect(res.body.alternatives).toEqual([]);
+      expect(res.body.summary).toEqual({ total: 0, eligible: 0, full: 0, clashing: 0 });
+      expect(res.body.current.missing).toBe(false);
+    });
+
+    it('falls back to the request snapshot when the current slot was deleted', async () => {
+      const world = makeWorld();
+      delete world.slots.current;
+      stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.status).toBe(200);
+      expect(res.body.current).toEqual({
+        id: String(world.request.currentSlot),
+        missing: true,
+        groupNumber: 1,
+        dayOfWeek: 'Monday',
+        startTime: '13:15',
+        endTime: '14:45',
+        room: 'H1-01',
+        maxCapacity: null,
+        assignedCount: null,
+        remainingSeats: null,
+      });
+      expect(res.body.alternatives).toHaveLength(4);
+    });
+
+    it('marks nothing eligible when the student record is gone, without reading a timetable', async () => {
+      const world = makeWorld();
+      world.studentExists = false;
+      const spies = stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.status).toBe(200);
+      expect(res.body.timetableChecked).toBe(false);
+      expect(spies.scheduleFind).not.toHaveBeenCalled();
+      res.body.alternatives.forEach((alt) => {
+        expect(alt.isEligible).toBe(false);
+        expect(alt.reasons).toContain('timetable-unavailable');
+      });
+      expect(res.body.summary.eligible).toBe(0);
+    });
+
+    it('copes with a request whose student reference is empty', async () => {
+      const world = makeWorld();
+      world.request.student = null;
+      const spies = stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(res.status).toBe(200);
+      expect(res.body.timetableChecked).toBe(false);
+      expect(spies.exists).not.toHaveBeenCalled();
+    });
+
+    it('skips the slot lookup for clashes when the student has no other assigned rows', async () => {
+      const world = makeWorld();
+      world.rows = world.rows.filter((r) => String(r.slotId) === String(world.slots.current._id));
+      const spies = stubCompare(world);
+
+      const res = await compare('Coordinator', world.request._id);
+
+      expect(spies.slotFind).toHaveBeenCalledTimes(1);
+      expect(res.body.alternatives.every((alt) => alt.clashes.length === 0)).toBe(true);
+    });
+  });
+
+  it('uses a fixed number of queries, however many groups there are', async () => {
+    const world = makeWorld();
+    for (let g = 7; g <= 20; g += 1) world.slots[`g${g}`] = slot(offering, 'Lecture', g, 'Saturday', '08:00', '09:30');
+    const spies = stubCompare(world);
+
+    const res = await compare('Coordinator', world.request._id);
+
+    expect(res.body.alternatives).toHaveLength(18);
+    expect(spies.slotFind).toHaveBeenCalledTimes(2);
+    expect(spies.scheduleFind).toHaveBeenCalledTimes(1);
+    expect(spies.exists).toHaveBeenCalledTimes(1);
+  });
+
+  it('never writes anything', async () => {
+    const world = makeWorld();
+    const spies = stubCompare(world);
+
+    await compare('Coordinator', world.request._id);
+    await compare('Advisor', world.request._id);
+    await compare('Student', world.request._id);
+    await compare('Coordinator', 'abc');
+
+    spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  it('answers 500 with a message when a lookup fails', async () => {
+    const world = makeWorld();
+    const spies = stubCompare(world);
+    spies.slotFind.mockImplementation(() => {
+      throw new Error('db down');
+    });
+
+    const res = await compare('Coordinator', world.request._id);
+
+    expect(res.status).toBe(500);
+    expect(res.body.message).toBe('Could not compare the alternative slots');
+  });
+
+  describe('slotsOverlap (conflictService)', () => {
+    const at = (dayOfWeek, startTime, endTime) => ({ dayOfWeek, startTime, endTime });
+
+    it.each([
+      [at('Monday', '08:00', '09:30'), at('Monday', '09:00', '10:30'), true],
+      [at('Monday', '08:00', '12:00'), at('Monday', '09:00', '10:00'), true],
+      [at('Monday', '08:00', '09:30'), at('Monday', '08:00', '09:30'), true],
+      [at('Monday', '08:00', '09:30'), at('Monday', '09:30', '11:00'), false],
+      [at('Monday', '09:30', '11:00'), at('Monday', '08:00', '09:30'), false],
+      [at('Monday', '08:00', '09:30'), at('Tuesday', '08:00', '09:30'), false],
+      [at('Monday', '08:00', '09:30'), null, false],
+    ])('%p vs %p -> %p', (a, b, expected) => {
+      expect(slotsOverlap(a, b)).toBe(expected);
+    });
+  });
+});
+
 describe('SlotChangeRequest model', () => {
   const valid = () => ({
     student: oid(),
