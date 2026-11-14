@@ -10,9 +10,10 @@ const selection = z.object({ studentId: objectId, termId: objectId,
   items: z.array(z.object({ courseId: objectId, requestedHours: z.number().int().min(1).max(12) }).strict()).min(1).max(34),
 }).strict();
 const submission = selection.extend({ submissionKey: z.string().uuid() });
-// Coordinator read-only endpoints have their own role/account checks. Register
+// Coordinator review endpoints have their own role/account checks. Register
 // before the Advisor-only submission middleware so FR 83 stays restricted.
 router.use('/review', require('./extraHoursReviewRoutes'));
+router.use('/mine', require('./extraHoursStudentRoutes'));
 router.use(authenticate, requireRole('Advisor'));
 router.use(async (req, res, next) => {
   try {

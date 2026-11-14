@@ -5,6 +5,7 @@ const { authenticate, requireRole } = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Request = require('../models/ExtraHoursRequest');
+const { decideRequest } = require('../services/extraHoursDecisionService');
 
 router.use(authenticate, requireRole('Coordinator'));
 router.use(async (req, res, next) => {
@@ -25,14 +26,34 @@ const summary = (request) => ({
   decision: request.decision, settlementOption: request.settlementOption, settlementStatus: request.settlementStatus,
   submittedAt: request.createdAt,
 });
+router.get('/filter-options', async (req, res) => {
+  try {
+    const rows = await Request.find({}).select('requestingAdvisor').populate('requestingAdvisor', 'fullName email').lean();
+    const advisors = new Map();
+    for (const row of rows) if (row.requestingAdvisor) {
+      const advisor = row.requestingAdvisor;
+      advisors.set(String(advisor._id), { id: advisor._id, name: advisor.fullName, email: advisor.email });
+    }
+    res.json({ advisors: [...advisors.values()].sort((a, b) => a.name.localeCompare(b.name)) });
+  } catch { res.status(500).json({ message: 'Could not load requesting Advisors.' }); }
+});
 router.get('/', async (req, res) => {
   const parsed = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1), limit: z.coerce.number().int().min(1).max(100).default(20),
     search: z.string().trim().max(32).regex(/^[0-9-]*$/).default(''),
+    advisor: z.string().regex(/^[a-fA-F0-9]{24}$/).optional(),
+    decision: z.enum(['Pending', 'Approved', 'Rejected', 'Withdrawn']).optional(),
+    settlementOption: z.enum(['Wallet', 'Gateway', 'Next Installment', 'Not selected']).optional(),
+    settlementStatus: z.enum(['Not Applicable', 'Awaiting Payment Choice', 'Paid', 'Deferred to Next Installment', 'Failed', 'Cancelled', 'Refunded']).optional(),
   }).strict().safeParse(req.query);
-  if (!parsed.success) return res.status(400).json({ message: 'Use a valid page/page size and a student ID containing only digits and hyphens.' });
+  if (!parsed.success) return res.status(400).json({ message: 'Use valid pagination, student ID and filter values.' });
   try {
     const { page, limit, search } = parsed.data;
     const filter = {};
+    const { advisor, decision, settlementOption, settlementStatus } = parsed.data;
+    if (advisor) filter.requestingAdvisor = advisor;
+    if (decision) filter.decision = decision;
+    if (settlementOption) filter.settlementOption = settlementOption === 'Not selected' ? null : settlementOption;
+    if (settlementStatus) filter.settlementStatus = settlementStatus;
     if (search) {
       // Digits/hyphens only: the search is literal, never arbitrary user regex.
       // Filter before pagination so totals and every page use the same scope.
@@ -46,6 +67,17 @@ router.get('/', async (req, res) => {
     ]);
     res.json({ requests: requests.map(summary), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch { res.status(500).json({ message: 'Could not load extra-hours requests.' }); }
+});
+router.post('/:requestId/decision', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.requestId)) return res.status(400).json({ message: 'Invalid extra-hours request ID.' });
+  const parsed = z.object({ decision: z.enum(['Approved', 'Rejected']), responseNote: z.string().trim().min(1).max(2000) }).strict().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ message: 'Choose approve or reject and provide a response note of 1–2000 characters.' });
+  try {
+    const request = await decideRequest(req.params.requestId, req.user.userId, parsed.data);
+    res.json({ request: { id: request._id, decision: request.decision, responseNote: request.responseNote,
+      decidedAt: request.decidedAt, settlementStatus: request.settlementStatus },
+      message: request.decision === 'Approved' ? 'Approved for settlement. Extra hours are not activated and no courses have been added.' : 'Request rejected.' });
+  } catch (error) { res.status(error.status || 500).json({ message: error.status ? error.message : 'Could not record the decision.' }); }
 });
 router.get('/:requestId', async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.requestId)) return res.status(400).json({ message: 'Invalid extra-hours request ID.' });

@@ -1,4 +1,5 @@
 process.env.JWT_SECRET = 'review-test-key';
+jest.mock('../services/extraHoursDecisionService', () => ({ decideRequest: jest.fn() }));
 jest.mock('../models/User', () => ({ findById: jest.fn() }));
 jest.mock('../models/Student', () => ({ find: jest.fn() }));
 jest.mock('../models/ExtraHoursRequest', () => ({ find: jest.fn(), findById: jest.fn(), countDocuments: jest.fn() }));
@@ -6,6 +7,7 @@ const express = require('express'), jwt = require('jsonwebtoken'), request = req
 const User = require('../models/User');
 const Student = require('../models/Student');
 const Request = require('../models/ExtraHoursRequest');
+const { decideRequest } = require('../services/extraHoursDecisionService');
 const app = express(); app.use(express.json()); app.use('/api/extra-hours', require('../routes/extraHoursRoutes'));
 const actorId = '507f1f77bcf86cd799439011', requestId = '507f1f77bcf86cd799439012';
 const auth = (role = 'Coordinator') => `Bearer ${jwt.sign({ userId: actorId, role }, process.env.JWT_SECRET)}`;
@@ -127,4 +129,64 @@ test.each(['.*', '[a-z]', 'student name', '1'.repeat(33)])('unsafe or oversized 
 test('non-Coordinators cannot use search to enumerate student requests', async () => {
   expect((await request(app).get('/api/extra-hours/review?search=64').set('Authorization', auth('Advisor'))).status).toBe(403);
   expect(Student.find).not.toHaveBeenCalled();
+});
+test.each([
+  ['advisor', actorId, { requestingAdvisor: actorId }],
+  ...['Pending', 'Approved', 'Rejected', 'Withdrawn'].map((value) => ['decision', value, { decision: value }]),
+  ...['Wallet', 'Gateway', 'Next Installment'].map((value) => ['settlementOption', value, { settlementOption: value }]),
+  ['settlementOption', 'Not selected', { settlementOption: null }],
+  ...['Not Applicable', 'Awaiting Payment Choice', 'Paid', 'Deferred to Next Installment', 'Failed', 'Cancelled', 'Refunded'].map((value) => ['settlementStatus', value, { settlementStatus: value }]),
+])('FR86 %s=%s filters results and totals', async (key, value, expected) => {
+  const result = await request(app).get('/api/extra-hours/review').query({ [key]: value }).set('Authorization', auth());
+  expect(result.status).toBe(200);
+  expect(Request.find).toHaveBeenCalledWith(expected);
+  expect(Request.countDocuments).toHaveBeenCalledWith(expected);
+});
+test('FR86 combines all filters with student search before pagination', async () => {
+  const result = await request(app).get('/api/extra-hours/review').query({ search: '64', advisor: actorId,
+    decision: 'Approved', settlementOption: 'Wallet', settlementStatus: 'Paid', page: 2, limit: 1 }).set('Authorization', auth());
+  expect(result.status).toBe(200);
+  const expected = { student: { $in: ['student'] }, requestingAdvisor: actorId, decision: 'Approved', settlementOption: 'Wallet', settlementStatus: 'Paid' };
+  expect(Request.find).toHaveBeenCalledWith(expected); expect(Request.countDocuments).toHaveBeenCalledWith(expected);
+  expect(listQuery.skip).toHaveBeenCalledWith(1);
+});
+test.each([{ advisor: 'invalid' }, { decision: 'Other' }, { settlementOption: 'Cash' }, { settlementStatus: 'Other' }, { 'decision[$ne]': 'Pending' }])('FR86 rejects invalid filters %j', async (filters) => {
+  expect((await request(app).get('/api/extra-hours/review').query(filters).set('Authorization', auth())).status).toBe(400);
+  expect(Request.find).not.toHaveBeenCalled();
+});
+test('FR86 advisor choices are deduplicated and exclude unavailable records and credentials', async () => {
+  Request.find.mockReturnValue(query([row, row, { requestingAdvisor: null }]));
+  const result = await request(app).get('/api/extra-hours/review/filter-options').set('Authorization', auth());
+  expect(result.status).toBe(200);
+  expect(result.body.advisors).toEqual([{ id: 'advisor', name: 'Advisor', email: 'advisor@guc.edu.eg' }]);
+  expect(result.text).not.toContain('private-password');
+});
+test('FR86 advisor choices require Coordinator access', async () => {
+  expect((await request(app).get('/api/extra-hours/review/filter-options')).status).toBe(401);
+  expect((await request(app).get('/api/extra-hours/review/filter-options').set('Authorization', auth('Advisor'))).status).toBe(403);
+  expect(Request.find).not.toHaveBeenCalled();
+});
+test('FR86 advisor lookup errors return a safe error', async () => {
+  Request.find.mockImplementation(() => { throw new Error('private database details'); });
+  const result = await request(app).get('/api/extra-hours/review/filter-options').set('Authorization', auth());
+  expect(result.status).toBe(500); expect(result.text).not.toContain('private database details');
+});
+test.each(['Approved', 'Rejected'])('FR87 records %s with trimmed note', async (decision) => {
+  decideRequest.mockResolvedValue({ _id: requestId, decision, responseNote: 'Reviewed', settlementStatus: 'Not Applicable' });
+  const result = await request(app).post(`/api/extra-hours/review/${requestId}/decision`).set('Authorization', auth()).send({ decision, responseNote: ' Reviewed ' });
+  expect(result.status).toBe(200); expect(decideRequest).toHaveBeenCalledWith(requestId, actorId, { decision, responseNote: 'Reviewed' });
+});
+test.each([{ decision: 'Approved' }, { decision: 'Approved', responseNote: ' ' }, { decision: 'Pending', responseNote: 'No' },
+  { decision: 'Approved', responseNote: 'a'.repeat(2001) }, { decision: 'Approved', responseNote: 'Yes', totalCost: 1 }])('FR87 invalid decision body rejected', async (body) => {
+  expect((await request(app).post(`/api/extra-hours/review/${requestId}/decision`).set('Authorization', auth()).send(body)).status).toBe(400);
+  expect(decideRequest).not.toHaveBeenCalled();
+});
+test.each(['Student', 'Advisor', 'Administrator'])('FR87 %s cannot decide', async (role) => {
+  expect((await request(app).post(`/api/extra-hours/review/${requestId}/decision`).set('Authorization', auth(role)).send({ decision: 'Approved', responseNote: 'Yes' })).status).toBe(403);
+  expect(decideRequest).not.toHaveBeenCalled();
+});
+test.each([404, 409, 422, 500])('FR87 decision error %s is handled', async (status) => {
+  decideRequest.mockRejectedValue(status === 500 ? new Error('private error') : Object.assign(new Error('Decision blocked'), { status }));
+  const result = await request(app).post(`/api/extra-hours/review/${requestId}/decision`).set('Authorization', auth()).send({ decision: 'Approved', responseNote: 'Yes' });
+  expect(result.status).toBe(status); expect(result.text).not.toContain('private error');
 });

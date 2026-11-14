@@ -34,6 +34,7 @@ import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
 import ExitExamRequestsPage from './pages/ExitExamRequestsPage';
 import SemesterStandingsPage from './pages/SemesterStandingsPage';
 import ExtraHoursRequestsPage from './pages/ExtraHoursRequestsPage';
+import MyExtraHoursRequestsPage from './pages/MyExtraHoursRequestsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -118,6 +119,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/wallet" element={<WalletPage />} />
+          <Route path="/my-extra-hours-requests" element={<MyExtraHoursRequestsPage />} />
           {/* Req 114: the accepted graduation plan, when there is one. */}
           <Route path="/my-graduation-plan" element={<MyGraduationPlanPage />} />
           {/* Req 54: an Advising Student's own history. */}
