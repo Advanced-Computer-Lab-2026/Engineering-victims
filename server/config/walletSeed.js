@@ -15,8 +15,8 @@ const { recordTransaction } = require('../services/walletService');
  * refunded to the wallet (credit), and the wallet then pays a later request
  * (debit). Amounts are whole credit hours at PRICE_PER_HOUR.
  *
- * Laila Hassan is deliberately left out so the empty-wallet state has a real
- * account to show it on.
+ * Every Advising Student has a wallet history so the demo wallet is populated
+ * for each account.
  */
 const PRICE_PER_HOUR = 2500;
 const hours = (count) => count * PRICE_PER_HOUR;
@@ -53,6 +53,26 @@ const WALLET_HISTORY = {
   'omar.nabil@student.guc.edu.eg': [
     { type: 'Refund', amount: hours(2), requestReference: 'EHR-2026-0006', paymentReference: 'PAY-6B3D02', description: 'Refund for cancelled extra-hours request (2 hours)', occurredAt: '2026-03-09T12:00:00Z' },
   ],
+  'laila.hassan@student.guc.edu.eg': [
+    { type: 'Refund', amount: hours(2), requestReference: 'EHR-2026-0017', paymentReference: 'PAY-17A4D2', description: 'Refund for cancelled extra-hours request (2 hours)', occurredAt: '2026-10-04T10:20:00Z' },
+  ],
+  'rana.adel@student.guc.edu.eg': [
+    { type: 'Refund', amount: hours(3), requestReference: 'EHR-2026-0018', paymentReference: 'PAY-18B5E3', description: 'Refund for cancelled extra-hours request (3 hours)', occurredAt: '2026-02-11T09:10:00Z' },
+    { type: 'Payment', amount: hours(1), requestReference: 'EHR-2026-0019', paymentReference: 'PAY-19C6F4', description: 'Wallet payment for approved extra hours (1 hour)', occurredAt: '2026-09-10T12:30:00Z' },
+  ],
+  'ahmed.sherif@student.guc.edu.eg': [
+    { type: 'Refund', amount: hours(2), requestReference: 'EHR-2026-0020', paymentReference: 'PAY-20D7A5', description: 'Refund for cancelled extra-hours request (2 hours)', occurredAt: '2026-03-20T14:00:00Z' },
+  ],
+  'nour.elsayed@student.guc.edu.eg': [
+    { type: 'Refund', amount: hours(1), requestReference: 'EHR-2026-0021', paymentReference: 'PAY-21E8B6', description: 'Refund for cancelled extra-hours request (1 hour)', occurredAt: '2026-04-01T11:35:00Z' },
+  ],
+  'dina.mostafa@student.guc.edu.eg': [
+    { type: 'Refund', amount: hours(2), requestReference: 'EHR-2026-0022', paymentReference: 'PAY-22F9C7', description: 'Refund for cancelled extra-hours request (2 hours)', occurredAt: '2026-10-22T08:50:00Z' },
+  ],
+  'hassan.rifaat@student.guc.edu.eg': [
+    { type: 'Refund', amount: hours(3), requestReference: 'EHR-2026-0023', paymentReference: 'PAY-23A1D8', description: 'Refund for cancelled extra-hours request (3 hours)', occurredAt: '2026-01-14T13:15:00Z' },
+    { type: 'Payment', amount: hours(2), requestReference: 'EHR-2026-0024', paymentReference: 'PAY-24B2E9', description: 'Wallet payment for approved extra hours (2 hours)', occurredAt: '2026-05-10T15:40:00Z' },
+  ],
 };
 
 /** Rebuilds every wallet from WALLET_HISTORY. Returns the number of rows written. */
@@ -81,4 +101,32 @@ const seedWallets = async (students) => {
   return count;
 };
 
-module.exports = { seedWallets, WALLET_HISTORY, PRICE_PER_HOUR };
+/**
+ * Adds demo histories only for students without an existing wallet, preserving
+ * wallets and transactions already created through the live application.
+ */
+const seedMissingWallets = async (students) => {
+  const studentByEmail = new Map(students.map((student) => [student.email, student]));
+  let count = 0;
+
+  for (const [email, events] of Object.entries(WALLET_HISTORY)) {
+    const student = studentByEmail.get(email);
+    if (!student) throw new Error(`Wallet seed references an unknown student: ${email}`);
+    if (student.studentType !== 'Advising Student') {
+      throw new Error(`Wallet seed gives a wallet to ${email}, who is not an Advising Student.`);
+    }
+
+    const existing = await Wallet.findOne({ student: student._id }).select('_id').lean();
+    if (existing) continue;
+
+    const ordered = [...events].sort((a, b) => new Date(a.occurredAt) - new Date(b.occurredAt));
+    for (const event of ordered) {
+      await recordTransaction(student._id, { ...event, occurredAt: new Date(event.occurredAt) }, { notifications: false });
+      count += 1;
+    }
+  }
+
+  return count;
+};
+
+module.exports = { seedWallets, seedMissingWallets, WALLET_HISTORY, PRICE_PER_HOUR };

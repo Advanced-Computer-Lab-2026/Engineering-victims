@@ -36,7 +36,10 @@ async function run() {
   );
   console.log(`   Advisors: ${result.advisors}, terms: ${result.terms}`);
   console.log(
-    `   Offerings: ${result.offerings}, slots: ${result.slots}, schedule groups: ${result.groups}, student schedules: ${result.schedules} (${result.grouped} students in groups)`,
+    `   Offerings: ${result.offerings}, slots: ${result.slots}, schedule groups: ${result.groups}, student schedule rows: ${result.schedules + result.advisingSchedules} (normal: ${result.schedules}, advising: ${result.advisingSchedules}; ${result.grouped} normal students grouped)`,
+  );
+  console.log(
+    `   Slot-change requests: ${result.slotChangeRequests}, exit-exam requests: ${result.exitExamRequests}, semester standings: ${result.semesterStandings}`,
   );
 
   await mongoose.disconnect();

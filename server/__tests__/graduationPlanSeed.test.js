@@ -32,6 +32,7 @@ const fixture = () => {
     { _id: 'student-submitted', studentId: '64-40077', studentType: 'Advising Student', assignedAdvisor: advisor._id },
     { _id: 'student-rejected', studentId: '64-40078', studentType: 'Advising Student', assignedAdvisor: advisor._id },
     { _id: 'student-draft', studentId: '64-20046', studentType: 'Advising Student', assignedAdvisor: advisor._id },
+    { _id: 'student-exam', studentId: '64-30011', studentType: 'Advising Student', assignedAdvisor: advisor._id },
   ];
   const course = {
     id: 'course-id',
@@ -139,7 +140,7 @@ describe('seedGraduationPlans', () => {
     const plans = await seedGraduationPlans({ students, users, now });
 
     expect(GraduationPlan.insertMany).toHaveBeenCalledTimes(1);
-    expect(plans.map((plan) => plan.status)).toEqual(['Accepted', 'Submitted', 'Draft', 'Draft']);
+    expect(plans.map((plan) => plan.status)).toEqual(['Accepted', 'Submitted', 'Draft', 'Draft', 'Draft']);
     expect(plans[0].advisor).toBe(advisor._id);
     expect(plans[0].decidedBy).toBe(coordinator._id);
     expect(plans[0].submittedAt).toEqual(new Date('2026-11-08T12:00:00.000Z'));
