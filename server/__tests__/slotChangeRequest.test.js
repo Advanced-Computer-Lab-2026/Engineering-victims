@@ -537,6 +537,243 @@ describe('GET /api/slot-change-requests/me/eligibility (req 40)', () => {
   });
 });
 
+describe('GET /api/slot-change-requests/me (req 41)', () => {
+  const list = (world, path = '/api/slot-change-requests/me') =>
+    request(app).get(path).set('Authorization', tokenFor('Student', world.userId));
+
+  /** A stored request as the populated, lean query returns it. */
+  const storedRequest = (world, overrides = {}) => ({
+    _id: oid(),
+    student: world.student._id,
+    term: { _id: world.term._id, academicYear: world.term.academicYear, season: world.term.season },
+    course: world.course,
+    slotType: 'Tutorial',
+    currentSlot: world.slot._id,
+    currentSlotSnapshot: { groupNumber: 4, dayOfWeek: 'Tuesday', startTime: '10:00', endTime: '11:30', room: 'C7.201' },
+    preferenceNote: 'Group 2 please',
+    status: 'Pending',
+    replacementSlot: null,
+    responseNote: '',
+    respondedBy: null,
+    respondedAt: null,
+    withdrawnAt: null,
+    createdAt: new Date('2026-11-10T09:00:00Z'),
+    ...overrides,
+  });
+
+  it("lists only the caller's own requests, newest first", async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    const q = query([storedRequest(world)]);
+    spies.find.mockReturnValue(q);
+
+    const res = await list(world);
+
+    expect(res.status).toBe(200);
+    expect(spies.find).toHaveBeenCalledWith({ student: world.student._id });
+    expect(q.sort).toHaveBeenCalledWith({ createdAt: -1, _id: -1 });
+    expect(res.body.requests).toHaveLength(1);
+  });
+
+  it('ignores any student id supplied in the query string', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    spies.find.mockReturnValue(query([]));
+
+    const res = await list(world, `/api/slot-change-requests/me?student=${oid()}&studentId=64-99999`);
+
+    expect(res.status).toBe(200);
+    expect(spies.find).toHaveBeenCalledWith({ student: world.student._id });
+  });
+
+  it('returns an empty list when the student has no requests', async () => {
+    const world = makeWorld({ student: { workflowStatus: 'Change Request Pending' } });
+    const spies = stubWorld(world);
+    spies.find.mockReturnValue(query([]));
+
+    const res = await list(world);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ requests: [] });
+  });
+
+  it('serializes a Pending request with its term, course, current slot and no response', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    const stored = storedRequest(world);
+    spies.find.mockReturnValue(query([stored]));
+
+    const res = await list(world);
+
+    expect(res.body.requests[0]).toEqual({
+      id: String(stored._id),
+      status: 'Pending',
+      course: { id: String(world.course._id), code: 'CSEN 501', name: 'Databases I' },
+      term: { id: String(world.term._id), label: '2026/2027 Winter' },
+      slotType: 'Tutorial',
+      currentSlot: {
+        id: String(world.slot._id),
+        groupNumber: 4,
+        dayOfWeek: 'Tuesday',
+        startTime: '10:00',
+        endTime: '11:30',
+        room: 'C7.201',
+      },
+      preferenceNote: 'Group 2 please',
+      submittedAt: '2026-11-10T09:00:00.000Z',
+      withdrawnAt: null,
+      response: null,
+    });
+  });
+
+  it('includes the approved replacement slot and who approved it', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    const replacement = { _id: oid(), groupNumber: 2, dayOfWeek: 'Sunday', startTime: '08:30', endTime: '10:00', roomId: 'C6.101' };
+    spies.find.mockReturnValue(
+      query([
+        storedRequest(world, {
+          status: 'Approved',
+          replacementSlot: replacement,
+          responseNote: 'Moved you to group 2.',
+          respondedBy: { _id: oid(), fullName: 'Mona Adel', role: 'Advisor' },
+          respondedAt: new Date('2026-11-11T12:00:00Z'),
+        }),
+      ])
+    );
+
+    const res = await list(world);
+
+    expect(res.body.requests[0].response).toEqual({
+      note: 'Moved you to group 2.',
+      respondedBy: { name: 'Mona Adel', role: 'Advisor' },
+      respondedAt: '2026-11-11T12:00:00.000Z',
+      replacementSlot: {
+        id: String(replacement._id),
+        groupNumber: 2,
+        dayOfWeek: 'Sunday',
+        startTime: '08:30',
+        endTime: '10:00',
+        room: 'C6.101',
+      },
+    });
+  });
+
+  it('shows a rejection with the Coordinator response and no replacement slot', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    spies.find.mockReturnValue(
+      query([
+        storedRequest(world, {
+          status: 'Rejected',
+          responseNote: 'No seats left in other groups.',
+          respondedBy: { _id: oid(), fullName: 'Coordinator One', role: 'Coordinator' },
+          respondedAt: new Date('2026-11-11T12:00:00Z'),
+        }),
+      ])
+    );
+
+    const res = await list(world);
+
+    expect(res.body.requests[0].status).toBe('Rejected');
+    expect(res.body.requests[0].response).toMatchObject({
+      note: 'No seats left in other groups.',
+      respondedBy: { name: 'Coordinator One', role: 'Coordinator' },
+      replacementSlot: null,
+    });
+  });
+
+  it('shows a withdrawn request with its withdrawal time and no response', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    spies.find.mockReturnValue(
+      query([storedRequest(world, { status: 'Withdrawn', withdrawnAt: new Date('2026-11-12T08:00:00Z') })])
+    );
+
+    const res = await list(world);
+
+    expect(res.body.requests[0]).toMatchObject({
+      status: 'Withdrawn',
+      withdrawnAt: '2026-11-12T08:00:00.000Z',
+      response: null,
+    });
+  });
+
+  it('copes with a deleted course, term, replacement slot or responder', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    spies.find.mockReturnValue(
+      query([storedRequest(world, { status: 'Approved', course: null, term: null, replacementSlot: null, respondedBy: null })])
+    );
+
+    const res = await list(world);
+
+    expect(res.status).toBe(200);
+    expect(res.body.requests[0]).toMatchObject({
+      course: null,
+      term: null,
+      response: { respondedBy: null, replacementSlot: null },
+    });
+  });
+
+  it('never writes anything', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    spies.find.mockReturnValue(query([storedRequest(world)]));
+
+    await list(world);
+
+    expect(spies.create).not.toHaveBeenCalled();
+    spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+  });
+
+  describe('access', () => {
+    it('requires a session', async () => {
+      const res = await request(app).get('/api/slot-change-requests/me');
+      expect(res.status).toBe(401);
+    });
+
+    it.each(['Advisor', 'Coordinator', 'Administrator'])('is closed to %s accounts', async (role) => {
+      const find = jest.spyOn(SlotChangeRequest, 'find');
+
+      const res = await request(app).get('/api/slot-change-requests/me').set('Authorization', tokenFor(role));
+
+      expect(res.status).toBe(403);
+      expect(find).not.toHaveBeenCalled();
+    });
+
+    it('refuses a Normal Student', async () => {
+      const world = makeWorld({ student: { studentType: 'Normal Student' } });
+      const spies = stubWorld(world);
+
+      const res = await list(world);
+
+      expect(res.status).toBe(403);
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('answers 404 when the account has no student record', async () => {
+      const world = makeWorld();
+      const spies = stubWorld(world);
+      spies.studentFindOne.mockReturnValue(query(null));
+
+      const res = await list(world);
+
+      expect(res.status).toBe(404);
+      expect(spies.find).not.toHaveBeenCalled();
+    });
+
+    it('has no route that takes a request or student id', async () => {
+      const world = makeWorld();
+      stubWorld(world);
+
+      const res = await list(world, `/api/slot-change-requests/${oid()}`);
+
+      expect(res.status).toBe(404);
+    });
+  });
+});
+
 describe('SlotChangeRequest model', () => {
   const valid = () => ({
     student: oid(),

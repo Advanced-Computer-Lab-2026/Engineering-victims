@@ -8,5 +8,7 @@ const slotChangeRequestController = require('../controllers/slotChangeRequestCon
 // The student always comes from the token — there is no id in these paths.
 router.get('/me/eligibility', authenticate, requireRole('Student'), slotChangeRequestController.getMyEligibility);
 router.post('/me', authenticate, requireRole('Student'), slotChangeRequestController.createMyRequest);
+// Req 41: the caller's own requests, statuses and staff responses.
+router.get('/me', authenticate, requireRole('Student'), slotChangeRequestController.listMyRequests);
 
 module.exports = router;
