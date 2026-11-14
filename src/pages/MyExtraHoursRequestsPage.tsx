@@ -5,13 +5,29 @@ import Card from '../components/ui/Card';
 import AlertBanner from '../components/ui/AlertBanner';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
+import { fetchMyWallet } from '../lib/walletService';
 import { fetchMyExtraHoursRequests, saveExtraHoursPreference, payExtraHoursWallet, openExtraHoursCheckout, confirmExtraHoursCheckout, type SettlementPreference, type StudentExtraHoursRequest } from '../lib/extraHoursReviewService';
 
 const money = (value: number) => `EGP ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const PayNow: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void }> = ({ request, onSaved }) => {
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
+  const [walletConfirmation, setWalletConfirmation] = useState<{ balance: number } | null>(null);
+  const reviewWalletPayment = async () => {
+    if (busy || walletConfirmation) return;
+    setBusy(true); setError(null);
+    try {
+      const { wallet } = await fetchMyWallet();
+      if (wallet.currency !== request.currency || wallet.balance < request.totalCost) {
+        setError('Insufficient wallet balance for the full approved amount. No payment was taken.');
+        return;
+      }
+      setWalletConfirmation({ balance: wallet.balance });
+    } catch (err) { setError(err instanceof Error ? err.message : 'Could not check your wallet balance.'); }
+    finally { setBusy(false); }
+  };
   const pay = async (method: 'Wallet' | 'Gateway' | 'Check') => {
-    if (busy) return;
+    if (busy || (method === 'Wallet' && !walletConfirmation)) return;
     setBusy(true); setError(null);
     try {
       if (method === 'Wallet') await payExtraHoursWallet(request.id);
@@ -24,16 +40,27 @@ const PayNow: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void 
       }
       onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : 'Could not complete payment.'); }
-    finally { setBusy(false); }
+    finally { setBusy(false); setWalletConfirmation(null); }
   };
   return <div className="space-y-3">
     <p className="text-sm text-slate-300">Pay the full approved amount of {money(request.totalCost)}. Wallet payments require enough balance. Stripe Checkout uses test payments only.</p>
     {error && <AlertBanner tone="info">{error}</AlertBanner>}
     <div className="flex flex-wrap gap-3">
-      <CustomButton type="button" size="sm" disabled={busy || Boolean(request.gatewayAttempt)} onClick={() => void pay('Wallet')}>Pay {money(request.totalCost)} from wallet</CustomButton>
+      <CustomButton type="button" size="sm" disabled={busy || Boolean(request.gatewayAttempt)} onClick={() => void reviewWalletPayment()}>Pay {money(request.totalCost)} from wallet</CustomButton>
       <CustomButton type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void pay('Gateway')}>{request.gatewayAttempt ? 'Continue Stripe checkout' : 'Pay with Stripe (test)'}</CustomButton>
       {request.gatewayAttempt && <CustomButton type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void pay('Check')}>Check Stripe payment</CustomButton>}
     </div>
+    <ConfirmDialog open={walletConfirmation !== null} title="Confirm wallet payment" tone="warning"
+      confirmLabel={`Confirm payment of ${money(request.totalCost)}`} isLoading={busy}
+      onCancel={() => { if (!busy) setWalletConfirmation(null); }} onConfirm={() => void pay('Wallet')}
+      message={<>
+        Request: <strong className="break-all text-slate-200">{request.reference}</strong><br />
+        Payment method: Wallet<br />
+        Total to pay: <strong className="text-slate-200">{money(request.totalCost)}</strong><br />
+        Current wallet balance: {money(walletConfirmation?.balance ?? 0)}<br />
+        Balance after payment: {money((walletConfirmation?.balance ?? 0) - request.totalCost)}<br />
+        Confirming deducts this amount and activates your approved extra hours and courses. Your balance will be checked again before payment.
+      </>} />
   </div>;
 };
 const SettlementChoice: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void }> = ({ request, onSaved }) => {
