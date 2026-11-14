@@ -31,18 +31,11 @@ const buildStudentQuery = (query = {}) => {
 
   if (search && String(search).trim()) {
     const term = String(search).trim();
-    // Student IDs are stored with a hyphen, but users often type them without.
-    const digitsOnly = term.replace(/\D/g, '');
-    const idVariants = [term];
-    if (/^\d{7}$/.test(digitsOnly)) {
-      idVariants.push(`${digitsOnly.slice(0, 2)}-${digitsOnly.slice(2)}`);
-    }
-
     const safeTerm = escapeRegex(term);
     filter.$or = [
       { fullName: { $regex: safeTerm, $options: 'i' } },
       { email: { $regex: safeTerm, $options: 'i' } },
-      { studentId: { $in: idVariants } },
+      { studentId: { $in: studentIdVariants(term) } },
     ];
   }
 
@@ -93,4 +86,20 @@ const buildStudentQuery = (query = {}) => {
 /** Escapes user input before it reaches a RegExp, so a stray "(" cannot throw. */
 const escapeRegex = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-module.exports = { buildStudentQuery, escapeRegex };
+/**
+ * The exact student IDs a search term can mean. Student IDs are stored with a
+ * hyphen (64-12345), but users often type them without, so seven digits also
+ * yield the hyphenated form. Shared by every student-ID search.
+ */
+const studentIdVariants = (term) => {
+  const value = String(term).trim();
+  const digitsOnly = value.replace(/\D/g, '');
+  const variants = [value];
+  if (/^\d{7}$/.test(digitsOnly)) {
+    const hyphenated = `${digitsOnly.slice(0, 2)}-${digitsOnly.slice(2)}`;
+    if (hyphenated !== value) variants.push(hyphenated);
+  }
+  return variants;
+};
+
+module.exports = { buildStudentQuery, escapeRegex, studentIdVariants };

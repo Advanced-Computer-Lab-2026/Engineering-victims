@@ -29,6 +29,7 @@ import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import EligibleSwapGroupsPage from './pages/EligibleSwapGroupsPage';
 import ScheduleSwapsPage from './pages/ScheduleSwapsPage';
 import MySlotChangeRequestsPage from './pages/MySlotChangeRequestsPage';
+import SlotChangeRequestsReviewPage from './pages/SlotChangeRequestsReviewPage';
 import GraduationPlansRoute from './pages/GraduationPlansRoute';
 import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
 import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
@@ -79,6 +80,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         >
           <Route path="/graduation-plans" element={<GraduationPlansRoute />} />
           <Route path="/graduation-plans/:planId" element={<GraduationPlanBuilderPage />} />
+          {/* Req 43: Advisors see their assigned students' slot-change
+              requests, Coordinators all of them; the API sets the scope. */}
+          <Route path="/slot-change-review" element={<SlotChangeRequestsReviewPage />} />
         </Route>
 
         {/* Req 11-12, Req 122, Req 123-125: Coordinator & Administrator routes. */}

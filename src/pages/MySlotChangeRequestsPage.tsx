@@ -1,12 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowRight, ClipboardList, Loader2, MessageSquare, RotateCcw } from 'lucide-react';
+import { ArrowRight, ClipboardList, Loader2, MessageSquare, RotateCcw, XCircle } from 'lucide-react';
 import type { ApiError } from '../lib/api';
 import type { SlotChangeRequestItem, SlotChangeRequestStatus } from '../lib/types';
-import { fetchMySlotChangeRequests } from '../lib/slotChangeRequestsService';
+import { fetchMySlotChangeRequests, withdrawSlotChangeRequest } from '../lib/slotChangeRequestsService';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
 import Card from '../components/ui/Card';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 
@@ -83,12 +84,18 @@ const ResponseBlock: React.FC<{ item: SlotChangeRequestItem }> = ({ item }) => {
  * newest first, with their statuses and the Advisor or Coordinator response,
  * including any approved replacement slot. The API only ever returns the
  * signed-in student's own requests.
+ *
+ * Req 42: a Pending request can be withdrawn after a confirmation; the card is
+ * then updated in place with the server's copy of the request.
  */
 const MySlotChangeRequestsPage: React.FC = () => {
   const [requests, setRequests] = useState<SlotChangeRequestItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [withdrawTarget, setWithdrawTarget] = useState<SlotChangeRequestItem | null>(null);
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
 
   const load = useCallback(async (refresh = false) => {
     if (refresh) setIsRefreshing(true);
@@ -107,6 +114,27 @@ const MySlotChangeRequestsPage: React.FC = () => {
   useEffect(() => {
     load();
   }, [load]);
+
+  const confirmWithdraw = async () => {
+    if (!withdrawTarget) return;
+    setIsWithdrawing(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const { message, request } = await withdrawSlotChangeRequest(withdrawTarget.id);
+      setRequests((current) => current.map((item) => (item.id === request.id ? request : item)));
+      setNotice(message);
+    } catch (err) {
+      const apiError = err as ApiError;
+      // The request changed or vanished meanwhile: show its real state. The
+      // refresh clears the error synchronously, so it starts before the message is set.
+      if (apiError.status === 404 || apiError.status === 409) load(true);
+      setError(apiError.message || 'Could not withdraw this request.');
+    } finally {
+      setIsWithdrawing(false);
+      setWithdrawTarget(null);
+    }
+  };
 
   return (
     <>
@@ -129,8 +157,16 @@ const MySlotChangeRequestsPage: React.FC = () => {
 
       {error && (
         <div className="mb-4">
-          <AlertBanner tone="error" title="Could not load requests" onDismiss={() => setError(null)}>
+          <AlertBanner tone="error" title="Action could not be completed" onDismiss={() => setError(null)}>
             {error}
+          </AlertBanner>
+        </div>
+      )}
+
+      {notice && (
+        <div className="mb-4">
+          <AlertBanner tone="success" onDismiss={() => setNotice(null)}>
+            {notice}
           </AlertBanner>
         </div>
       )}
@@ -155,13 +191,26 @@ const MySlotChangeRequestsPage: React.FC = () => {
           </h2>
           {requests.map((item) => (
             <Card key={item.id} tone="raised" className="space-y-3 p-4">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="font-mono text-sm font-bold text-indigo-300">{item.course?.code ?? 'Course removed'}</span>
-                {item.course && <span className="text-sm text-slate-200">{item.course.name}</span>}
-                <Badge tone={SLOT_TONE[item.slotType]}>{item.slotType}</Badge>
-                <Badge tone={STATUS_TONE[item.status]} dot>
-                  {item.status}
-                </Badge>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <span className="font-mono text-sm font-bold text-indigo-300">{item.course?.code ?? 'Course removed'}</span>
+                  {item.course && <span className="text-sm text-slate-200">{item.course.name}</span>}
+                  <Badge tone={SLOT_TONE[item.slotType]}>{item.slotType}</Badge>
+                  <Badge tone={STATUS_TONE[item.status]} dot>
+                    {item.status}
+                  </Badge>
+                </div>
+
+                {item.status === 'Pending' && (
+                  <CustomButton
+                    variant="danger"
+                    size="sm"
+                    onClick={() => setWithdrawTarget(item)}
+                    icon={<XCircle className="h-4 w-4" aria-hidden />}
+                  >
+                    Withdraw Request
+                  </CustomButton>
+                )}
               </div>
 
               <p className="text-xs text-slate-400">
@@ -190,6 +239,31 @@ const MySlotChangeRequestsPage: React.FC = () => {
           ))}
         </div>
       )}
+
+      <ConfirmDialog
+        open={withdrawTarget !== null}
+        tone="danger"
+        title="Withdraw this slot-change request?"
+        message={
+          withdrawTarget && (
+            <>
+              Your request to change{' '}
+              <span className="font-semibold text-slate-200">
+                {withdrawTarget.course?.code ?? 'this course'} {withdrawTarget.slotType} (
+                {slotLabel(withdrawTarget.currentSlot)})
+              </span>{' '}
+              will be withdrawn and can no longer be reviewed. Your schedule stays as it is. This cannot be undone.
+            </>
+          )
+        }
+        confirmLabel="Withdraw Request"
+        cancelLabel="Keep Request"
+        isLoading={isWithdrawing}
+        onConfirm={confirmWithdraw}
+        onCancel={() => {
+          if (!isWithdrawing) setWithdrawTarget(null);
+        }}
+      />
     </>
   );
 };
