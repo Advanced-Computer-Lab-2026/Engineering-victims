@@ -76,22 +76,22 @@ const WalletPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading your wallet...
         </Card>
       ) : data ? (
         <div className="space-y-6">
           <div className="grid gap-4 md:grid-cols-3">
-            <Card tone="raised" className="p-6 md:col-span-1" sheen>
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
-                <Wallet className="h-4 w-4 text-indigo-400" aria-hidden />
+            <Card tone="raised" className="p-6 md:col-span-1">
+              <p className="flex items-center gap-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
+                <Wallet className="h-4 w-4 text-primary" aria-hidden />
                 Current balance
               </p>
-              <p className="mt-3 text-3xl font-bold tracking-tight text-white">
+              <p className="mt-3 text-h1 font-bold tracking-tight text-on-surface">
                 {formatMoney(data.wallet.balance, currency)}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-caption text-on-surface-variant">
                 {/* Newest row first, so its date is the last time money moved. */}
                 {data.transactions[0]
                   ? `Last transaction ${formatDate(data.transactions[0].occurredAt)}`
@@ -101,12 +101,12 @@ const WalletPage: React.FC = () => {
             <SummaryTile
               label="Refunds credited"
               value={formatMoney(data.summary.totalCredits, currency)}
-              icon={<ArrowDownLeft className="h-4 w-4 text-emerald-400" aria-hidden />}
+              icon={<ArrowDownLeft className="h-4 w-4 text-success" aria-hidden />}
             />
             <SummaryTile
               label="Payments debited"
               value={formatMoney(data.summary.totalDebits, currency)}
-              icon={<ArrowUpRight className="h-4 w-4 text-rose-400" aria-hidden />}
+              icon={<ArrowUpRight className="h-4 w-4 text-error" aria-hidden />}
             />
           </div>
 
@@ -119,9 +119,9 @@ const WalletPage: React.FC = () => {
           ) : (
             <Card tone="raised" className="overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[48rem] text-left text-sm">
+                <table className="w-full min-w-[48rem] text-left text-body">
                   <caption className="sr-only">Wallet transaction history, newest first</caption>
-                  <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+                  <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                     <tr>
                       <th scope="col" className="px-4 py-3 font-semibold">Date</th>
                       <th scope="col" className="px-4 py-3 font-semibold">Type</th>
@@ -130,7 +130,7 @@ const WalletPage: React.FC = () => {
                       <th scope="col" className="px-4 py-3 text-right font-semibold">Resulting balance</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                  <tbody className="divide-y divide-outline-variant">
                     {data.transactions.map((row) => (
                       <TransactionRow key={row.id} row={row} currency={currency} />
                     ))}
@@ -147,11 +147,11 @@ const WalletPage: React.FC = () => {
 
 const SummaryTile: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => (
   <Card className="p-6">
-    <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-400">
+    <p className="flex items-center gap-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
       {icon}
       {label}
     </p>
-    <p className="mt-3 text-xl font-semibold text-slate-100">{value}</p>
+    <p className="mt-3 text-h2 font-semibold text-on-surface">{value}</p>
   </Card>
 );
 
@@ -159,28 +159,28 @@ const TransactionRow: React.FC<{ row: WalletTransaction; currency: string }> = (
   const isCredit = row.direction === 'Credit';
 
   return (
-    <tr className="transition-colors hover:bg-slate-800/40">
-      <td className="whitespace-nowrap px-4 py-3 text-slate-300">{formatDate(row.occurredAt)}</td>
+    <tr className="transition-colors hover:bg-surface-container">
+      <td className="whitespace-nowrap px-4 py-3 text-on-surface">{formatDate(row.occurredAt)}</td>
       <td className="px-4 py-3">
         <Badge tone={isCredit ? 'emerald' : 'rose'} dot>
           {isCredit ? 'Refund credit' : 'Payment debit'}
         </Badge>
       </td>
       <td className="px-4 py-3">
-        <span className="block font-mono text-xs text-slate-200">
+        <span className="block font-mono text-caption text-on-surface">
           {[row.requestReference, row.paymentReference].filter(Boolean).join(' · ') || '—'}
         </span>
-        {row.description && <span className="mt-0.5 block text-xs text-slate-500">{row.description}</span>}
+        {row.description && <span className="mt-0.5 block text-caption text-on-surface-variant">{row.description}</span>}
       </td>
       <td
         className={`whitespace-nowrap px-4 py-3 text-right font-medium ${
-          isCredit ? 'text-emerald-300' : 'text-rose-300'
+          isCredit ? 'text-success' : 'text-error'
         }`}
       >
         {isCredit ? '+' : '−'}
         {formatMoney(row.amount, currency)}
       </td>
-      <td className="whitespace-nowrap px-4 py-3 text-right text-slate-200">
+      <td className="whitespace-nowrap px-4 py-3 text-right text-on-surface">
         {formatMoney(row.balanceAfter, currency)}
       </td>
     </tr>

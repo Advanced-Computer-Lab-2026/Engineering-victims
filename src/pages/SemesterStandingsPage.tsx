@@ -113,15 +113,15 @@ const SemesterStandingsPage: React.FC = () => {
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <Card className="space-y-4 p-5">
-          <h2 className="font-semibold text-white">Finalize a semester</h2>
-          <label className="flex flex-col gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+          <h2 className="font-semibold text-on-surface">Finalize a semester</h2>
+          <label className="flex flex-col gap-1.5 text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
             Find student
             <input
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name, student ID or email"
-              className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm normal-case tracking-normal text-slate-100 placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+              className="rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body normal-case tracking-normal text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </label>
           <Select
@@ -151,8 +151,8 @@ const SemesterStandingsPage: React.FC = () => {
               options={termOptions}
               disabled={!studentId || loading || loadingHistory}
             />
-            <p className="text-xs text-slate-400">Current revision for this student and term: {revision}</p>
-            <label className="flex flex-col gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+            <p className="text-caption text-on-surface-variant">Current revision for this student and term: {revision}</p>
+            <label className="flex flex-col gap-1.5 text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
               Cumulative GPA at semester close
               <input
                 type="number"
@@ -162,10 +162,10 @@ const SemesterStandingsPage: React.FC = () => {
                 required
                 value={gpa}
                 onChange={(event) => setGpa(event.target.value)}
-                className="rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                className="rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
               />
             </label>
-            <p className="text-xs text-slate-400">Probation is determined by the server's 3.70 GPA threshold. Revisions require the current revision shown below.</p>
+            <p className="text-caption text-on-surface-variant">Probation is determined by the server's 3.70 GPA threshold. Revisions require the current revision shown below.</p>
             <CustomButton type="submit" disabled={!studentId || !selectedTerm || !gpa || saving} isLoading={saving} icon={<Save className="h-4 w-4" aria-hidden />}>Finalize standing</CustomButton>
           </form>
         </Card>
@@ -173,31 +173,31 @@ const SemesterStandingsPage: React.FC = () => {
         <Card className="p-5">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-semibold text-white">Standing history</h2>
-              {history && <p className="mt-1 text-sm text-slate-400">
+              <h2 className="font-semibold text-on-surface">Standing history</h2>
+              {history && <p className="mt-1 text-body text-on-surface-variant">
                 Current: {history.summary.standing ?? 'Not finalized'}
                 {history.summary.isProbation && ` · ${history.summary.consecutiveProbationSemesters} consecutive semester(s)`}
               </p>}
             </div>
-            {(loading || loadingHistory) && <Loader2 className="h-4 w-4 animate-spin text-slate-400" aria-label="Loading" />}
+            {(loading || loadingHistory) && <Loader2 className="h-4 w-4 animate-spin text-on-surface-variant" aria-label="Loading" />}
           </div>
-          {!studentId ? <p className="text-sm text-slate-400">Choose a student to view their finalized standing history.</p>
-            : loadingHistory || !history ? <p className="text-sm text-slate-400">Loading standing history…</p>
-              : history.history.length === 0 ? <p className="text-sm text-slate-400">No semesters have been finalized.</p>
+          {!studentId ? <p className="text-body text-on-surface-variant">Choose a student to view their finalized standing history.</p>
+            : loadingHistory || !history ? <p className="text-body text-on-surface-variant">Loading standing history…</p>
+              : history.history.length === 0 ? <p className="text-body text-on-surface-variant">No semesters have been finalized.</p>
                 : <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead className="text-xs uppercase tracking-wide text-slate-500">
+                  <table className="w-full text-left text-body">
+                    <thead className="text-caption uppercase tracking-eyebrow text-on-surface-variant">
                       <tr><th className="py-2 pr-3">Term</th><th className="py-2 pr-3">GPA</th><th className="py-2 pr-3">Standing</th><th className="py-2">Revision</th></tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800">
+                    <tbody className="divide-y divide-outline-variant">
                       {history.history.map((item) => <React.Fragment key={item._id}>
                         <tr>
-                          <td className="py-3 pr-3 text-slate-300">{item.academicYear} {item.season}</td>
-                          <td className="py-3 pr-3 text-slate-300">{item.cumulativeGpa.toFixed(2)}</td>
-                          <td className="py-3 pr-3 text-slate-300">{item.standing}</td>
-                          <td className="py-3 text-slate-400">{item.revision}</td>
+                          <td className="py-3 pr-3 text-on-surface">{item.academicYear} {item.season}</td>
+                          <td className="py-3 pr-3 text-on-surface">{item.cumulativeGpa.toFixed(2)}</td>
+                          <td className="py-3 pr-3 text-on-surface">{item.standing}</td>
+                          <td className="py-3 text-on-surface-variant">{item.revision}</td>
                         </tr>
-                        {(item.previousVersions ?? []).map((version) => <tr key={`${item._id}-${version.revision}`} className="text-xs text-slate-500">
+                        {(item.previousVersions ?? []).map((version) => <tr key={`${item._id}-${version.revision}`} className="text-caption text-on-surface-variant">
                           <td className="pb-2 pr-3 pl-3">{item.academicYear} {item.season} · prior</td>
                           <td className="pb-2 pr-3">{version.cumulativeGpa.toFixed(2)}</td>
                           <td className="pb-2 pr-3">{version.standing}</td>

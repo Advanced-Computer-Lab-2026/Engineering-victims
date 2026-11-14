@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { ShieldAlert } from 'lucide-react';
 import type { ApiError } from '../lib/api';
 import {
@@ -22,7 +23,7 @@ interface MandatoryRemovalRequestDialogProps {
 }
 
 const fieldClass =
-  'w-full rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 transition-colors hover:border-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 disabled:cursor-not-allowed disabled:opacity-60';
+  'w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-body text-on-surface transition-colors hover:border-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 /**
  * Req 64: the assigned Advisor asks for a mandatory course to be removed and
@@ -46,6 +47,7 @@ const MandatoryRemovalRequestDialog: React.FC<MandatoryRemovalRequestDialogProps
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const trapRef = useFocusTrap<HTMLFormElement>(true);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -80,47 +82,48 @@ const MandatoryRemovalRequestDialog: React.FC<MandatoryRemovalRequestDialogProps
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-toast flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 scrim backdrop-blur-sm"
         onClick={isSubmitting ? undefined : onCancel}
         aria-hidden
       />
       <form
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="removal-request-title"
         onSubmit={handleSubmit}
-        className="relative max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-slate-800 bg-slate-950 p-6 shadow-2xl"
+        className="relative max-h-full w-full max-w-md overflow-y-auto rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 shadow-2xl"
       >
         <div className="flex items-start gap-4">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-rose-800/60 bg-rose-950/60 text-rose-300">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-error bg-error-container text-error">
             <ShieldAlert className="h-5 w-5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 id="removal-request-title" className="text-base font-bold text-white">
+            <h2 id="removal-request-title" className="text-body-lg font-bold text-on-surface">
               Request mandatory-course removal
             </h2>
-            <p className="mt-1 text-sm leading-relaxed text-slate-400">
+            <p className="mt-1 text-body leading-relaxed text-on-surface-variant">
               The Coordinator reviews the request. The course stays mandatory until it is approved.
             </p>
           </div>
         </div>
 
-        <dl className="mt-5 grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm">
-          <dt className="text-slate-500">Course</dt>
-          <dd className="text-slate-200">
-            <span className="font-mono font-semibold text-indigo-300">{candidate.course.code}</span> ·{' '}
+        <dl className="mt-5 grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 rounded-xl border border-outline-variant bg-surface-container-low p-4 text-body">
+          <dt className="text-on-surface-variant">Course</dt>
+          <dd className="text-on-surface">
+            <span className="font-mono font-semibold text-primary">{candidate.course.code}</span> ·{' '}
             {candidate.course.name}
           </dd>
-          <dt className="text-slate-500">Mandatory because</dt>
-          <dd className="text-slate-200">
+          <dt className="text-on-surface-variant">Mandatory because</dt>
+          <dd className="text-on-surface">
             {candidate.reason === 'Failed' ? `Failed in ${candidate.term}` : `Not attended in semester ${candidate.semester}`}
           </dd>
         </dl>
 
         <label className="mt-5 block">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Case</span>
+          <span className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Case</span>
           <select
             value={category}
             disabled={isSubmitting}
@@ -129,17 +132,17 @@ const MandatoryRemovalRequestDialog: React.FC<MandatoryRemovalRequestDialogProps
           >
             <option value="">Choose the case that applies</option>
             {categories.map((option) => (
-              <option key={option.value} value={option.value} className="bg-slate-900">
+              <option key={option.value} value={option.value} className="bg-surface-container-low">
                 {option.value}
               </option>
             ))}
           </select>
-          {description && <span className="mt-1.5 block text-xs leading-relaxed text-slate-500">{description}</span>}
+          {description && <span className="mt-1.5 block text-caption leading-relaxed text-on-surface-variant">{description}</span>}
         </label>
 
         {isPair && (
           <label className="mt-4 block">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Other course of the pair</span>
+            <span className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Other course of the pair</span>
             <select
               value={pairedCourseId}
               disabled={isSubmitting}
@@ -148,7 +151,7 @@ const MandatoryRemovalRequestDialog: React.FC<MandatoryRemovalRequestDialogProps
             >
               <option value="">Choose a mandatory course</option>
               {otherCourses.map((entry) => (
-                <option key={entry.course.id} value={entry.course.id} className="bg-slate-900">
+                <option key={entry.course.id} value={entry.course.id} className="bg-surface-container-low">
                   {entry.course.code} · {entry.course.name}
                 </option>
               ))}
@@ -157,7 +160,7 @@ const MandatoryRemovalRequestDialog: React.FC<MandatoryRemovalRequestDialogProps
         )}
 
         <label className="mt-4 block">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Reason</span>
+          <span className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Reason</span>
           <textarea
             value={reason}
             maxLength={REMOVAL_NOTE_LIMIT}
@@ -167,7 +170,7 @@ const MandatoryRemovalRequestDialog: React.FC<MandatoryRemovalRequestDialogProps
             placeholder="Explain why this course should not be mandatory for this student."
             className={`${fieldClass} mt-1.5 resize-y`}
           />
-          <span className="mt-1 block text-right text-[11px] text-slate-500">
+          <span className="mt-1 block text-right text-caption text-on-surface-variant">
             {reason.length}/{REMOVAL_NOTE_LIMIT}
           </span>
         </label>

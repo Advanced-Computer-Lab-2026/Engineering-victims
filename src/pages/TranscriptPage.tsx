@@ -124,17 +124,17 @@ const TranscriptPage: React.FC = () => {
       )}
 
       {isLoading && !data ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading transcript...
         </Card>
       ) : data && student ? (
         <div className="space-y-6">
-          <Card tone="raised" className="p-6" sheen>
+          <Card tone="raised" className="p-6">
             <div className="flex flex-wrap items-end gap-4">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-bold text-white">{student.fullName}</h2>
-                <p className="font-mono text-xs text-slate-500">
+                <h2 className="truncate text-h3 font-bold text-on-surface">{student.fullName}</h2>
+                <p className="font-mono text-caption text-on-surface-variant">
                   {student.studentId} · {student.major}
                 </p>
               </div>
@@ -142,7 +142,7 @@ const TranscriptPage: React.FC = () => {
               {data.years.length > 0 && (
                 <Select
                   label="Academic year"
-                  className="ml-auto w-full sm:w-56"
+                  className="ml-auto w-full md:w-56"
                   value={data.academicYear ?? ''}
                   disabled={isLoading}
                   onChange={(event) => setSearchParams({ year: event.target.value })}
@@ -176,13 +176,13 @@ const SessionCard: React.FC<{ session: TranscriptSession }> = ({ session }) => {
 
   return (
     <Card tone="raised" className="overflow-hidden">
-      <p className="border-b border-slate-800 bg-slate-900/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+      <p className="border-b border-outline-variant bg-surface-container-low px-4 py-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
         {session.term} · {session.courses.length} {session.courses.length === 1 ? 'course' : 'courses'} · {hours} credit hours
       </p>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[36rem] text-left text-sm">
+        <table className="w-full min-w-[36rem] text-left text-body">
           <caption className="sr-only">Results for {session.term}</caption>
-          <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <thead className="text-caption uppercase tracking-eyebrow text-on-surface-variant">
             <tr>
               <th scope="col" className="px-4 py-2 font-semibold">Code</th>
               <th scope="col" className="px-4 py-2 font-semibold">Course</th>
@@ -190,12 +190,12 @@ const SessionCard: React.FC<{ session: TranscriptSession }> = ({ session }) => {
               <th scope="col" className="px-4 py-2 text-right font-semibold">Grade</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-800/60">
+          <tbody className="divide-y divide-outline-variant">
             {session.courses.map((row) => (
-              <tr key={row.id} className="hover:bg-slate-800/40">
-                <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-slate-300">{row.course.code}</td>
-                <td className="px-4 py-2 text-slate-200">{row.course.name}</td>
-                <td className="px-4 py-2 text-right text-slate-300">{row.course.creditHours}</td>
+              <tr key={row.id} className="hover:bg-surface-container">
+                <td className="whitespace-nowrap px-4 py-2 font-mono text-caption text-on-surface">{row.course.code}</td>
+                <td className="px-4 py-2 text-on-surface">{row.course.name}</td>
+                <td className="px-4 py-2 text-right text-on-surface">{row.course.creditHours}</td>
                 <td className="px-4 py-2 text-right">
                   {row.grade !== null && row.gradePoints !== null ? (
                     <Badge tone={gradeTone(row.grade)}>

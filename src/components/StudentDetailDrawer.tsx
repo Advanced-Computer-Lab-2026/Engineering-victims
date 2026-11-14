@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useNavigate } from 'react-router-dom';
 import {
   BadgeCheck,
@@ -40,12 +41,12 @@ interface DetailRowProps {
 
 const DetailRow: React.FC<DetailRowProps> = ({ icon, label, children }) => (
   <div className="flex items-start gap-3 py-2.5">
-    <span className="mt-0.5 shrink-0 text-slate-500" aria-hidden>
+    <span className="mt-0.5 shrink-0 text-on-surface-variant" aria-hidden>
       {icon}
     </span>
     <div className="min-w-0 flex-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm text-slate-200">{children}</dd>
+      <dt className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">{label}</dt>
+      <dd className="mt-0.5 break-words text-body text-on-surface">{children}</dd>
     </div>
   </div>
 );
@@ -69,6 +70,7 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
   onClose,
   onStatusChange,
 }) => {
+  const trapRef = useFocusTrap<HTMLElement>(!!studentId);
   const [data, setData] = useState<StudentDetailResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -218,32 +220,33 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
   const student = data?.student;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+    <div className="fixed inset-0 z-toast flex justify-end">
+      <div className="absolute inset-0 scrim backdrop-blur-sm" onClick={onClose} aria-hidden />
 
       <aside
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label="Student details"
-        className="relative flex h-full w-full max-w-lg flex-col border-l border-slate-800 bg-slate-950/95 backdrop-blur-xl shadow-2xl"
+        className="relative flex h-full w-full max-w-lg flex-col border-l border-outline-variant bg-surface-container-lowest backdrop-blur-xl shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-6">
+        <div className="flex items-start justify-between gap-4 border-b border-outline-variant p-6">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-bold text-white">{student?.fullName ?? 'Loading...'}</h2>
-            {student && <p className="mt-0.5 truncate font-mono text-xs text-slate-500">{student.studentId}</p>}
+            <h2 className="truncate text-h3 font-bold text-on-surface">{student?.fullName ?? 'Loading...'}</h2>
+            {student && <p className="mt-0.5 truncate font-mono text-caption text-on-surface-variant">{student.studentId}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close details"
-            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>
         </div>
 
         <div className="flex-1 space-y-5 overflow-y-auto p-6">
-          {error && <AlertBanner tone="error" title="Something went wrong">{error}</AlertBanner>}
+          {error && <AlertBanner tone="error" title="Could not load student details">{error}</AlertBanner>}
 
           {notice && (
             <AlertBanner tone="success" onDismiss={() => setNotice(null)}>
@@ -252,7 +255,7 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
           )}
 
           {!student && !error && (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+            <div role="status" className="flex items-center justify-center gap-2 py-16 text-body text-on-surface-variant">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Loading student...
             </div>
@@ -270,11 +273,11 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                 </Badge>
               </div>
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                   Academic
                 </h3>
-                <dl className="divide-y divide-slate-800/70">
+                <dl className="divide-y divide-outline-variant">
                   <DetailRow icon={<Mail className="h-4 w-4" />} label="GUC email">
                     {student.email}
                   </DetailRow>
@@ -287,19 +290,19 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                   <DetailRow icon={<UserRound className="h-4 w-4" />} label="Assigned advisor">
                     {student.assignedAdvisor ? (
                       <>
-                        <span className="block text-slate-200">{student.assignedAdvisor.fullName}</span>
-                        <span className="block text-xs text-slate-500">{student.assignedAdvisor.email}</span>
+                        <span className="block text-on-surface">{student.assignedAdvisor.fullName}</span>
+                        <span className="block text-caption text-on-surface-variant">{student.assignedAdvisor.email}</span>
                       </>
                     ) : (
-                      <span className="text-slate-500">Not assigned</span>
+                      <span className="text-on-surface-variant">Not assigned</span>
                     )}
                   </DetailRow>
                 </dl>
               </section>
 
               {canAssignAdvisor && (
-                <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                  <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                  <h3 className="mb-3 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                     Advisor assignment
                   </h3>
 
@@ -307,11 +310,11 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
 
                   <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1.5">
-                      <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Assigned advisor</span>
+                      <span className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Assigned advisor</span>
                       <select
                         value={selectedAdvisorId}
                         onChange={(event) => setSelectedAdvisorId(event.target.value)}
-                        className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2.5 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                        className="w-full rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2.5 text-body text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         <option value="">Select an advisor</option>
                         {advisors.map((advisor) => (
@@ -335,22 +338,22 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                 </section>
               )}
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                   Scheduling workflow
                 </h3>
-                <dl className="divide-y divide-slate-800/70">
+                <dl className="divide-y divide-outline-variant">
                   <DetailRow icon={<BadgeCheck className="h-4 w-4" />} label="Workflow status">
                     <Badge tone="indigo" dot>
                       {student.workflowStatus}
                     </Badge>
                   </DetailRow>
                   <DetailRow icon={<CircleAlert className="h-4 w-4" />} label="Blocking step">
-                    {student.blockingStep ?? <span className="text-slate-500">None</span>}
+                    {student.blockingStep ?? <span className="text-on-surface-variant">None</span>}
                   </DetailRow>
                   <DetailRow icon={<Hash className="h-4 w-4" />} label="Last updated">
                     {formatRelative(student.lastUpdateAt)}{' '}
-                    <span className="text-xs text-slate-500">({formatDate(student.lastUpdateAt)})</span>
+                    <span className="text-caption text-on-surface-variant">({formatDate(student.lastUpdateAt)})</span>
                   </DetailRow>
                 </dl>
               </section>
@@ -370,12 +373,12 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
               {/* Req 59: advising reason, allowance and bachelor-project eligibility. */}
               {student.studentType === 'Advising Student' && <AdvisingOverviewPanel studentId={student.id} />}
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-2 flex items-center gap-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                   <Building2 className="h-3.5 w-3.5" aria-hidden />
                   Account
                 </h3>
-                <p className="text-xs leading-relaxed text-slate-400">
+                <p className="text-caption leading-relaxed text-on-surface-variant">
                   Deactivating blocks this student from logging in. Their academic, scheduling and
                   audit history is kept.
                 </p>
@@ -385,7 +388,7 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
         </div>
 
         {student && (
-          <div className="border-t border-slate-800 p-6">
+          <div className="border-t border-outline-variant p-6">
             {canManage ? (
               <CustomButton
                 variant={student.isActive ? 'danger' : 'primary'}
@@ -403,7 +406,7 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                 {student.isActive ? 'Deactivate account' : 'Activate account'}
               </CustomButton>
             ) : (
-              <p className="text-center text-xs text-slate-500">
+              <p className="text-center text-caption text-on-surface-variant">
                 Only an Administrator can change an account status.
               </p>
             )}

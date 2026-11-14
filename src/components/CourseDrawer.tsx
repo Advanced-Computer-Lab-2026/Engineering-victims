@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   BookOpen,
   Building2,
@@ -86,12 +87,12 @@ interface DetailRowProps {
 
 const DetailRow: React.FC<DetailRowProps> = ({ icon, label, children }) => (
   <div className="flex items-start gap-3 py-2.5">
-    <span className="mt-0.5 shrink-0 text-slate-500" aria-hidden>
+    <span className="mt-0.5 shrink-0 text-on-surface-variant" aria-hidden>
       {icon}
     </span>
     <div className="min-w-0 flex-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm text-slate-200">{children}</dd>
+      <dt className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">{label}</dt>
+      <dd className="mt-0.5 break-words text-body text-on-surface">{children}</dd>
     </div>
   </div>
 );
@@ -105,6 +106,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
   const [draft, setDraft] = useState<CourseDraft>(emptyDraft());
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const trapRef = useFocusTrap<HTMLElement>(!!mode);
   const [isSaving, setIsSaving] = useState(false);
 
   // Reset the form whenever the panel opens on a different course or mode.
@@ -181,25 +183,26 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
   const subtitle = mode === 'create' ? 'Add a course to the catalogue.' : course?.name;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+    <div className="fixed inset-0 z-toast flex justify-end">
+      <div className="absolute inset-0 scrim backdrop-blur-sm" onClick={onClose} aria-hidden />
 
       <aside
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label={mode === 'create' ? 'New course' : 'Course details'}
-        className="relative flex h-full w-full max-w-xl flex-col border-l border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl"
+        className="relative flex h-full w-full max-w-xl flex-col border-l border-outline-variant bg-surface-container-lowest shadow-2xl backdrop-blur-xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-6">
+        <div className="flex items-start justify-between gap-4 border-b border-outline-variant p-6">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-bold text-white">{title}</h2>
-            {subtitle && <p className="mt-0.5 truncate text-sm text-slate-400">{subtitle}</p>}
+            <h2 className="truncate text-h3 font-bold text-on-surface">{title}</h2>
+            {subtitle && <p className="mt-0.5 truncate text-body text-on-surface-variant">{subtitle}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>
@@ -219,9 +222,9 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                 <Badge>{course.creditHours} credit hours</Badge>
               </div>
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Course</h3>
-                <dl className="divide-y divide-slate-800/70">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Course</h3>
+                <dl className="divide-y divide-outline-variant">
                   <DetailRow icon={<BookOpen className="h-4 w-4" />} label="Name">
                     {course.name}
                   </DetailRow>
@@ -243,19 +246,19 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                 </dl>
               </section>
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-3 flex items-center gap-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                   <GitBranch className="h-3.5 w-3.5" aria-hidden />
                   Prerequisites
                 </h3>
                 {course.prerequisites.length === 0 ? (
-                  <p className="text-sm text-slate-400">None. Any student can take this course.</p>
+                  <p className="text-body text-on-surface-variant">None. Any student can take this course.</p>
                 ) : (
                   <ul className="space-y-1.5">
                     {course.prerequisites.map((prerequisite) => (
-                      <li key={prerequisite.id} className="text-sm text-slate-200">
-                        <span className="font-mono text-indigo-300">{prerequisite.code}</span>{' '}
-                        <span className="text-slate-400">{prerequisite.name}</span>
+                      <li key={prerequisite.id} className="text-body text-on-surface">
+                        <span className="font-mono text-primary">{prerequisite.code}</span>{' '}
+                        <span className="text-on-surface-variant">{prerequisite.name}</span>
                       </li>
                     ))}
                   </ul>
@@ -263,7 +266,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
 
                 {requiredBy.length > 0 && (
                   <>
-                    <h4 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <h4 className="mb-2 mt-4 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                       Required by
                     </h4>
                     <div className="flex flex-wrap gap-1.5">
@@ -278,7 +281,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
               </section>
             </div>
 
-            <div className="flex justify-end border-t border-slate-800 p-4">
+            <div className="flex justify-end border-t border-outline-variant p-4">
               <CustomButton onClick={() => onModeChange('edit')} icon={<Pencil className="h-4 w-4" aria-hidden />}>
                 Edit course
               </CustomButton>
@@ -299,7 +302,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                 </AlertBanner>
               )}
 
-              <div className="grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)]">
+              <div className="grid gap-4 md:grid-cols-[10rem_minmax(0,1fr)]">
                 <CustomInput
                   label="Code"
                   value={draft.code}
@@ -316,7 +319,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                 />
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-3">
                 <Select
                   label="Course type"
                   value={draft.courseType}
@@ -354,7 +357,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                 onChange={(value) => set('offeringSeasons', value)}
               />
 
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                 <CustomInput
                   label="Lecture hrs"
                   type="number"
@@ -402,20 +405,20 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                   options={prerequisiteOptions}
                 />
                 {draft.prerequisites.length === 0 ? (
-                  <p className="text-xs text-slate-500">No prerequisites.</p>
+                  <p className="text-caption text-on-surface-variant">No prerequisites.</p>
                 ) : (
                   <div className="flex flex-wrap gap-2">
                     {draft.prerequisites.map((id) => (
                       <span
                         key={id}
-                        className="inline-flex items-center gap-1.5 rounded-full bg-indigo-500/15 py-1 pl-3 pr-1.5 text-xs font-medium text-indigo-200 ring-1 ring-inset ring-indigo-400/30"
+                        className="inline-flex items-center gap-1.5 rounded-full bg-primary-container py-1 pl-3 pr-1.5 text-caption font-medium text-on-primary-container ring-1 ring-inset ring-primary"
                       >
                         <span className="font-mono">{byId.get(id)?.code ?? 'Removed course'}</span>
                         <button
                           type="button"
                           onClick={() => set('prerequisites', draft.prerequisites.filter((item) => item !== id))}
                           aria-label={`Remove ${byId.get(id)?.code ?? 'prerequisite'}`}
-                          className="rounded-full p-0.5 text-indigo-300 transition-colors hover:bg-indigo-500/30 hover:text-white"
+                          className="flex h-6 w-6 items-center justify-center rounded-full text-primary transition-colors hover:bg-surface-container hover:text-on-surface"
                         >
                           <X className="h-3 w-3" aria-hidden />
                         </button>
@@ -426,7 +429,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-800 p-4">
+            <div className="flex justify-end gap-2 border-t border-outline-variant p-4">
               <CustomButton
                 variant="ghost"
                 onClick={() => (mode === 'edit' ? onModeChange('view') : onClose())}

@@ -3,7 +3,7 @@
  *
  * The server no longer seeds itself on every boot: it calls seedIfEmpty(),
  * which leaves an already-initialized database untouched so a restart cannot
- * wipe work in progress (nodemon restarts on every save, so this used to happen
+ * wipe work in progress (the dev watcher restarts on every save, so this used to happen
  * constantly). This script always calls the destructive seed() directly, which
  * is what makes it a clean slate. Both paths share that one seed(), so the
  * database can never end up with a different (or smaller) set of accounts

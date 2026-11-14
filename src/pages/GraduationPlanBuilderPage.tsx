@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -79,6 +80,17 @@ const GraduationPlanBuilderPage: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDelete, setShowDelete] = useState(false);
+  const trapRef = useFocusTrap<HTMLDivElement>(showDelete);
+
+  // Escape closes the delete confirmation unless deletion is in flight.
+  useEffect(() => {
+    if (!showDelete) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isDeleting) setShowDelete(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [showDelete, isDeleting]);
   const [decisionNote, setDecisionNote] = useState('');
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [isDeciding, setIsDeciding] = useState(false);
@@ -266,7 +278,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+      <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         Loading graduation plan...
       </Card>
@@ -330,7 +342,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
         >
           All plans
         </CustomButton>
-        <p className="text-xs text-slate-500">
+        <p className="text-caption text-on-surface-variant">
           Updated {formatRelative(plan.updatedAt)}
           {plan.submittedAt ? ` · Submitted ${formatDate(plan.submittedAt)}` : ''}
         </p>
@@ -351,54 +363,54 @@ const GraduationPlanBuilderPage: React.FC = () => {
 
       {plan.advisor && (
         <Card tone="raised" className="mb-4 p-4">
-          <p className="text-sm text-slate-300">
-            Prepared by <span className="font-medium text-slate-100">{plan.advisor.fullName}</span>
-            <span className="ml-2 text-slate-500">{plan.advisor.email}</span>
+          <p className="text-body text-on-surface">
+            Prepared by <span className="font-medium text-on-surface">{plan.advisor.fullName}</span>
+            <span className="ml-2 text-on-surface-variant">{plan.advisor.email}</span>
           </p>
         </Card>
       )}
 
       {plan.responseNote && (
-        <Card tone="raised" className="mb-4 border border-indigo-800/50 p-4">
-          <h2 className="text-sm font-semibold text-slate-100">Coordinator's response</h2>
-          <p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{plan.responseNote}</p>
+        <Card tone="raised" className="mb-4 border border-primary p-4">
+          <h2 className="text-body font-semibold text-on-surface">Coordinator's response</h2>
+          <p className="mt-2 whitespace-pre-wrap text-body text-on-surface">{plan.responseNote}</p>
           {plan.decidedAt && (
-            <p className="mt-2 text-xs text-slate-500">Recorded {formatDate(plan.decidedAt)}</p>
+            <p className="mt-2 text-caption text-on-surface-variant">Recorded {formatDate(plan.decidedAt)}</p>
           )}
         </Card>
       )}
 
       {user?.role === 'Advisor' && isDraft && (
         <Card tone="raised" className="mb-5 p-4">
-          <h2 className="text-sm font-bold text-white">Exit-exam request</h2>
+          <h2 className="text-body font-bold text-on-surface">Exit-exam request</h2>
           {isLoadingExitExamRequests ? (
-            <p className="mt-2 text-sm text-slate-400">Loading exit-exam requests...</p>
+            <p className="mt-2 text-body text-on-surface-variant">Loading exit-exam requests...</p>
           ) : failedCourses.length !== 1 ? (
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-body text-on-surface-variant">
               A request can be made only when exactly one failed course remains.
             </p>
           ) : exitExamRequest?.status === 'Pending' ? (
-            <p className="mt-2 text-sm text-amber-200">
+            <p className="mt-2 text-body text-warning">
               The request for {failedCourses[0].code} is awaiting the Coordinator's decision.
             </p>
           ) : exitExamRequest?.status === 'Approved' ? (
-            <p className="mt-2 text-sm text-emerald-200">
+            <p className="mt-2 text-body text-success">
               {failedCourses[0].code} is covered by an approved exit exam and may remain unassigned.
             </p>
           ) : exitExamRequest?.status === 'Rejected' ? (
-            <div className="mt-2 rounded-lg border border-rose-900/60 bg-rose-950/20 p-3 text-sm text-rose-200">
+            <div className="mt-2 rounded-lg border border-error bg-error-container p-3 text-body text-error">
               <p>The request for {failedCourses[0].code} was rejected. Assign the course to a valid term.</p>
-              <p className="mt-1 whitespace-pre-wrap text-rose-100">{exitExamRequest.responseNote}</p>
+              <p className="mt-1 whitespace-pre-wrap text-error">{exitExamRequest.responseNote}</p>
             </div>
           ) : (
             <>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-body text-on-surface-variant">
                 Request an exit exam for the one remaining failed course only if it cannot be repeated
                 before graduation.
               </p>
               <label
                 htmlFor="exit-exam-reason"
-                className="mt-3 block text-xs font-medium uppercase tracking-wide text-slate-400"
+                className="mt-3 block text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant"
               >
                 Why can {failedCourses[0].code} not be placed in a term?
               </label>
@@ -408,11 +420,11 @@ const GraduationPlanBuilderPage: React.FC = () => {
                 onChange={(event) => setExitExamReason(event.target.value)}
                 maxLength={1000}
                 rows={3}
-                className="mt-1.5 w-full resize-y rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                className="mt-1.5 w-full resize-y rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="For example, the course is not offered in any remaining term."
               />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <span className="text-xs text-slate-500">{exitExamReason.length}/1000 characters</span>
+                <span className="text-caption text-on-surface-variant">{exitExamReason.length}/1000 characters</span>
                 <CustomButton
                   isLoading={isSubmittingExitExamRequest}
                   disabled={!exitExamReason.trim() || Boolean(exitExamRequest)}
@@ -423,31 +435,31 @@ const GraduationPlanBuilderPage: React.FC = () => {
               </div>
             </>
           )}
-          {exitExamMessage && <p className="mt-2 text-sm text-emerald-300">{exitExamMessage}</p>}
+          {exitExamMessage && <p className="mt-2 text-body text-success">{exitExamMessage}</p>}
           {exitExamError && (
-            <p role="alert" className="mt-2 text-sm text-rose-300">
+            <p role="alert" className="mt-2 text-body text-error">
               {exitExamError}
             </p>
           )}
         </Card>
       )}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid gap-3 md:grid-cols-3">
         {plan.terms.map((term, index) => {
           const hours = hoursByTerm[index] ?? 0;
           const limit = plan.validation.creditLimits[index] ?? 0;
           const over = hours > limit;
           return (
             <Card key={term.label} tone="raised" className="p-4">
-              <div className="flex items-center gap-2 text-slate-400">
+              <div className="flex items-center gap-2 text-on-surface-variant">
                 <CalendarRange className="h-4 w-4" aria-hidden />
-                <span className="text-xs font-semibold uppercase tracking-wide">{term.label}</span>
+                <span className="text-caption font-semibold uppercase tracking-eyebrow">{term.label}</span>
               </div>
-              <p className={`mt-2 text-2xl font-bold ${over ? 'text-rose-300' : 'text-white'}`}>
-                {hours} <span className="text-sm font-medium text-slate-500">/ {limit} hrs</span>
+              <p className={`mt-2 text-h2 font-bold ${over ? 'text-error' : 'text-on-surface'}`}>
+                {hours} <span className="text-body font-medium text-on-surface-variant">/ {limit} hrs</span>
               </p>
               {over && (
-                <p className="mt-1 flex items-center gap-1 text-xs text-rose-300">
+                <p className="mt-1 flex items-center gap-1 text-caption text-error">
                   <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
                   Over the credit-hour limit
                 </p>
@@ -458,10 +470,10 @@ const GraduationPlanBuilderPage: React.FC = () => {
       </div>
 
       <Card tone="raised" className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-outline-variant px-4 py-3">
           <div>
-            <h2 className="text-sm font-bold text-white">Remaining courses</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="text-body font-bold text-on-surface">Remaining courses</h2>
+            <p className="text-caption text-on-surface-variant">
               {assignedCount} assigned
               {approvedExitExamUnassigned ? ' · 1 covered by an approved exit exam' : ''}
               {' · '}
@@ -474,14 +486,14 @@ const GraduationPlanBuilderPage: React.FC = () => {
         </div>
 
         {plan.remaining.length === 0 ? (
-          <p className="flex items-center justify-center gap-2 p-12 text-sm text-slate-400">
+          <p className="flex items-center justify-center gap-2 p-12 text-body text-on-surface-variant">
             <GraduationCap className="h-4 w-4" aria-hidden />
             No remaining courses — this student's graduation requirements are complete.
           </p>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+            <table className="w-full text-left text-body">
+              <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">Course</th>
                   <th scope="col" className="px-4 py-3 text-right font-semibold">Credits</th>
@@ -490,7 +502,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
                   <th scope="col" className="px-4 py-3 font-semibold">Term</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-outline-variant">
                 {plan.remaining.map((course) => {
                   const offered = plan.terms
                     .map((term, index) => ({ term, index }))
@@ -498,10 +510,10 @@ const GraduationPlanBuilderPage: React.FC = () => {
                   const value = assignments[course.id] ?? '';
 
                   return (
-                    <tr key={course.id} className="transition-colors hover:bg-slate-800/40">
+                    <tr key={course.id} className="transition-colors hover:bg-surface-container">
                       <td className="px-4 py-3">
-                        <p className="font-mono text-xs font-semibold text-indigo-300">{course.code}</p>
-                        <p className="text-slate-200">{course.name}</p>
+                        <p className="font-mono text-caption font-semibold text-primary">{course.code}</p>
+                        <p className="text-on-surface">{course.name}</p>
                         {course.isRetake && (
                           <Badge tone="rose" className="mt-1">
                             Retake
@@ -513,11 +525,11 @@ const GraduationPlanBuilderPage: React.FC = () => {
                           </Badge>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-right font-mono text-slate-300">{course.creditHours}</td>
-                      <td className="px-4 py-3 text-slate-400">{course.offeringSeasons.join(', ')}</td>
+                      <td className="px-4 py-3 text-right font-mono text-on-surface">{course.creditHours}</td>
+                      <td className="px-4 py-3 text-on-surface-variant">{course.offeringSeasons.join(', ')}</td>
                       <td className="px-4 py-3">
                         {course.prerequisites.length === 0 ? (
-                          <span className="text-slate-500">None</span>
+                          <span className="text-on-surface-variant">None</span>
                         ) : (
                           <div className="flex flex-wrap gap-1">
                             {course.prerequisites.map((prerequisite) => (
@@ -538,10 +550,10 @@ const GraduationPlanBuilderPage: React.FC = () => {
                             onChange={(event) =>
                               setAssignments((current) => ({ ...current, [course.id]: event.target.value }))
                             }
-                            className={`w-full min-w-[11rem] rounded-lg border bg-slate-900/70 px-2.5 py-2 text-sm transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 ${
+                            className={`w-full min-w-[11rem] rounded-lg border bg-surface-container-low px-2.5 py-2 text-body transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary ${
                               value === ''
-                                ? 'border-amber-700/60 text-amber-200'
-                                : 'border-slate-700 text-slate-200 hover:border-slate-600'
+                                ? 'border-warning text-warning'
+                                : 'border-outline-variant text-on-surface hover:border-outline'
                             }`}
                           >
                             <option value="">Unassigned</option>
@@ -552,9 +564,9 @@ const GraduationPlanBuilderPage: React.FC = () => {
                             ))}
                           </select>
                         ) : value === '' ? (
-                          <span className="text-slate-500">Unassigned</span>
+                          <span className="text-on-surface-variant">Unassigned</span>
                         ) : (
-                          <span className="text-slate-200">{plan.terms[Number(value)]?.label ?? 'Unassigned'}</span>
+                          <span className="text-on-surface">{plan.terms[Number(value)]?.label ?? 'Unassigned'}</span>
                         )}
                       </td>
                     </tr>
@@ -568,14 +580,14 @@ const GraduationPlanBuilderPage: React.FC = () => {
 
       {isCoordinator && plan.status === 'Submitted' && (
         <Card tone="raised" className="mt-5 p-4">
-          <h2 className="text-sm font-bold text-white">Coordinator decision</h2>
-          <p className="mt-1 text-sm text-slate-400">
+          <h2 className="text-body font-bold text-on-surface">Coordinator decision</h2>
+          <p className="mt-1 text-body text-on-surface-variant">
             Acceptance confirms the remaining graduation requirements can be completed within one year.
             Rejection returns this plan to the Advisor as a private draft.
           </p>
           <label
             htmlFor="graduation-plan-response"
-            className="mt-4 block text-xs font-medium uppercase tracking-wide text-slate-400"
+            className="mt-4 block text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant"
           >
             Response note (required)
           </label>
@@ -585,13 +597,13 @@ const GraduationPlanBuilderPage: React.FC = () => {
             onChange={(event) => setDecisionNote(event.target.value)}
             maxLength={1000}
             rows={4}
-            className="mt-1.5 w-full resize-y rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+            className="mt-1.5 w-full resize-y rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="Explain the decision to the Advisor."
           />
           <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-xs text-slate-500">{decisionNote.length}/1000 characters</span>
+            <span className="text-caption text-on-surface-variant">{decisionNote.length}/1000 characters</span>
             {decisionError && (
-              <span role="alert" className="text-xs text-rose-300">
+              <span role="alert" className="text-caption text-error">
                 {decisionError}
               </span>
             )}
@@ -621,7 +633,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
       {isDraft || error || success ? (
         <div
           ref={feedbackRef}
-          className="sticky bottom-0 z-20 mt-5 max-h-[55vh] space-y-3 overflow-y-auto border-t border-slate-800/80 bg-slate-950/95 pb-1 pt-3 backdrop-blur"
+          className="sticky bottom-0 z-dropdown mt-5 max-h-[55vh] space-y-3 overflow-y-auto border-t border-outline-variant bg-surface-container-lowest pb-1 pt-3 backdrop-blur"
         >
           {error && (
             <AlertBanner
@@ -631,7 +643,7 @@ const GraduationPlanBuilderPage: React.FC = () => {
                   ? 'Plan not submitted — fix the issues below'
                   : failedAction === 'save'
                     ? 'Draft not saved — fix the issues below'
-                    : 'Something went wrong'
+                    : 'Could not complete that action'
               }
               onDismiss={clearFeedback}
             >
@@ -655,8 +667,8 @@ const GraduationPlanBuilderPage: React.FC = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p
               aria-live="polite"
-              className={`flex items-center gap-1.5 text-xs font-semibold ${
-                error ? 'text-rose-300' : unassignedCount === 0 ? 'text-emerald-300' : 'text-amber-300'
+              className={`flex items-center gap-1.5 text-caption font-semibold ${
+                error ? 'text-error' : unassignedCount === 0 ? 'text-success' : 'text-warning'
               }`}
             >
               {error ? (
@@ -710,11 +722,11 @@ const GraduationPlanBuilderPage: React.FC = () => {
       ) : null}
 
       {showDelete && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowDelete(false)} aria-hidden />
-          <Card tone="raised" className="relative w-full max-w-md p-6">
-            <h2 className="text-base font-bold text-white">Delete this draft?</h2>
-            <p className="mt-2 text-sm text-slate-400">
+        <div className="fixed inset-0 z-toast flex items-center justify-center p-4">
+          <div className="absolute inset-0 scrim backdrop-blur-sm" onClick={() => setShowDelete(false)} aria-hidden />
+          <Card ref={trapRef} tone="raised" role="dialog" aria-modal="true" aria-label="Delete draft" className="relative w-full max-w-md p-6">
+            <h2 className="text-body-lg font-bold text-on-surface">Delete this draft?</h2>
+            <p className="mt-2 text-body text-on-surface-variant">
               The plan and every placement on it will be removed. This cannot be undone.
             </p>
             <div className="mt-6 flex justify-end gap-2">

@@ -4,6 +4,16 @@ import type { SessionUser } from '../lib/types';
 
 const TOKEN_KEY = 'token';
 
+/** One-shot message explaining why the sign-in screen is showing. */
+export const SESSION_NOTICE_KEY = 'session-notice';
+
+/** Reads and clears the notice, so it is shown exactly once. */
+export const consumeSessionNotice = (): string | null => {
+  const notice = sessionStorage.getItem(SESSION_NOTICE_KEY);
+  if (notice) sessionStorage.removeItem(SESSION_NOTICE_KEY);
+  return notice;
+};
+
 interface SessionState {
   user: SessionUser | null;
   isLoading: boolean;
@@ -27,6 +37,20 @@ const publish = (user: SessionUser | null) => {
   cachedUser = user;
   subscribers.forEach((notify) => notify(user));
 };
+
+/**
+ * `apiFetch` announces a rejected token rather than redirecting, so this stays
+ * the one place that knows how a dead session is cleared. The guards then see
+ * a null user and send the visitor to sign-in, which reads the notice.
+ */
+if (typeof window !== 'undefined') {
+  window.addEventListener('session-expired', () => {
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem('user');
+    sessionStorage.setItem(SESSION_NOTICE_KEY, 'Your session expired. Sign in again to continue.');
+    publish(null);
+  });
+}
 
 const load = () => {
   if (inFlight) return inFlight;

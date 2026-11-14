@@ -80,7 +80,7 @@ const ExitExamRequestsPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading exit-exam requests...
         </Card>
@@ -96,30 +96,30 @@ const ExitExamRequestsPage: React.FC = () => {
             <Card key={request.id} tone="raised" className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-semibold text-white">
+                  <h2 className="font-semibold text-on-surface">
                     {request.course?.code ?? 'Failed course'} — {request.course?.name ?? 'Course details unavailable'}
                   </h2>
-                  <p className="mt-1 text-sm text-slate-300">
+                  <p className="mt-1 text-body text-on-surface">
                     {request.student?.fullName ?? 'Student unavailable'} · {request.student?.studentId ?? '—'} ·{' '}
                     {request.student?.major ?? '—'}
                   </p>
-                  <p className="mt-1 text-xs text-slate-500">
+                  <p className="mt-1 text-caption text-on-surface-variant">
                     Advisor: {request.advisor?.fullName ?? '—'} · Submitted {formatDate(request.submittedAt)}
                   </p>
                 </div>
                 <Badge tone="amber" dot>Pending review</Badge>
               </div>
 
-              <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <div className="mt-4 rounded-lg border border-outline-variant bg-surface-container-low p-3">
+                <h3 className="text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                   Advisor's explanation
                 </h3>
-                <p className="mt-2 whitespace-pre-wrap text-sm text-slate-200">{request.reason}</p>
+                <p className="mt-2 whitespace-pre-wrap text-body text-on-surface">{request.reason}</p>
               </div>
 
               <label
                 htmlFor={`exit-exam-note-${request.id}`}
-                className="mt-4 block text-xs font-medium uppercase tracking-wide text-slate-400"
+                className="mt-4 block text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant"
               >
                 Response note (required)
               </label>
@@ -131,11 +131,11 @@ const ExitExamRequestsPage: React.FC = () => {
                 }
                 maxLength={EXIT_EXAM_NOTE_LIMIT}
                 rows={3}
-                className="mt-1.5 w-full resize-y rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                className="mt-1.5 w-full resize-y rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="Explain why the request is approved or rejected."
               />
               <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                <span className="text-xs text-slate-500">
+                <span className="text-caption text-on-surface-variant">
                   {(notes[request.id] ?? '').length}/{EXIT_EXAM_NOTE_LIMIT} characters
                 </span>
                 <div className="flex flex-wrap justify-end gap-2">

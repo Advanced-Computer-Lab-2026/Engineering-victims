@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { AlertTriangle, Trash2 } from 'lucide-react';
 import CustomButton from './CustomButton';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 
 type Tone = 'warning' | 'danger';
 
@@ -20,12 +21,12 @@ interface ConfirmDialogProps {
 
 const TONES: Record<Tone, { chip: string; icon: React.ReactNode; button: 'danger' | 'primary' }> = {
   warning: {
-    chip: 'bg-amber-950/60 border-amber-800/60 text-amber-400',
+    chip: 'bg-warning-container border-warning text-warning',
     icon: <AlertTriangle className="h-5 w-5" aria-hidden />,
     button: 'primary',
   },
   danger: {
-    chip: 'bg-rose-950/60 border-rose-800/60 text-rose-400',
+    chip: 'bg-error-container border-error text-error',
     icon: <Trash2 className="h-5 w-5" aria-hidden />,
     button: 'danger',
   },
@@ -35,9 +36,9 @@ const TONES: Record<Tone, { chip: string; icon: React.ReactNode; button: 'danger
  * In-app replacement for `window.confirm`: same yes/no contract, but styled to
  * the product instead of the browser's own dialog.
  *
- * The dialog only mounts while `open`, so Escape handling and the initial focus
- * land fresh on every opening. Backing out is blocked while `isLoading` — the
- * request is already on its way.
+ * The dialog only mounts while `open`, so Escape handling, focus trapping and
+ * the initial focus land fresh on every opening. Backing out is blocked while
+ * `isLoading` — the request is already on its way.
  */
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   open,
@@ -51,6 +52,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   onCancel,
 }) => {
   const styles = TONES[tone];
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
 
   useEffect(() => {
     if (!open) return;
@@ -64,28 +66,29 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-toast flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 scrim backdrop-blur-sm"
         onClick={isLoading ? undefined : onCancel}
         aria-hidden
       />
       <div
+        ref={trapRef}
         role="alertdialog"
         aria-modal="true"
         aria-labelledby="confirm-dialog-title"
         aria-describedby="confirm-dialog-message"
-        className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950 p-6 shadow-2xl"
+        className="relative w-full max-w-md rounded-xl border border-outline-variant bg-surface-container-lowest p-6 shadow-elevation-3"
       >
         <div className="flex items-start gap-4">
           <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${styles.chip}`}>
             {styles.icon}
           </span>
           <div className="min-w-0 space-y-2">
-            <h2 id="confirm-dialog-title" className="text-base font-bold text-white">
+            <h2 id="confirm-dialog-title" className="text-body-lg font-bold text-on-surface">
               {title}
             </h2>
-            <p id="confirm-dialog-message" className="text-sm leading-relaxed text-slate-400">
+            <p id="confirm-dialog-message" className="text-body leading-relaxed text-on-surface-variant">
               {message}
             </p>
           </div>

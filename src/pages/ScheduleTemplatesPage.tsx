@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowRightLeft, BookOpen, CalendarDays, Loader2, Pencil, Plus, RotateCcw, Save, Search, Users } from 'lucide-react';
 import AlertBanner from '../components/ui/AlertBanner';
 import Card from '../components/ui/Card';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import CustomButton from '../components/ui/CustomButton';
 import CustomInput from '../components/ui/CustomInput';
 import EmptyState from '../components/ui/EmptyState';
@@ -53,6 +54,7 @@ const ScheduleTemplatesPage: React.FC = () => {
   const [isLoadingStudents, setIsLoadingStudents] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingStudentId, setPendingStudentId] = useState('');
+  const [reassignStudent, setReassignStudent] = useState<StudentSummary | null>(null);
 
   const selectedTemplate = templates.find((template) => template.id === selectedTemplateId) ?? null;
 
@@ -196,19 +198,25 @@ const ScheduleTemplatesPage: React.FC = () => {
   const handleAssign = async (student: StudentSummary) => {
     const group = selectedGroups[student.id] ?? '';
     if (!group || !selectedTermId) return;
-    if (student.studyGroup && !window.confirm(
-      `Replace ${student.fullName}'s processed schedule for ${termLabel(terms.find((term) => term.id === selectedTermId)!)} with group ${group}?`
-    )) return;
+    if (student.studyGroup) {
+      setReassignStudent(student);
+      return;
+    }
+    await performAssign(student, group);
+  };
 
+  const performAssign = async (student: StudentSummary, group: string) => {
     setPendingStudentId(student.id);
     setError(null);
     setNotice(null);
     try {
       const result = await assignStudentToScheduleGroup(student.id, group, selectedTermId);
       setNotice(`${result.message} ${result.slotsCount} course slots processed.`);
+      setReassignStudent(null);
       await loadStudents();
     } catch (err) {
       setError((err as ApiError).message);
+      setReassignStudent(null);
     } finally {
       setPendingStudentId('');
     }
@@ -233,7 +241,7 @@ const ScheduleTemplatesPage: React.FC = () => {
       {error && <div className="mb-4"><AlertBanner tone="error" title="Action could not be completed" onDismiss={() => setError(null)}>{error}</AlertBanner></div>}
       {notice && <div className="mb-4"><AlertBanner tone="success" onDismiss={() => setNotice(null)}>{notice}</AlertBanner></div>}
 
-      <div className="mb-5 flex flex-wrap items-end gap-4 border-b border-slate-800 pb-5">
+      <div className="mb-5 flex flex-wrap items-end gap-4 border-b border-outline-variant pb-5">
         <div className="w-full max-w-xs">
           <Select
             label="Academic term"
@@ -244,11 +252,11 @@ const ScheduleTemplatesPage: React.FC = () => {
             disabled={isLoading || terms.length === 0}
           />
         </div>
-        <div className="inline-flex rounded-lg border border-slate-700 bg-slate-950/50 p-1" role="tablist" aria-label="Schedule group workspace">
-          <button type="button" role="tab" aria-selected={view === 'templates'} onClick={() => setView('templates')} className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${view === 'templates' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+        <div className="inline-flex rounded-lg border border-outline-variant bg-surface-container-lowest p-1" role="tablist" aria-label="Schedule group workspace">
+          <button type="button" role="tab" aria-selected={view === 'templates'} onClick={() => setView('templates')} className={`flex items-center gap-2 rounded-md px-3 py-2 text-body font-medium transition-colors ${view === 'templates' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>
             <CalendarDays className="h-4 w-4" aria-hidden /> Templates
           </button>
-          <button type="button" role="tab" aria-selected={view === 'students'} onClick={() => setView('students')} className={`flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${view === 'students' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>
+          <button type="button" role="tab" aria-selected={view === 'students'} onClick={() => setView('students')} className={`flex items-center gap-2 rounded-md px-3 py-2 text-body font-medium transition-colors ${view === 'students' ? 'bg-primary text-on-primary' : 'text-on-surface-variant hover:text-on-surface'}`}>
             <Users className="h-4 w-4" aria-hidden /> Student assignments
           </button>
         </div>
@@ -259,31 +267,31 @@ const ScheduleTemplatesPage: React.FC = () => {
           <section aria-label="Schedule templates">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-white">Templates for {currentTerm ? termLabel(currentTerm) : 'selected term'}</h2>
-                <p className="mt-1 text-xs text-slate-500">Only published templates can be assigned.</p>
+                <h2 className="text-h3 font-semibold text-on-surface">Templates for {currentTerm ? termLabel(currentTerm) : 'selected term'}</h2>
+                <p className="mt-1 text-caption text-on-surface-variant">Only published templates can be assigned.</p>
               </div>
               <CustomButton variant="secondary" size="sm" onClick={startNewTemplate} icon={<Plus className="h-4 w-4" aria-hidden />}>New template</CustomButton>
             </div>
             {isLoadingTemplates ? (
-              <Card className="flex items-center justify-center gap-2 p-12 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Loading templates...</Card>
+              <Card role="status" className="flex items-center justify-center gap-2 p-12 text-body text-on-surface-variant"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Loading templates...</Card>
             ) : templates.length === 0 ? (
               <EmptyState icon={<BookOpen className="h-5 w-5" />} title="No templates for this term" description="Create a group template from published course slots for a major and semester." />
             ) : (
               <Card tone="raised" className="overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[38rem] text-left text-sm">
-                    <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase text-slate-400">
+                  <table className="w-full min-w-[38rem] text-left text-body">
+                    <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase text-on-surface-variant">
                       <tr><th className="px-4 py-3 font-semibold">Major / Semester</th><th className="px-4 py-3 font-semibold">Group</th><th className="px-4 py-3 font-semibold">Status</th><th className="px-4 py-3 text-right font-semibold">Actions</th></tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-outline-variant">
                       {templates.map((template) => (
-                        <tr key={template.id} className={`transition-colors hover:bg-slate-800/40 ${selectedTemplateId === template.id ? 'bg-indigo-950/30' : ''}`}>
-                          <td className="px-4 py-3"><div className="font-medium text-slate-100">{template.major}</div><div className="text-xs text-slate-500">Semester {template.semester}</div></td>
-                          <td className="px-4 py-3 text-slate-200">{template.studyGroup}<div className="text-xs text-slate-500">{template.slots.length} slots</div></td>
-                          <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-xs font-semibold ${template.publicationStatus === 'Published' ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{template.publicationStatus}</span></td>
+                        <tr key={template.id} className={`transition-colors hover:bg-surface-container ${selectedTemplateId === template.id ? 'bg-primary-container' : ''}`}>
+                          <td className="px-4 py-3"><div className="font-medium text-on-surface">{template.major}</div><div className="text-caption text-on-surface-variant">Semester {template.semester}</div></td>
+                          <td className="px-4 py-3 text-on-surface">{template.studyGroup}<div className="text-caption text-on-surface-variant">{template.slots.length} slots</div></td>
+                          <td className="px-4 py-3"><span className={`rounded-full px-2 py-1 text-caption font-semibold ${template.publicationStatus === 'Published' ? 'bg-success-container text-success' : 'bg-warning-container text-warning'}`}>{template.publicationStatus}</span></td>
                           <td className="px-4 py-3 text-right"><div className="inline-flex items-center gap-1">
-                            <button type="button" title="Edit template" aria-label={`Edit ${template.studyGroup}`} onClick={() => editTemplate(template)} className="rounded-md p-2 text-slate-400 hover:bg-slate-700 hover:text-white"><Pencil className="h-4 w-4" aria-hidden /></button>
-                            <button type="button" onClick={() => handlePublication(template)} className="rounded-md px-2.5 py-2 text-xs font-semibold text-indigo-300 hover:bg-indigo-500/10 hover:text-indigo-200">{template.publicationStatus === 'Published' ? 'Unpublish' : 'Publish'}</button>
+                            <button type="button" title="Edit template" aria-label={`Edit ${template.studyGroup}`} onClick={() => editTemplate(template)} className="flex h-11 w-11 items-center justify-center rounded-md text-on-surface-variant hover:bg-surface-container-high hover:text-on-surface"><Pencil className="h-4 w-4" aria-hidden /></button>
+                            <button type="button" onClick={() => handlePublication(template)} className="rounded-md px-2.5 py-2 text-caption font-semibold text-primary hover:bg-surface-container hover:text-on-surface">{template.publicationStatus === 'Published' ? 'Unpublish' : 'Publish'}</button>
                           </div></td>
                         </tr>
                       ))}
@@ -296,38 +304,38 @@ const ScheduleTemplatesPage: React.FC = () => {
 
           <section aria-label={selectedTemplateId ? 'Edit schedule template' : 'Create schedule template'}>
             <div className="mb-3">
-              <h2 className="text-lg font-semibold text-white">{selectedTemplateId ? 'Edit template' : 'Create template'}</h2>
-              <p className="mt-1 text-xs text-slate-500">Choose published course slots that match the selected term, major, and semester.</p>
+              <h2 className="text-h3 font-semibold text-on-surface">{selectedTemplateId ? 'Edit template' : 'Create template'}</h2>
+              <p className="mt-1 text-caption text-on-surface-variant">Choose published course slots that match the selected term, major, and semester.</p>
             </div>
             <Card tone="raised" className="p-5">
               <form onSubmit={handleSaveTemplate} className="space-y-4">
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 md:grid-cols-2">
                   <Select label="Major" value={templateMajor} onChange={(event) => { setTemplateMajor(event.target.value); setSelectedSlotIds([]); }} options={majors.map((major) => ({ value: major, label: major }))} placeholder="Select a major" required />
                   <Select label="Semester" value={templateSemester} onChange={(event) => { setTemplateSemester(event.target.value); setSelectedSlotIds([]); }} options={SEMESTERS.map((semester) => ({ value: String(semester), label: `Semester ${semester}` }))} />
                 </div>
                 <CustomInput label="Study group" value={templateGroup} onChange={(event) => setTemplateGroup(event.target.value)} placeholder="e.g. G1" required />
 
                 <fieldset>
-                  <legend className="mb-2 text-xs font-medium uppercase text-slate-400">Course slots</legend>
+                  <legend className="mb-2 text-caption font-medium uppercase text-on-surface-variant">Course slots</legend>
                   {isLoadingSlots ? (
-                    <div className="flex items-center gap-2 rounded-lg border border-slate-800 p-4 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Loading published slots...</div>
+                    <div className="flex items-center gap-2 rounded-lg border border-outline-variant p-4 text-body text-on-surface-variant"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Loading published slots...</div>
                   ) : slots.length === 0 ? (
-                    <p className="rounded-lg border border-dashed border-slate-700 p-4 text-sm text-slate-500">No published course slots match this term, major, and semester.</p>
+                    <p className="rounded-lg border border-dashed border-outline-variant p-4 text-body text-on-surface-variant">No published course slots match this term, major, and semester.</p>
                   ) : (
-                    <div className="max-h-72 divide-y divide-slate-800 overflow-y-auto rounded-lg border border-slate-800">
+                    <div className="max-h-72 divide-y divide-outline-variant overflow-y-auto rounded-lg border border-outline-variant">
                       {slots.map((slot) => (
-                        <label key={slot.id} className="flex cursor-pointer items-start gap-3 px-3 py-3 hover:bg-slate-800/50">
-                          <input type="checkbox" checked={selectedSlotIds.includes(slot.id)} onChange={(event) => setSelectedSlotIds((current) => event.target.checked ? [...current, slot.id] : current.filter((id) => id !== slot.id))} className="mt-1 h-4 w-4 accent-indigo-500" />
-                          <span className="min-w-0 flex-1"><span className="block text-sm font-medium text-slate-200">{slot.courseCode} · {slot.courseName}</span><span className="mt-0.5 block text-xs text-slate-500">{slot.slotType} {slot.groupNumber} · {slot.dayOfWeek}, {slot.startTime}–{slot.endTime} · {slot.roomId}</span></span>
+                        <label key={slot.id} className="flex cursor-pointer items-start gap-3 px-3 py-3 hover:bg-surface-container">
+                          <input type="checkbox" checked={selectedSlotIds.includes(slot.id)} onChange={(event) => setSelectedSlotIds((current) => event.target.checked ? [...current, slot.id] : current.filter((id) => id !== slot.id))} className="mt-1 h-4 w-4 accent-primary" />
+                          <span className="min-w-0 flex-1"><span className="block text-body font-medium text-on-surface">{slot.courseCode} · {slot.courseName}</span><span className="mt-0.5 block text-caption text-on-surface-variant">{slot.slotType} {slot.groupNumber} · {slot.dayOfWeek}, {slot.startTime}–{slot.endTime} · {slot.roomId}</span></span>
                         </label>
                       ))}
                     </div>
                   )}
-                  <p className="mt-1.5 text-xs text-slate-500">{selectedSlotIds.length} slots selected</p>
+                  <p className="mt-1.5 text-caption text-on-surface-variant">{selectedSlotIds.length} slots selected</p>
                 </fieldset>
 
-                {selectedTemplate?.publicationStatus === 'Published' && <p className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-3 py-2 text-xs text-amber-200">Saving changes returns this template to draft. Existing processed schedules stay as they are until students are reassigned.</p>}
-                <div className="flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-4">
+                {selectedTemplate?.publicationStatus === 'Published' && <p className="rounded-lg border border-warning bg-warning-container px-3 py-2 text-caption text-warning">Saving changes returns this template to draft. Existing processed schedules stay as they are until students are reassigned.</p>}
+                <div className="flex flex-wrap justify-end gap-2 border-t border-outline-variant pt-4">
                   {selectedTemplateId && <CustomButton type="button" variant="ghost" size="sm" onClick={startNewTemplate}>Cancel edit</CustomButton>}
                   <CustomButton type="submit" variant="primary" size="sm" isLoading={isSaving} disabled={!selectedTermId || !templateMajor || !templateGroup.trim() || selectedSlotIds.length === 0 || isLoadingSlots} icon={<Save className="h-4 w-4" aria-hidden />}>{selectedTemplateId ? 'Save changes' : 'Save draft'}</CustomButton>
                 </div>
@@ -337,38 +345,38 @@ const ScheduleTemplatesPage: React.FC = () => {
         </div>
       ) : (
         <section aria-label="Assign normal students to schedule groups">
-          <div className="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_12rem_minmax(15rem,1.2fr)_auto] xl:items-end">
+          <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_12rem_minmax(15rem,1.2fr)_auto] xl:items-end">
             <Select label="Major" value={studentMajor} onChange={(event) => { setStudentMajor(event.target.value); setStudentPage(1); }} options={majors.map((major) => ({ value: major, label: major }))} placeholder="Select a major" />
             <Select label="Semester" value={studentSemester} onChange={(event) => { setStudentSemester(event.target.value); setStudentPage(1); }} options={SEMESTERS.map((semester) => ({ value: String(semester), label: `Semester ${semester}` }))} />
             <CustomInput label="Find a student" value={studentSearch} onChange={(event) => { setStudentSearch(event.target.value); setStudentPage(1); }} placeholder="Name, email, or student ID" icon={<Search className="h-4 w-4" aria-hidden />} />
             <CustomButton variant="secondary" size="sm" onClick={loadStudents} isLoading={isLoadingStudents} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>
           </div>
-          <p className="mb-3 text-xs text-slate-500">Assigning a group replaces the processed schedule for this term. Only published templates are available.</p>
-          {availableGroups.length === 0 && <div className="mb-4 rounded-lg border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-200">No published group templates match these filters. Create and publish one in Templates first.</div>}
+          <p className="mb-3 text-caption text-on-surface-variant">Assigning a group replaces the processed schedule for this term. Only published templates are available.</p>
+          {availableGroups.length === 0 && <div className="mb-4 rounded-lg border border-warning bg-warning-container px-4 py-3 text-body text-warning">No published group templates match these filters. Create and publish one in Templates first.</div>}
           {isLoadingStudents ? (
-            <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Loading normal students...</Card>
+            <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant"><Loader2 className="h-4 w-4 animate-spin" aria-hidden />Loading normal students...</Card>
           ) : students.length === 0 ? (
             <EmptyState icon={<Users className="h-5 w-5" />} title="No normal students found" description="Try another major, semester, or search term." />
           ) : (
             <Card tone="raised" className="overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[48rem] text-left text-sm">
-                  <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase text-slate-400"><tr><th className="px-4 py-3 font-semibold">Student</th><th className="px-4 py-3 font-semibold">Major / Semester</th><th className="px-4 py-3 font-semibold">Current group</th><th className="px-4 py-3 font-semibold">Assign group</th><th className="px-4 py-3 text-right font-semibold">Action</th></tr></thead>
-                  <tbody className="divide-y divide-slate-800/60">
+                <table className="w-full min-w-[48rem] text-left text-body">
+                  <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase text-on-surface-variant"><tr><th className="px-4 py-3 font-semibold">Student</th><th className="px-4 py-3 font-semibold">Major / Semester</th><th className="px-4 py-3 font-semibold">Current group</th><th className="px-4 py-3 font-semibold">Assign group</th><th className="px-4 py-3 text-right font-semibold">Action</th></tr></thead>
+                  <tbody className="divide-y divide-outline-variant">
                     {students.map((student) => {
                       const groupValue = selectedGroups[student.id] ?? '';
-                      return <tr key={student.id} className="hover:bg-slate-800/40">
-                        <td className="px-4 py-3"><div className="font-medium text-slate-100">{student.fullName}</div><div className="text-xs text-slate-500">{student.studentId} · {student.email}</div></td>
-                        <td className="px-4 py-3 text-slate-300">{student.major}<div className="text-xs text-slate-500">Semester {student.currentSemester}</div></td>
-                        <td className="px-4 py-3 text-slate-300">{student.studyGroup ?? 'Unassigned'}</td>
-                        <td className="w-52 px-4 py-3"><select aria-label={`Schedule group for ${student.fullName}`} value={groupValue} onChange={(event) => setSelectedGroups((current) => ({ ...current, [student.id]: event.target.value }))} className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40"><option value="">Select group</option>{availableGroups.map((template) => <option key={template.id} value={template.studyGroup}>{template.studyGroup}</option>)}</select></td>
+                      return <tr key={student.id} className="hover:bg-surface-container">
+                        <td className="px-4 py-3"><div className="font-medium text-on-surface">{student.fullName}</div><div className="text-caption text-on-surface-variant">{student.studentId} · {student.email}</div></td>
+                        <td className="px-4 py-3 text-on-surface">{student.major}<div className="text-caption text-on-surface-variant">Semester {student.currentSemester}</div></td>
+                        <td className="px-4 py-3 text-on-surface">{student.studyGroup ?? 'Unassigned'}</td>
+                        <td className="w-52 px-4 py-3"><select aria-label={`Schedule group for ${student.fullName}`} value={groupValue} onChange={(event) => setSelectedGroups((current) => ({ ...current, [student.id]: event.target.value }))} className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-body text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"><option value="">Select group</option>{availableGroups.map((template) => <option key={template.id} value={template.studyGroup}>{template.studyGroup}</option>)}</select></td>
                         <td className="px-4 py-3 text-right"><CustomButton size="sm" variant="primary" disabled={!groupValue || pendingStudentId === student.id} isLoading={pendingStudentId === student.id} onClick={() => handleAssign(student)} icon={<ArrowRightLeft className="h-4 w-4" aria-hidden />}>{student.studyGroup ? 'Reassign' : 'Assign'}</CustomButton></td>
                       </tr>;
                     })}
                   </tbody>
                 </table>
               </div>
-              <div className="flex items-center justify-between border-t border-slate-800 px-4 py-3 text-xs text-slate-500">
+              <div className="flex items-center justify-between border-t border-outline-variant px-4 py-3 text-caption text-on-surface-variant">
                 <span>Page {studentPage} of {studentPages}</span>
                 <div className="flex gap-2"><CustomButton size="sm" variant="secondary" disabled={studentPage <= 1} onClick={() => setStudentPage((page) => Math.max(1, page - 1))}>Previous</CustomButton><CustomButton size="sm" variant="secondary" disabled={studentPage >= studentPages} onClick={() => setStudentPage((page) => Math.min(studentPages, page + 1))}>Next</CustomButton></div>
               </div>
@@ -376,6 +384,28 @@ const ScheduleTemplatesPage: React.FC = () => {
           )}
         </section>
       )}
+
+      <ConfirmDialog
+        open={!!reassignStudent}
+        title="Replace this processed schedule?"
+        message={
+          <>
+            <span className="font-medium text-on-surface">{reassignStudent?.fullName}</span> already has a
+            processed schedule for {currentTerm ? termLabel(currentTerm) : 'this term'}. Assigning group{' '}
+            <span className="font-medium text-on-surface">
+              {reassignStudent ? selectedGroups[reassignStudent.id] : ''}
+            </span>{' '}
+            replaces it.
+          </>
+        }
+        confirmLabel="Replace schedule"
+        tone="warning"
+        isLoading={!!reassignStudent && pendingStudentId === reassignStudent.id}
+        onConfirm={() =>
+          reassignStudent && performAssign(reassignStudent, selectedGroups[reassignStudent.id] ?? '')
+        }
+        onCancel={() => setReassignStudent(null)}
+      />
     </>
   );
 };

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useNavigate } from 'react-router-dom';
 import {
   BadgeCheck,
@@ -38,12 +39,12 @@ interface DetailRowProps {
 
 const DetailRow: React.FC<DetailRowProps> = ({ icon, label, children }) => (
   <div className="flex items-start gap-3 py-2.5">
-    <span className="mt-0.5 shrink-0 text-slate-500" aria-hidden>
+    <span className="mt-0.5 shrink-0 text-on-surface-variant" aria-hidden>
       {icon}
     </span>
     <div className="min-w-0 flex-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm text-slate-200">{children}</dd>
+      <dt className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">{label}</dt>
+      <dd className="mt-0.5 break-words text-body text-on-surface">{children}</dd>
     </div>
   </div>
 );
@@ -73,6 +74,7 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  const trapRef = useFocusTrap<HTMLElement>(!!studentId);
 
   const reloadStudent = () => {
     if (!studentId) return;
@@ -119,26 +121,27 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
   if (!studentId) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+    <div className="fixed inset-0 z-toast flex justify-end">
+      <div className="absolute inset-0 scrim backdrop-blur-sm" onClick={onClose} aria-hidden />
 
       <aside
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label="Advising details"
-        className="relative flex h-full w-full max-w-lg flex-col border-l border-slate-800 bg-slate-950/95 backdrop-blur-xl shadow-2xl"
+        className="relative flex h-full w-full max-w-lg flex-col border-l border-outline-variant bg-surface-container-lowest backdrop-blur-xl shadow-2xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-6">
+        <div className="flex items-start justify-between gap-4 border-b border-outline-variant p-6">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Advising details</p>
-            <h2 className="mt-1 truncate text-lg font-bold text-white">{student?.fullName ?? 'Loading...'}</h2>
-            {student && <p className="mt-0.5 truncate font-mono text-xs text-slate-500">{student.studentId}</p>}
+            <p className="text-caption font-semibold uppercase tracking-eyebrow text-primary">Advising details</p>
+            <h2 className="mt-1 truncate text-h3 font-bold text-on-surface">{student?.fullName ?? 'Loading...'}</h2>
+            {student && <p className="mt-0.5 truncate font-mono text-caption text-on-surface-variant">{student.studentId}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close advising details"
-            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>
@@ -148,7 +151,7 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
           {error && <AlertBanner tone="error" title="Could not open advising details">{error}</AlertBanner>}
 
           {isLoading && !student && !error && (
-            <div className="flex items-center justify-center gap-2 py-16 text-sm text-slate-400">
+            <div role="status" className="flex items-center justify-center gap-2 py-16 text-body text-on-surface-variant">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Loading advising details...
             </div>
@@ -164,9 +167,9 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
                 {student.isMine && <Badge tone="indigo">Your student</Badge>}
               </div>
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</h3>
-                <dl className="divide-y divide-slate-800/70">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Student</h3>
+                <dl className="divide-y divide-outline-variant">
                   <DetailRow icon={<Mail className="h-4 w-4" />} label="GUC email">
                     {student.email}
                   </DetailRow>
@@ -179,21 +182,21 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
                   <DetailRow icon={<UserRound className="h-4 w-4" />} label="Assigned advisor">
                     {student.assignedAdvisor ? (
                       <>
-                        <span className="block text-slate-200">{student.assignedAdvisor.fullName}</span>
-                        <span className="block text-xs text-slate-500">{student.assignedAdvisor.email}</span>
+                        <span className="block text-on-surface">{student.assignedAdvisor.fullName}</span>
+                        <span className="block text-caption text-on-surface-variant">{student.assignedAdvisor.email}</span>
                       </>
                     ) : (
-                      <span className="text-slate-500">Not assigned</span>
+                      <span className="text-on-surface-variant">Not assigned</span>
                     )}
                   </DetailRow>
                 </dl>
               </section>
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Advising</h3>
-                <dl className="divide-y divide-slate-800/70">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Advising</h3>
+                <dl className="divide-y divide-outline-variant">
                   <DetailRow icon={<ClipboardList className="h-4 w-4" />} label="Advising reason">
-                    {student.advisingReason ?? <span className="text-slate-500">Not recorded</span>}
+                    {student.advisingReason ?? <span className="text-on-surface-variant">Not recorded</span>}
                   </DetailRow>
                   <DetailRow icon={<BadgeCheck className="h-4 w-4" />} label="Schedule status">
                     <Badge tone="indigo" dot>
@@ -202,17 +205,17 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
                   </DetailRow>
                   <DetailRow icon={<Hourglass className="h-4 w-4" />} label="Pending request">
                     {student.pendingRequest === 'None' ? (
-                      <span className="text-slate-500">None</span>
+                      <span className="text-on-surface-variant">None</span>
                     ) : (
                       <Badge tone="amber">{student.pendingRequest}</Badge>
                     )}
                   </DetailRow>
                   <DetailRow icon={<CircleAlert className="h-4 w-4" />} label="Blocking step">
-                    {student.blockingStep ?? <span className="text-slate-500">None</span>}
+                    {student.blockingStep ?? <span className="text-on-surface-variant">None</span>}
                   </DetailRow>
                   <DetailRow icon={<Hash className="h-4 w-4" />} label="Last update">
                     {formatRelative(student.lastUpdateAt)}{' '}
-                    <span className="text-xs text-slate-500">({formatDate(student.lastUpdateAt)})</span>
+                    <span className="text-caption text-on-surface-variant">({formatDate(student.lastUpdateAt)})</span>
                   </DetailRow>
                 </dl>
               </section>
@@ -231,7 +234,7 @@ const AdvisingStudentDetailDrawer: React.FC<AdvisingStudentDetailDrawerProps> = 
         </div>
 
         {student && (
-          <div className="border-t border-slate-800 p-6">
+          <div className="border-t border-outline-variant p-6">
             {/* Req 54: academic history, open to Advisors for any advising student. */}
             <CustomButton
               variant="secondary"

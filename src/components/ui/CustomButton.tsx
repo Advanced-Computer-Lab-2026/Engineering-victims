@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
 
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'danger-ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 interface CustomButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -15,17 +15,20 @@ interface CustomButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-indigo-600 text-white shadow-lg shadow-indigo-950/40 hover:bg-indigo-500 active:translate-y-px disabled:hover:bg-indigo-600',
+    'bg-primary text-on-primary shadow-elevation-1 hover:brightness-110 active:translate-y-px disabled:hover:brightness-100',
   secondary:
-    'bg-slate-800/80 text-slate-200 ring-1 ring-inset ring-slate-700 hover:bg-slate-700/80 hover:text-white active:translate-y-px',
-  ghost: 'text-slate-300 hover:bg-slate-800/70 hover:text-white active:translate-y-px',
-  danger: 'bg-rose-600/90 text-white hover:bg-rose-500 active:translate-y-px',
+    'bg-surface-container text-on-surface ring-1 ring-inset ring-outline-variant hover:bg-surface-container-high active:translate-y-px',
+  ghost: 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface active:translate-y-px',
+  // Destructive action that lives outside a filled primary slot, e.g. sign out.
+  'danger-ghost':
+    'text-on-surface-variant hover:bg-error-container hover:text-on-error-container active:translate-y-px',
+  danger: 'bg-error text-on-error hover:brightness-110 active:translate-y-px',
 };
 
 const SIZES: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-xs gap-1.5',
-  md: 'px-4 py-2 text-sm gap-2',
-  lg: 'px-4 py-3 text-sm gap-2',
+  sm: 'min-h-11 px-3 py-2 text-caption gap-1.5',
+  md: 'min-h-11 px-4 py-2 text-body gap-2',
+  lg: 'min-h-12 px-4 py-3 text-body gap-2',
 };
 
 const CustomButton: React.FC<CustomButtonProps> = ({
@@ -47,13 +50,13 @@ const CustomButton: React.FC<CustomButtonProps> = ({
       type={type}
       disabled={isDisabled}
       aria-busy={isLoading || undefined}
-      className={`inline-flex items-center justify-center rounded-lg font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`inline-flex items-center justify-center rounded-lg font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:opacity-50 disabled:cursor-not-allowed ${
         VARIANTS[variant]
       } ${SIZES[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
       {...props}
     >
       {isLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : icon}
-      {isLoading ? 'Working...' : children}
+      {children}
     </button>
   );
 };

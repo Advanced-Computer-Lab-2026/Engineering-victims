@@ -236,17 +236,17 @@ const AcademicHistoryPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading academic history...
         </Card>
       ) : data && student ? (
         <div className="space-y-6">
-          <Card tone="raised" className="p-6" sheen>
+          <Card tone="raised" className="p-6">
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-bold text-white">{student.fullName}</h2>
-                <p className="font-mono text-xs text-slate-500">
+                <h2 className="truncate text-h3 font-bold text-on-surface">{student.fullName}</h2>
+                <p className="font-mono text-caption text-on-surface-variant">
                   {student.studentId} · {student.email}
                 </p>
               </div>
@@ -254,15 +254,15 @@ const AcademicHistoryPage: React.FC = () => {
                 {student.academicStanding}
               </Badge>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
               <Fact icon={<UserRound className="h-4 w-4" />} label="Advisor">
-                {student.assignedAdvisor ? student.assignedAdvisor.fullName : <span className="text-slate-500">Not assigned</span>}
+                {student.assignedAdvisor ? student.assignedAdvisor.fullName : <span className="text-on-surface-variant">Not assigned</span>}
               </Fact>
               <Fact icon={<GraduationCap className="h-4 w-4" />} label="Major">
                 {student.major}
               </Fact>
               <Fact icon={<Sigma className="h-4 w-4" />} label="GPA">
-                {data.summary.gpa !== null ? data.summary.gpa.toFixed(2) : <span className="text-slate-500">No grades yet</span>}
+                {data.summary.gpa !== null ? data.summary.gpa.toFixed(2) : <span className="text-on-surface-variant">No grades yet</span>}
               </Fact>
               <Fact icon={<BookCheck className="h-4 w-4" />} label="Completed hours">
                 {data.summary.completedHours}
@@ -271,14 +271,14 @@ const AcademicHistoryPage: React.FC = () => {
                 Semester {student.currentSemester}
               </Fact>
             </div>
-            <p className="mt-3 text-xs text-slate-500">
+            <p className="mt-3 text-caption text-on-surface-variant">
               GPA uses the GUC scale, where 0.7 is the best grade and 5.0 is a fail.
             </p>
           </Card>
 
           {!isOwn && (
             <Section
-              icon={<ShieldAlert className="h-4 w-4 text-rose-400" aria-hidden />}
+              icon={<ShieldAlert className="h-4 w-4 text-error" aria-hidden />}
               title="Mandatory-course candidates"
               count={candidates?.length ?? 0}
               note="Failed and unattended courses are mandatory unless an approved removal applies"
@@ -288,7 +288,7 @@ const AcademicHistoryPage: React.FC = () => {
                   {candidatesError.message}
                 </AlertBanner>
               ) : !candidates ? (
-                <Card className="flex items-center justify-center gap-2 p-8 text-sm text-slate-400">
+                <Card role="status" className="flex items-center justify-center gap-2 p-8 text-body text-on-surface-variant">
                   <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                   Loading mandatory-course candidates...
                 </Card>
@@ -309,9 +309,9 @@ const AcademicHistoryPage: React.FC = () => {
                 )}
                 <Card tone="raised" className="overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[48rem] text-left text-sm">
+                    <table className="w-full min-w-[48rem] text-left text-body">
                       <caption className="sr-only">Failed and unattended courses that are mandatory-course candidates</caption>
-                      <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+                      <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                         <tr>
                           <th scope="col" className="px-4 py-3 font-semibold">Code</th>
                           <th scope="col" className="px-4 py-3 font-semibold">Course</th>
@@ -321,7 +321,7 @@ const AcademicHistoryPage: React.FC = () => {
                           <th scope="col" className="px-4 py-3 text-right font-semibold">Removal</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/60">
+                      <tbody className="divide-y divide-outline-variant">
                         {candidates.map((candidate) => (
                           <CandidateRow
                             key={candidate.course.id}
@@ -335,7 +335,7 @@ const AcademicHistoryPage: React.FC = () => {
                   </div>
                 </Card>
                 {removals && !removals.canRequest && user?.role === 'Advisor' && (
-                  <p className="mt-2 text-xs text-slate-500">
+                  <p className="mt-2 text-caption text-on-surface-variant">
                     Only this student's assigned Advisor can request a mandatory-course removal.
                   </p>
                 )}
@@ -345,7 +345,7 @@ const AcademicHistoryPage: React.FC = () => {
           )}
 
           <Section
-            icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" aria-hidden />}
+            icon={<CheckCircle2 className="h-4 w-4 text-success" aria-hidden />}
             title="Completed courses"
             count={data.completed.length}
           >
@@ -359,13 +359,13 @@ const AcademicHistoryPage: React.FC = () => {
               <div className="space-y-4">
                 {completedByTerm.map(([term, rows]) => (
                   <Card key={term} tone="raised" className="overflow-hidden">
-                    <p className="border-b border-slate-800 bg-slate-900/80 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                    <p className="border-b border-outline-variant bg-surface-container-low px-4 py-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                       {term} · Semester {rows[0].semester}
                     </p>
                     <div className="overflow-x-auto">
-                      <table className="w-full min-w-[36rem] text-left text-sm">
+                      <table className="w-full min-w-[36rem] text-left text-body">
                         <caption className="sr-only">Completed courses in {term}</caption>
-                        <thead className="text-xs uppercase tracking-wide text-slate-500">
+                        <thead className="text-caption uppercase tracking-eyebrow text-on-surface-variant">
                           <tr>
                             <th scope="col" className="px-4 py-2 font-semibold">Code</th>
                             <th scope="col" className="px-4 py-2 font-semibold">Course</th>
@@ -373,12 +373,12 @@ const AcademicHistoryPage: React.FC = () => {
                             <th scope="col" className="px-4 py-2 text-right font-semibold">Grade</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-800/60">
+                        <tbody className="divide-y divide-outline-variant">
                           {rows.map((row) => (
-                            <tr key={row.id} className="hover:bg-slate-800/40">
-                              <td className="whitespace-nowrap px-4 py-2 font-mono text-xs text-slate-300">{row.course.code}</td>
-                              <td className="px-4 py-2 text-slate-200">{row.course.name}</td>
-                              <td className="px-4 py-2 text-right text-slate-300">{row.course.creditHours}</td>
+                            <tr key={row.id} className="hover:bg-surface-container">
+                              <td className="whitespace-nowrap px-4 py-2 font-mono text-caption text-on-surface">{row.course.code}</td>
+                              <td className="px-4 py-2 text-on-surface">{row.course.name}</td>
+                              <td className="px-4 py-2 text-right text-on-surface">{row.course.creditHours}</td>
                               <td className="px-4 py-2 text-right">
                                 <Badge tone={gradeTone(row.grade)}>
                                   {row.grade} · {row.gradePoints.toFixed(1)}
@@ -396,7 +396,7 @@ const AcademicHistoryPage: React.FC = () => {
           </Section>
 
           <Section
-            icon={<Clock className="h-4 w-4 text-sky-400" aria-hidden />}
+            icon={<Clock className="h-4 w-4 text-info" aria-hidden />}
             title="Current courses"
             count={data.current.length}
             note={data.current[0] ? `${data.current[0].term} · ${data.summary.currentHours} credit hours` : undefined}
@@ -414,21 +414,21 @@ const AcademicHistoryPage: React.FC = () => {
             ) : (
               <Card tone="raised" className="overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[32rem] text-left text-sm">
+                  <table className="w-full min-w-[32rem] text-left text-body">
                     <caption className="sr-only">Courses in progress this term</caption>
-                    <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+                    <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                       <tr>
                         <th scope="col" className="px-4 py-3 font-semibold">Code</th>
                         <th scope="col" className="px-4 py-3 font-semibold">Course</th>
                         <th scope="col" className="px-4 py-3 text-right font-semibold">Credit hrs</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-outline-variant">
                       {data.current.map((row) => (
-                        <tr key={row.id} className="hover:bg-slate-800/40">
-                          <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">{row.course.code}</td>
-                          <td className="px-4 py-3 text-slate-200">{row.course.name}</td>
-                          <td className="px-4 py-3 text-right text-slate-300">{row.course.creditHours}</td>
+                        <tr key={row.id} className="hover:bg-surface-container">
+                          <td className="whitespace-nowrap px-4 py-3 font-mono text-caption text-on-surface">{row.course.code}</td>
+                          <td className="px-4 py-3 text-on-surface">{row.course.name}</td>
+                          <td className="px-4 py-3 text-right text-on-surface">{row.course.creditHours}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -439,7 +439,7 @@ const AcademicHistoryPage: React.FC = () => {
           </Section>
 
           <Section
-            icon={<ListTodo className="h-4 w-4 text-amber-400" aria-hidden />}
+            icon={<ListTodo className="h-4 w-4 text-warning" aria-hidden />}
             title="Remaining courses"
             count={data.remaining.length}
             note={`${data.summary.remainingHours} credit hours · electives are chosen later and not listed`}
@@ -453,9 +453,9 @@ const AcademicHistoryPage: React.FC = () => {
             ) : (
               <Card tone="raised" className="overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[52rem] text-left text-sm">
+                  <table className="w-full min-w-[52rem] text-left text-body">
                     <caption className="sr-only">Remaining courses with credit hours, prerequisites and offering season</caption>
-                    <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+                    <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                       <tr>
                         <th scope="col" className="px-4 py-3 font-semibold">Code</th>
                         <th scope="col" className="px-4 py-3 font-semibold">Course</th>
@@ -465,7 +465,7 @@ const AcademicHistoryPage: React.FC = () => {
                         <th scope="col" className="px-4 py-3 text-right font-semibold">Sem.</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-outline-variant">
                       {data.remaining.map((course) => (
                         <RemainingRow key={course.id} course={course} />
                       ))}
@@ -494,12 +494,12 @@ const AcademicHistoryPage: React.FC = () => {
 };
 
 const Fact: React.FC<{ icon: React.ReactNode; label: string; children: React.ReactNode }> = ({ icon, label, children }) => (
-  <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-3">
-    <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-slate-500">
+  <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
+    <p className="flex items-center gap-1.5 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
       <span aria-hidden>{icon}</span>
       {label}
     </p>
-    <p className="mt-1 text-sm font-medium text-white">{children}</p>
+    <p className="mt-1 text-body font-medium text-on-surface">{children}</p>
   </div>
 );
 
@@ -512,12 +512,12 @@ const Section: React.FC<{
 }> = ({ icon, title, count, note, children }) => (
   <section>
     <div className="mb-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-      <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-300">
+      <h2 className="flex items-center gap-2 text-body font-semibold uppercase tracking-eyebrow text-on-surface">
         {icon}
         {title}
-        <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-400">{count}</span>
+        <span className="rounded-full bg-surface-container px-2 py-0.5 text-caption text-on-surface-variant">{count}</span>
       </h2>
-      {note && <p className="text-xs text-slate-500">{note}</p>}
+      {note && <p className="text-caption text-on-surface-variant">{note}</p>}
     </div>
     {children}
   </section>
@@ -532,9 +532,9 @@ interface CandidateRowProps {
 }
 
 const CandidateRow: React.FC<CandidateRowProps> = ({ candidate, removal, onRequestRemoval }) => (
-  <tr className="hover:bg-slate-800/40">
-    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">{candidate.course.code}</td>
-    <td className="px-4 py-3 text-slate-200">
+  <tr className="hover:bg-surface-container">
+    <td className="whitespace-nowrap px-4 py-3 font-mono text-caption text-on-surface">{candidate.course.code}</td>
+    <td className="px-4 py-3 text-on-surface">
       <span className="flex flex-wrap items-center gap-2">
         {candidate.course.name}
         {candidate.inProgress && <Badge tone="sky">Retaking now</Badge>}
@@ -543,7 +543,7 @@ const CandidateRow: React.FC<CandidateRowProps> = ({ candidate, removal, onReque
     <td className="px-4 py-3">
       <Badge tone={candidate.reason === 'Failed' ? 'rose' : 'amber'}>{candidate.reason}</Badge>
     </td>
-    <td className="px-4 py-3 text-slate-400">
+    <td className="px-4 py-3 text-on-surface-variant">
       {candidate.term ? `${candidate.term} · Semester ${candidate.semester}` : `Semester ${candidate.semester} · not taken`}
     </td>
     <td className="px-4 py-3">
@@ -564,26 +564,26 @@ const CandidateRow: React.FC<CandidateRowProps> = ({ candidate, removal, onReque
             Request removal
           </CustomButton>
         )}
-        {!removal && !onRequestRemoval && <span className="text-xs text-slate-600">None</span>}
+        {!removal && !onRequestRemoval && <span className="text-caption text-on-surface-variant">None</span>}
       </span>
     </td>
   </tr>
 );
 
 const RemainingRow: React.FC<{ course: RemainingCourse }> = ({ course }) => (
-  <tr className="hover:bg-slate-800/40">
-    <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">{course.code}</td>
-    <td className="px-4 py-3 text-slate-200">
+  <tr className="hover:bg-surface-container">
+    <td className="whitespace-nowrap px-4 py-3 font-mono text-caption text-on-surface">{course.code}</td>
+    <td className="px-4 py-3 text-on-surface">
       <span className="flex flex-wrap items-center gap-2">
         {course.name}
         {course.isRetake && <Badge tone="rose">Retake</Badge>}
         {course.courseType === 'Huma' && <Badge tone="neutral">Huma</Badge>}
       </span>
     </td>
-    <td className="px-4 py-3 text-right text-slate-300">{course.creditHours}</td>
+    <td className="px-4 py-3 text-right text-on-surface">{course.creditHours}</td>
     <td className="px-4 py-3">
       {course.prerequisites.length === 0 ? (
-        <span className="text-xs text-slate-600">None</span>
+        <span className="text-caption text-on-surface-variant">None</span>
       ) : (
         <span className="flex flex-wrap gap-1">
           {course.prerequisites.map((prerequisite) => (
@@ -600,8 +600,8 @@ const RemainingRow: React.FC<{ course: RemainingCourse }> = ({ course }) => (
         </span>
       )}
     </td>
-    <td className="px-4 py-3 text-slate-300">{course.offeringSeasons.join(', ')}</td>
-    <td className="px-4 py-3 text-right text-slate-400">{course.recommendedSemester}</td>
+    <td className="px-4 py-3 text-on-surface">{course.offeringSeasons.join(', ')}</td>
+    <td className="px-4 py-3 text-right text-on-surface-variant">{course.recommendedSemester}</td>
   </tr>
 );
 

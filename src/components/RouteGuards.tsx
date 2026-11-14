@@ -14,7 +14,7 @@ interface GuardProps {
 }
 
 const FullPageLoader: React.FC<{ label: string }> = ({ label }) => (
-  <div className="app-gradient flex min-h-screen items-center justify-center gap-2 text-sm text-slate-400">
+  <div className="flex min-h-dvh items-center justify-center gap-2 bg-surface text-body text-on-surface-variant" role="status">
     <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
     {label}
   </div>
@@ -39,15 +39,15 @@ export const ProtectedRoute: React.FC<GuardProps> = ({ children, roles }) => {
 
   if (roles && !roles.includes(user.role)) {
     return (
-      <div className="app-gradient flex min-h-screen items-center justify-center p-6">
-        <Card tone="raised" className="w-full max-w-md p-8 text-center" sheen>
-          <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-rose-500/15 text-rose-400">
+      <div className="flex min-h-dvh items-center justify-center bg-surface p-6">
+        <Card tone="raised" className="w-full max-w-md p-8 text-center">
+          <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-error-container text-error">
             <ShieldAlert className="h-6 w-6" aria-hidden />
           </span>
-          <h1 className="text-lg font-bold text-white">You do not have access to this page</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <h1 className="text-h3 font-bold text-on-surface">You do not have access to this page</h1>
+          <p className="mt-2 text-body text-on-surface-variant">
             This area is limited to {roles.join(' and ')} accounts. You are signed in as{' '}
-            <span className="text-slate-200">{user.role}</span>.
+            <span className="text-on-surface">{user.role}</span>.
           </p>
           <div className="mt-4">
             <AlertBanner tone="info">

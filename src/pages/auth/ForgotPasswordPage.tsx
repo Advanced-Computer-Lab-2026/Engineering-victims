@@ -6,6 +6,7 @@ import AlertBanner from '../../components/ui/AlertBanner';
 import Card from '../../components/ui/Card';
 import CustomButton from '../../components/ui/CustomButton';
 import CustomInput from '../../components/ui/CustomInput';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 type Tone = 'error' | 'success' | 'info';
 
@@ -15,6 +16,7 @@ const ForgotPasswordPage: React.FC = () => {
   const [tone, setTone] = useState<Tone>('info');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
+  usePageTitle('Forgot password');
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -45,24 +47,24 @@ const ForgotPasswordPage: React.FC = () => {
   };
 
   return (
-    <div className="app-gradient flex min-h-screen items-center justify-center px-4 py-10">
+    <div className="bg-surface flex min-h-dvh items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="mb-4 inline-flex items-center gap-1.5 text-xs text-slate-400 transition-colors hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+          className="mb-4 inline-flex items-center gap-1.5 text-caption text-on-surface-variant transition-colors hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         >
           <ArrowLeft className="h-3.5 w-3.5" aria-hidden />
           Back to sign in
         </button>
 
-        <Card tone="raised" className="p-6 sm:p-8" sheen>
+        <Card tone="raised" className="p-6 md:p-8">
           <div className="mb-6 text-center">
-            <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-400">
+            <span className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-primary-container text-on-primary-container">
               <Mail className="h-5 w-5" aria-hidden />
             </span>
-            <h1 className="text-xl font-bold tracking-tight text-white">Reset your password</h1>
-            <p className="mt-1 text-sm text-slate-400">We will email you a one-time code</p>
+            <h1 className="text-h2 font-bold tracking-tight text-on-surface">Reset your password</h1>
+            <p className="mt-1 text-body text-on-surface-variant">We will email you a one-time code</p>
           </div>
 
           <form onSubmit={handleSubmit} noValidate className="space-y-4">

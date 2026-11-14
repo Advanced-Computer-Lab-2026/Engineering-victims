@@ -71,7 +71,7 @@ const toPayload = (entries: DraftEntry[]): PreferenceEntry[] =>
 const snapshotOf = (list: DraftEntry[], text: string) => JSON.stringify({ p: toPayload(list), n: text.trim() });
 
 const fieldClass =
-  'rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 transition-colors hover:border-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 disabled:cursor-not-allowed disabled:opacity-60';
+  'rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-body text-on-surface transition-colors hover:border-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 /**
  * Req 57: an Advising Student submits or updates ranked scheduling
@@ -147,7 +147,7 @@ const SchedulingPreferencesPage: React.FC = () => {
     return (
       <>
         {header}
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading your preferences...
         </Card>
@@ -163,7 +163,7 @@ const SchedulingPreferencesPage: React.FC = () => {
           tone={loadError?.status === 403 ? 'info' : 'error'}
           title={loadError?.status === 403 ? 'Not available on this account' : 'Could not load your preferences'}
         >
-          {loadError?.message ?? 'Something went wrong.'}
+          {loadError?.message ?? 'No response was returned. Check your connection and try again.'}
         </AlertBanner>
       </>
     );
@@ -199,8 +199,8 @@ const SchedulingPreferencesPage: React.FC = () => {
           </AlertBanner>
         )}
 
-        <p className="flex items-start gap-2 rounded-xl border border-slate-800 bg-slate-900/40 px-4 py-3 text-xs leading-relaxed text-slate-400">
-          <Info className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+        <p className="flex items-start gap-2 rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-caption leading-relaxed text-on-surface-variant">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
           Preferences are not guaranteed. Your advisor tries to meet them when possible, but they cannot override
           mandatory courses, prerequisites, published offerings, capacity, timetable clashes, credit-hour limits or
           approved extra-hour rules.
@@ -219,18 +219,18 @@ const SchedulingPreferencesPage: React.FC = () => {
 
         <Card tone="raised" className="p-5">
           <div className="mb-4 flex flex-wrap items-center gap-3">
-            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-300">
-              <ListOrdered className="h-4 w-4 text-indigo-400" aria-hidden />
+            <h2 className="flex items-center gap-2 text-body font-semibold uppercase tracking-eyebrow text-on-surface">
+              <ListOrdered className="h-4 w-4 text-primary" aria-hidden />
               Your preferences
-              <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[11px] text-slate-400">
+              <span className="rounded-full bg-surface-container px-2 py-0.5 text-caption text-on-surface-variant">
                 {entries.length}/{maxPreferences}
               </span>
             </h2>
-            <p className="text-xs text-slate-500">#1 is the most important. Use the arrows to change the order.</p>
+            <p className="text-caption text-on-surface-variant">#1 is the most important. Use the arrows to change the order.</p>
           </div>
 
           {entries.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-slate-700/70 px-4 py-8 text-center text-sm text-slate-400">
+            <p className="rounded-xl border border-dashed border-outline-variant px-4 py-8 text-center text-body text-on-surface-variant">
               {isOpen ? 'No preferences yet. Add your first one below.' : 'No preferences were submitted.'}
             </p>
           ) : (
@@ -238,9 +238,9 @@ const SchedulingPreferencesPage: React.FC = () => {
               {entries.map((entry, index) => (
                 <li
                   key={entry.key}
-                  className="flex flex-wrap items-center gap-2 rounded-xl border border-slate-800 bg-slate-950/40 p-3"
+                  className="flex flex-wrap items-center gap-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-3"
                 >
-                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-600/80 text-xs font-bold text-white">
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-container text-caption font-bold text-on-primary-container">
                     {index + 1}
                   </span>
                   <select
@@ -251,7 +251,7 @@ const SchedulingPreferencesPage: React.FC = () => {
                     className={fieldClass}
                   >
                     {KINDS.map((kind) => (
-                      <option key={kind} value={kind} className="bg-slate-900">
+                      <option key={kind} value={kind} className="bg-surface-container-low">
                         {kind}
                       </option>
                     ))}
@@ -266,7 +266,7 @@ const SchedulingPreferencesPage: React.FC = () => {
                       className={fieldClass}
                     >
                       {DAYS.map((day) => (
-                        <option key={day} value={day} className="bg-slate-900">
+                        <option key={day} value={day} className="bg-surface-container-low">
                           {day}
                         </option>
                       ))}
@@ -274,7 +274,7 @@ const SchedulingPreferencesPage: React.FC = () => {
                   )}
 
                   {needsTime(entry.kind) && (
-                    <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <span className="flex items-center gap-1.5 text-caption text-on-surface-variant">
                       <input
                         type="time"
                         aria-label={`Preference ${index + 1} start time`}
@@ -296,7 +296,7 @@ const SchedulingPreferencesPage: React.FC = () => {
                   )}
 
                   {entry.kind === 'Preferred group' && (
-                    <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                    <span className="flex items-center gap-1.5 text-caption text-on-surface-variant">
                       Group
                       <input
                         type="number"
@@ -361,7 +361,7 @@ const SchedulingPreferencesPage: React.FC = () => {
           )}
 
           <label className="mt-5 block">
-            <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Note to your advisor (optional)</span>
+            <span className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Note to your advisor (optional)</span>
             <textarea
               value={note}
               maxLength={NOTE_LIMIT}
@@ -371,12 +371,12 @@ const SchedulingPreferencesPage: React.FC = () => {
               placeholder="Anything else your advisor should know, e.g. work or commute times."
               className={`${fieldClass} mt-1.5 w-full resize-y`}
             />
-            <span className="mt-1 block text-right text-[11px] text-slate-500">
+            <span className="mt-1 block text-right text-caption text-on-surface-variant">
               {note.length}/{NOTE_LIMIT}
             </span>
           </label>
 
-          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-outline-variant pt-4">
             {isOpen ? (
               <CustomButton
                 variant="primary"
@@ -389,14 +389,14 @@ const SchedulingPreferencesPage: React.FC = () => {
                 {data.preference ? 'Save changes' : 'Submit preferences'}
               </CustomButton>
             ) : (
-              <span className="flex items-center gap-1.5 text-sm text-slate-400">
+              <span className="flex items-center gap-1.5 text-body text-on-surface-variant">
                 <Lock className="h-4 w-4" aria-hidden />
                 Read-only after the deadline
               </span>
             )}
-            {isOpen && isDirty && <span className="text-xs text-amber-300">You have unsaved changes.</span>}
+            {isOpen && isDirty && <span className="text-caption text-warning">You have unsaved changes.</span>}
             {data.preference && (
-              <span className="ml-auto text-xs text-slate-500">
+              <span className="ml-auto text-caption text-on-surface-variant">
                 Last updated {formatRelative(data.preference.updatedAt)} ({formatDate(data.preference.updatedAt)})
               </span>
             )}
@@ -420,8 +420,8 @@ const IconButton: React.FC<{
     title={label}
     onClick={onClick}
     disabled={disabled}
-    className={`rounded-lg p-2 text-slate-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-30 ${
-      danger ? 'hover:bg-rose-950/50 hover:text-rose-300' : 'hover:bg-slate-800 hover:text-white'
+    className={`flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-30 ${
+      danger ? 'hover:bg-error-container hover:text-error' : 'hover:bg-surface-container hover:text-on-surface'
     }`}
   >
     {children}

@@ -219,7 +219,7 @@ const ScheduleSwapsPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading whole-schedule swap workspace...
         </Card>
@@ -227,13 +227,13 @@ const ScheduleSwapsPage: React.FC = () => {
         <div className="space-y-6">
           {/* Req 35: Auto-populated Current Group & Read-Only Current Schedule + Swap Submission */}
           <Card tone="raised" className="p-6 space-y-5">
-            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-slate-800 pb-4">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b border-outline-variant pb-4">
               <div>
-                <h2 className="flex items-center gap-2 text-lg font-bold text-white">
-                  <ArrowRightLeft className="h-5 w-5 text-indigo-400" aria-hidden />
+                <h2 className="flex items-center gap-2 text-h3 font-bold text-on-surface">
+                  <ArrowRightLeft className="h-5 w-5 text-primary" aria-hidden />
                   Submit a Whole-Schedule Swap Request
                 </h2>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-caption text-on-surface-variant">
                   Your current group number and processed schedule are auto-populated from your record and cannot be edited.
                 </p>
               </div>
@@ -245,13 +245,13 @@ const ScheduleSwapsPage: React.FC = () => {
             </div>
 
             {eligibleGroupsData && (
-              <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
+              <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4 space-y-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <Badge tone="indigo" icon={<Users className="h-3.5 w-3.5" />}>
                       Current Group: {eligibleGroupsData.myGroup}
                     </Badge>
-                    <span className="text-xs text-slate-400">
+                    <span className="text-caption text-on-surface-variant">
                       {eligibleGroupsData.myCourses.length} registered courses · {mySchedule.length} scheduled slots (read-only)
                     </span>
                   </div>
@@ -267,27 +267,27 @@ const ScheduleSwapsPage: React.FC = () => {
 
                 <div className="flex flex-wrap gap-1.5">
                   {eligibleGroupsData.myCourses.map((code) => (
-                    <Badge key={code} tone="sky" className="text-[11px]">
+                    <Badge key={code} tone="sky" className="text-caption">
                       {code}
                     </Badge>
                   ))}
                 </div>
 
                 {showCurrentSchedule && mySchedule.length > 0 && (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 pt-3 border-t border-slate-800/80">
+                  <div className="mt-3 grid gap-2 md:grid-cols-2 lg:grid-cols-3 pt-3 border-t border-outline-variant">
                     {mySchedule.map((slot, idx) => (
                       <div
                         key={`${slot.slotId}-${idx}`}
-                        className="rounded-lg border border-slate-800 bg-slate-900/70 p-2.5 text-xs space-y-1"
+                        className="rounded-lg border border-outline-variant bg-surface-container-low p-2.5 text-caption space-y-1"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-mono font-semibold text-white">{slot.courseCode}</span>
+                          <span className="font-mono font-semibold text-on-surface">{slot.courseCode}</span>
                           <Badge tone={SLOT_TONE[slot.slotType]}>
                             {slot.slotType} · G{slot.groupNumber}
                           </Badge>
                         </div>
-                        <p className="truncate text-slate-300">{slot.courseName}</p>
-                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-slate-400">
+                        <p className="truncate text-on-surface">{slot.courseName}</p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-caption text-on-surface-variant">
                           <span>
                             {slot.dayOfWeek} {slot.startTime}–{slot.endTime}
                           </span>
@@ -318,10 +318,10 @@ const ScheduleSwapsPage: React.FC = () => {
             ) : (
               <form onSubmit={handleSubmitSwap} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 mb-2">
+                  <label className="block text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant mb-2">
                     Select One or More Eligible Desired Groups
                   </label>
-                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                     {eligibleGroupsData.eligibleGroups.map((group) => {
                       const isSelected = selectedGroups.includes(group.studyGroup);
                       return (
@@ -331,19 +331,19 @@ const ScheduleSwapsPage: React.FC = () => {
                           onClick={() => toggleDesiredGroup(group.studyGroup)}
                           className={`flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
                             isSelected
-                              ? 'border-indigo-500 bg-indigo-500/15 ring-1 ring-indigo-400/50'
-                              : 'border-slate-800 bg-slate-900/50 hover:border-slate-700'
+                              ? 'border-primary bg-primary-container ring-1 ring-primary'
+                              : 'border-outline-variant bg-surface-container-low hover:border-outline-variant'
                           }`}
                         >
                           <div className="flex w-full items-center justify-between">
-                            <span className="font-mono text-base font-bold text-white">
+                            <span className="font-mono text-body-lg font-bold text-on-surface">
                               Group {group.studyGroup}
                             </span>
                             <Badge tone={isSelected ? 'indigo' : 'neutral'}>
                               {isSelected ? 'Selected' : `${group.slotCount} slots`}
                             </Badge>
                           </div>
-                          <span className="mt-1 text-xs text-slate-400">
+                          <span className="mt-1 text-caption text-on-surface-variant">
                             {group.major} · Semester {group.semester}
                           </span>
                         </button>
@@ -371,7 +371,7 @@ const ScheduleSwapsPage: React.FC = () => {
           {/* Req 36 & 37: Open Whole-Schedule Swap Requests Eligible to Complete (Anonymized) */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+              <h2 className="text-body font-semibold uppercase tracking-eyebrow text-on-surface">
                 Eligible Open Swap Requests ({openRequests.length})
               </h2>
             </div>
@@ -386,19 +386,19 @@ const ScheduleSwapsPage: React.FC = () => {
               <div className="grid gap-4 lg:grid-cols-2">
                 {openRequests.map((reqItem) => (
                   <Card key={reqItem.id} tone="raised" className="p-5 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant pb-3">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-base font-bold text-white">
+                          <span className="font-mono text-body-lg font-bold text-on-surface">
                             Requester’s Group: {reqItem.requesterGroup}
                           </span>
                           <Badge tone="emerald" dot>
                             Open
                           </Badge>
                         </div>
-                        <p className="mt-0.5 text-xs text-slate-400">
+                        <p className="mt-0.5 text-caption text-on-surface-variant">
                           Desired destination group(s):{' '}
-                          <span className="font-mono text-indigo-300">
+                          <span className="font-mono text-primary">
                             {reqItem.desiredGroups.join(', ')}
                           </span>{' '}
                           · Identity hidden per privacy rules
@@ -418,39 +418,39 @@ const ScheduleSwapsPage: React.FC = () => {
 
                     <div className="flex flex-wrap gap-1.5">
                       {reqItem.courseCodes.map((code) => (
-                        <Badge key={code} tone="sky" className="text-[10px]">
+                        <Badge key={code} tone="sky" className="text-caption">
                           {code}
                         </Badge>
                       ))}
                     </div>
 
-                    <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60 p-3">
-                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                    <div className="max-h-56 space-y-1.5 overflow-y-auto rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
+                      <p className="mb-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                         Requester’s Complete Weekly Schedule ({reqItem.schedule.length} slots)
                       </p>
                       {reqItem.schedule.map((slot, idx) => (
                         <div
                           key={`${slot.slotId}-${idx}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800/80 bg-slate-900/60 px-3 py-2 text-xs"
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-caption"
                         >
                           <div className="flex items-center gap-2">
-                            <span className="font-mono font-semibold text-white">{slot.courseCode}</span>
+                            <span className="font-mono font-semibold text-on-surface">{slot.courseCode}</span>
                             <Badge tone={SLOT_TONE[slot.slotType]}>
                               {slot.slotType} · G{slot.groupNumber}
                             </Badge>
                           </div>
-                          <div className="flex flex-wrap items-center gap-3 text-slate-300">
+                          <div className="flex flex-wrap items-center gap-3 text-on-surface">
                             <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-slate-500" aria-hidden />
+                              <Clock className="h-3 w-3 text-on-surface-variant" aria-hidden />
                               {slot.dayOfWeek} {slot.startTime}–{slot.endTime}
                             </span>
                             <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3 text-slate-500" aria-hidden />
+                              <MapPin className="h-3 w-3 text-on-surface-variant" aria-hidden />
                               {slot.roomId}
                             </span>
                             {slot.instructorName && (
-                              <span className="flex items-center gap-1 text-slate-400">
-                                <UserRound className="h-3 w-3 text-slate-500" aria-hidden />
+                              <span className="flex items-center gap-1 text-on-surface-variant">
+                                <UserRound className="h-3 w-3 text-on-surface-variant" aria-hidden />
                                 {slot.instructorName}
                               </span>
                             )}
@@ -466,7 +466,7 @@ const ScheduleSwapsPage: React.FC = () => {
 
           {/* Req 38 & 39: My Submitted or Completed Swap Requests & Withdraw Action */}
           <div className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+            <h2 className="text-body font-semibold uppercase tracking-eyebrow text-on-surface">
               My Submitted & Completed Swap Requests ({myRequests.length})
             </h2>
 
@@ -483,7 +483,7 @@ const ScheduleSwapsPage: React.FC = () => {
                     <div className="flex flex-wrap items-center justify-between gap-4">
                       <div className="space-y-1">
                         <div className="flex flex-wrap items-center gap-2.5">
-                          <span className="font-mono text-sm font-bold text-white">
+                          <span className="font-mono text-body font-bold text-on-surface">
                             Group {item.currentGroup} → Desired: {item.desiredGroups.join(', ')}
                           </span>
                           <Badge tone={STATUS_TONE[item.status]} dot>
@@ -492,7 +492,7 @@ const ScheduleSwapsPage: React.FC = () => {
                           <Badge tone="neutral">{item.roleInSwap}</Badge>
                         </div>
 
-                        <p className="text-xs text-slate-400">
+                        <p className="text-caption text-on-surface-variant">
                           {item.term
                             ? `${item.term.academicYear} ${item.term.season} · `
                             : ''}

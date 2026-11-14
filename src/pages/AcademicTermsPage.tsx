@@ -146,8 +146,8 @@ const AcademicTermsPage: React.FC = () => {
       <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)]">
         <Card className="p-4">
           <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-slate-400">
-              <CalendarRange className="h-4 w-4 text-indigo-400" aria-hidden />
+            <div className="flex items-center gap-2 text-body font-semibold uppercase tracking-eyebrow text-on-surface-variant">
+              <CalendarRange className="h-4 w-4 text-primary" aria-hidden />
               Saved Terms
             </div>
             <CustomButton
@@ -162,18 +162,18 @@ const AcademicTermsPage: React.FC = () => {
           </div>
 
           {!isLoading && terms.length > 0 && (
-            <p className="mb-3 mt-2 text-xs text-slate-500">
+            <p className="mb-3 mt-2 text-caption text-on-surface-variant">
               Select a term to edit its dates.
             </p>
           )}
 
           {isLoading ? (
-            <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
+            <div role="status" className="flex items-center justify-center gap-2 py-10 text-body text-on-surface-variant">
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               Loading terms...
             </div>
           ) : terms.length === 0 ? (
-            <p className="text-sm text-slate-400">No academic terms yet. Create the first one.</p>
+            <p className="text-body text-on-surface-variant">No academic terms yet. Create the first one.</p>
           ) : (
             <div className="space-y-2">
               {terms.map((term) => {
@@ -188,15 +188,15 @@ const AcademicTermsPage: React.FC = () => {
                     aria-pressed={isSelected}
                     className={`group w-full rounded-xl border p-3 text-left transition-colors ${
                       isSelected
-                        ? 'border-indigo-500 bg-indigo-500/10 text-white'
-                        : 'border-slate-800 bg-slate-900/60 text-slate-300 hover:border-slate-700'
+                        ? 'border-primary bg-primary-container text-on-surface'
+                        : 'border-outline-variant bg-surface-container-low text-on-surface hover:border-outline-variant'
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="font-semibold">{term.season}</span>
-                      <span className="text-xs text-slate-400">{term.academicYear}</span>
+                      <span className="text-caption text-on-surface-variant">{term.academicYear}</span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400">
+                    <p className="mt-1 text-caption text-on-surface-variant">
                       {new Date(term.advisingDeadline).toLocaleDateString('en-GB', {
                         day: '2-digit',
                         month: 'short',
@@ -204,8 +204,8 @@ const AcademicTermsPage: React.FC = () => {
                       })}
                     </p>
                     <span
-                      className={`mt-2 inline-flex items-center gap-1.5 text-xs font-medium ${
-                        isSelected ? 'text-indigo-200' : 'text-indigo-300 group-hover:text-indigo-200'
+                      className={`mt-2 inline-flex items-center gap-1.5 text-caption font-medium ${
+                        isSelected ? 'text-primary' : 'text-primary group-hover:text-primary'
                       }`}
                     >
                       <Pencil className="h-3 w-3" aria-hidden />
@@ -222,12 +222,12 @@ const AcademicTermsPage: React.FC = () => {
           <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-white">
+                <h2 className="text-h3 font-semibold text-on-surface">
                   {selectedTerm
                     ? `Edit ${selectedTerm.season} ${selectedTerm.academicYear}`
                     : 'Create academic term'}
                 </h2>
-                <p className="mt-0.5 text-sm text-slate-400">
+                <p className="mt-0.5 text-body text-on-surface-variant">
                   {selectedTerm
                     ? 'Change the dates below, then save your updates.'
                     : 'Set the registration and advising dates for a new term.'}
@@ -250,11 +250,11 @@ const AcademicTermsPage: React.FC = () => {
               />
 
               <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Season</span>
+                <span className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Season</span>
                 <select
                   value={draft.season}
                   onChange={(event) => handleChange('season', event.target.value)}
-                  className="w-full rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2.5 text-sm text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+                  className="w-full rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2.5 text-body text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="Winter">Winter</option>
                   <option value="Spring">Spring</option>

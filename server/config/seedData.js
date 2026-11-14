@@ -833,7 +833,7 @@ const isSeeded = async () => {
  * skip one that already has.
  *
  * The skip is the whole point. Boot used to call seed() unconditionally, so
- * every restart — including a nodemon restart triggered by saving a file —
+ * every restart — including a dev-watcher restart triggered by saving a file —
  * wiped the database mid-session. Now a restart is harmless, and
  * `node seed/seed.cjs` remains the deliberate way to get a clean slate.
  *

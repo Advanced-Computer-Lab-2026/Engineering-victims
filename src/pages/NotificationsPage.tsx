@@ -29,12 +29,12 @@ import type { NotificationSummary, NotificationType } from '../lib/types';
 
 /** Icon and colour per notification type, so the list scans at a glance. */
 const TYPE_META: Record<NotificationType, { icon: typeof Info; wrap: string }> = {
-  info: { icon: Info, wrap: 'bg-indigo-500/15 text-indigo-300' },
-  success: { icon: CheckCircle2, wrap: 'bg-emerald-500/15 text-emerald-300' },
-  warning: { icon: AlertTriangle, wrap: 'bg-amber-500/15 text-amber-300' },
-  schedule: { icon: CalendarDays, wrap: 'bg-sky-500/15 text-sky-300' },
-  approval: { icon: ClipboardCheck, wrap: 'bg-violet-500/15 text-violet-300' },
-  payment: { icon: CreditCard, wrap: 'bg-teal-500/15 text-teal-300' },
+  info: { icon: Info, wrap: 'bg-primary-container text-on-primary-container' },
+  success: { icon: CheckCircle2, wrap: 'bg-success-container text-success' },
+  warning: { icon: AlertTriangle, wrap: 'bg-warning-container text-warning' },
+  schedule: { icon: CalendarDays, wrap: 'bg-info-container text-info' },
+  approval: { icon: ClipboardCheck, wrap: 'bg-tertiary-container text-on-tertiary-container' },
+  payment: { icon: CreditCard, wrap: 'bg-secondary-container text-on-secondary-container' },
 };
 
 const NotificationsPage: React.FC = () => {
@@ -130,7 +130,7 @@ const NotificationsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center gap-2 text-sm text-slate-400">
+      <div role="status" className="flex min-h-[50vh] items-center justify-center gap-2 text-body text-on-surface-variant">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         Loading your notifications...
       </div>
@@ -194,7 +194,7 @@ const NotificationsPage: React.FC = () => {
           />
         ) : (
           <Card>
-            <ul className="divide-y divide-slate-800/70">
+            <ul className="divide-y divide-outline-variant">
               {notifications.map((notification) => {
                 const meta = TYPE_META[notification.type] ?? TYPE_META.info;
                 const Icon = meta.icon;
@@ -202,8 +202,8 @@ const NotificationsPage: React.FC = () => {
                 return (
                   <li
                     key={notification.id}
-                    className={`flex flex-wrap items-start gap-4 p-4 sm:flex-nowrap ${
-                      notification.isRead ? '' : 'bg-indigo-500/[0.06]'
+                    className={`flex flex-wrap items-start gap-4 p-4 md:flex-nowrap ${
+                      notification.isRead ? '' : 'bg-surface-container-low'
                     }`}
                   >
                     <span
@@ -216,24 +216,24 @@ const NotificationsPage: React.FC = () => {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <p
-                          className={`truncate text-sm ${
-                            notification.isRead ? 'text-slate-300' : 'font-semibold text-white'
+                          className={`truncate text-body ${
+                            notification.isRead ? 'text-on-surface' : 'font-semibold text-on-surface'
                           }`}
                         >
                           {notification.title}
                         </p>
                         {!notification.isRead && (
                           <span
-                            className="h-2 w-2 shrink-0 rounded-full bg-indigo-400"
+                            className="h-2 w-2 shrink-0 rounded-full bg-primary"
                             title="Unread"
                             aria-label="Unread"
                           />
                         )}
                       </div>
-                      <p className="mt-0.5 text-sm leading-relaxed text-slate-400">
+                      <p className="mt-0.5 text-body leading-relaxed text-on-surface-variant">
                         {notification.message}
                       </p>
-                      <p className="mt-1.5 text-xs text-slate-500">
+                      <p className="mt-1.5 text-caption text-on-surface-variant">
                         {formatRelative(notification.createdAt)}
                       </p>
                     </div>
@@ -261,7 +261,7 @@ const NotificationsPage: React.FC = () => {
         )}
 
         {notifications.length > 0 && unreadIds.length === 0 && (
-          <p className="text-center text-xs text-slate-500">
+          <p className="text-center text-caption text-on-surface-variant">
             You are all caught up — {notifications.length} notification
             {notifications.length === 1 ? '' : 's'} read.
           </p>

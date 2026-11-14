@@ -80,8 +80,8 @@ const PendingWorkDashboardPage: React.FC = () => {
 
   const renderStudentTable = (rows: PendingWorkStudent[]) => (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[48rem] text-left text-sm">
-        <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+      <table className="w-full min-w-[48rem] text-left text-body">
+        <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
           <tr>
             <th className="px-4 py-3 font-semibold">Student</th>
             <th className="px-4 py-3 font-semibold">Cohort</th>
@@ -92,16 +92,16 @@ const PendingWorkDashboardPage: React.FC = () => {
             <th className="px-4 py-3 text-right font-semibold">Details</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-800/60">
+        <tbody className="divide-y divide-outline-variant">
           {rows.map((st) => (
-            <tr key={st.id} className="transition-colors hover:bg-slate-800/40">
+            <tr key={st.id} className="transition-colors hover:bg-surface-container">
               <td className="px-4 py-3">
-                <div className="font-medium text-white">{st.fullName}</div>
-                <div className="font-mono text-xs text-slate-400">{st.studentId}</div>
+                <div className="font-medium text-on-surface">{st.fullName}</div>
+                <div className="font-mono text-caption text-on-surface-variant">{st.studentId}</div>
               </td>
-              <td className="px-4 py-3 text-xs text-slate-300">
+              <td className="px-4 py-3 text-caption text-on-surface">
                 <div>{st.major}</div>
-                <div className="text-slate-500">
+                <div className="text-on-surface-variant">
                   Sem {st.currentSemester}
                   {st.studyGroup ? ` · Group ${st.studyGroup}` : ''}
                 </div>
@@ -111,18 +111,18 @@ const PendingWorkDashboardPage: React.FC = () => {
                   {st.workflowStatus}
                 </Badge>
               </td>
-              <td className="px-4 py-3 text-xs text-slate-300">
-                {st.blockingStep ?? <span className="text-slate-500">None</span>}
+              <td className="px-4 py-3 text-caption text-on-surface">
+                {st.blockingStep ?? <span className="text-on-surface-variant">None</span>}
               </td>
-              <td className="px-4 py-3 text-xs">
+              <td className="px-4 py-3 text-caption">
                 {st.awaitingRequest === 'None' ? (
-                  <span className="text-slate-500">None</span>
+                  <span className="text-on-surface-variant">None</span>
                 ) : (
                   <Badge tone="amber">{st.awaitingRequest}</Badge>
                 )}
               </td>
-              <td className="px-4 py-3 text-xs text-slate-300">
-                {st.assignedAdvisor ? st.assignedAdvisor.fullName : <span className="text-slate-500">Unassigned</span>}
+              <td className="px-4 py-3 text-caption text-on-surface">
+                {st.assignedAdvisor ? st.assignedAdvisor.fullName : <span className="text-on-surface-variant">Unassigned</span>}
               </td>
               <td className="px-4 py-3 text-right">
                 <CustomButton
@@ -169,7 +169,7 @@ const PendingWorkDashboardPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading pending-work dashboard...
         </Card>
@@ -183,49 +183,49 @@ const PendingWorkDashboardPage: React.FC = () => {
           {/* Summary KPI Tiles */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <Card tone="raised" className="p-4">
-              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-400">
+              <div className="flex items-center justify-between text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
                 <span>Advising Students</span>
-                <GraduationCap className="h-4 w-4 text-indigo-400" aria-hidden />
+                <GraduationCap className="h-4 w-4 text-primary" aria-hidden />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white">{data.summary.advisingStudents}</p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-2 text-h2 font-bold text-on-surface">{data.summary.advisingStudents}</p>
+              <p className="mt-1 text-caption text-on-surface-variant">
                 Draft, review, change-request, approval, settlement & processing states
               </p>
             </Card>
 
             <Card tone="raised" className="p-4">
-              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-400">
+              <div className="flex items-center justify-between text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
                 <span>Normal Students</span>
-                <Users className="h-4 w-4 text-sky-400" aria-hidden />
+                <Users className="h-4 w-4 text-info" aria-hidden />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white">{data.summary.normalStudents}</p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-2 text-h2 font-bold text-on-surface">{data.summary.normalStudents}</p>
+              <p className="mt-1 text-caption text-on-surface-variant">
                 Standard group assignments & whole-schedule swaps
               </p>
             </Card>
 
             <Card tone="raised" className="p-4">
-              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-400">
+              <div className="flex items-center justify-between text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
                 <span>Group Swaps (Open / Completed)</span>
-                <ShieldCheck className="h-4 w-4 text-emerald-400" aria-hidden />
+                <ShieldCheck className="h-4 w-4 text-success" aria-hidden />
               </div>
-              <p className="mt-2 text-2xl font-bold text-white">
+              <p className="mt-2 text-h2 font-bold text-on-surface">
                 {data.summary.openSwaps} / {data.summary.completedSwaps}
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-caption text-on-surface-variant">
                 Normal-student group swap activity
               </p>
             </Card>
 
             <Card tone="raised" className="p-4">
-              <div className="flex items-center justify-between text-xs font-medium uppercase tracking-wide text-slate-400">
+              <div className="flex items-center justify-between text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
                 <span>Requests Awaiting Action</span>
-                <Bell className="h-4 w-4 text-amber-400" aria-hidden />
+                <Bell className="h-4 w-4 text-warning" aria-hidden />
               </div>
-              <p className="mt-2 text-2xl font-bold text-amber-300">
+              <p className="mt-2 text-h2 font-bold text-warning">
                 {data.summary.awaitingActionCount}
               </p>
-              <p className="mt-1 text-xs text-slate-400">
+              <p className="mt-1 text-caption text-on-surface-variant">
                 Across swaps, slot changes, extra hours, plans & exit exams
               </p>
             </Card>
@@ -233,28 +233,28 @@ const PendingWorkDashboardPage: React.FC = () => {
 
           {/* Advising-Student State Breakdown Pills */}
           <Card tone="default" className="p-4">
-            <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <h2 className="mb-3 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
               Advising-Student Workflow State Breakdown
             </h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
               {(
                 ['Draft', 'Review', 'Change-Request', 'Approval', 'Settlement', 'Processing'] as const
               ).map((stage) => (
                 <div
                   key={stage}
-                  className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 text-center"
+                  className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-center"
                 >
-                  <div className="text-lg font-bold text-white">
+                  <div className="text-h3 font-bold text-on-surface">
                     {data.advisingStateBreakdown[stage]?.length ?? 0}
                   </div>
-                  <div className="mt-0.5 text-xs text-slate-400">{stage}</div>
+                  <div className="mt-0.5 text-caption text-on-surface-variant">{stage}</div>
                 </div>
               ))}
             </div>
           </Card>
 
           {/* Grouping Mode Switcher */}
-          <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 pb-3">
+          <div className="flex flex-wrap items-center gap-2 border-b border-outline-variant pb-3">
             <CustomButton
               variant={grouping === 'studentType' ? 'primary' : 'secondary'}
               size="sm"
@@ -288,14 +288,14 @@ const PendingWorkDashboardPage: React.FC = () => {
                 const rows = data.byStudentType[type] ?? [];
                 return (
                   <Card key={type} tone="raised" className="overflow-hidden">
-                    <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900/90 px-5 py-3.5">
-                      <h3 className="text-sm font-bold text-white">{type}s</h3>
+                    <div className="flex items-center justify-between border-b border-outline-variant bg-surface-container-low px-5 py-3.5">
+                      <h3 className="text-body font-bold text-on-surface">{type}s</h3>
                       <Badge tone={type === 'Advising Student' ? 'indigo' : 'sky'}>
                         {rows.length} students
                       </Badge>
                     </div>
                     {rows.length === 0 ? (
-                      <div className="p-8 text-center text-sm text-slate-500">
+                      <div className="p-8 text-center text-body text-on-surface-variant">
                         No students in this group.
                       </div>
                     ) : (
@@ -312,28 +312,28 @@ const PendingWorkDashboardPage: React.FC = () => {
             <div className="grid gap-4 lg:grid-cols-2">
               {data.byRequestType.map((group) => (
                 <Card key={group.requestType} tone="raised" className="p-5 space-y-3">
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                    <h3 className="text-sm font-bold text-white">{group.requestType}</h3>
+                  <div className="flex items-center justify-between border-b border-outline-variant pb-3">
+                    <h3 className="text-body font-bold text-on-surface">{group.requestType}</h3>
                     <Badge tone={group.count > 0 ? 'amber' : 'neutral'}>{group.count}</Badge>
                   </div>
 
                   {group.items.length === 0 ? (
-                    <p className="py-4 text-xs text-slate-500">
+                    <p className="py-4 text-caption text-on-surface-variant">
                       No requests currently in this category.
                     </p>
                   ) : (
-                    <ul className="divide-y divide-slate-800/70 max-h-72 overflow-y-auto pr-1">
+                    <ul className="divide-y divide-outline-variant max-h-72 overflow-y-auto pr-1">
                       {group.items.map((item) => (
                         <li
                           key={item.id}
-                          className="flex items-center justify-between gap-3 py-2.5 text-xs"
+                          className="flex items-center justify-between gap-3 py-2.5 text-caption"
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-2">
-                              <span className="font-semibold text-white">{item.studentName}</span>
-                              <span className="font-mono text-slate-400">({item.studentId})</span>
+                              <span className="font-semibold text-on-surface">{item.studentName}</span>
+                              <span className="font-mono text-on-surface-variant">({item.studentId})</span>
                             </div>
-                            <p className="mt-0.5 truncate text-slate-400">{item.detail}</p>
+                            <p className="mt-0.5 truncate text-on-surface-variant">{item.detail}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             <Badge tone={item.status === 'Completed' ? 'emerald' : 'indigo'}>
@@ -373,11 +373,11 @@ const PendingWorkDashboardPage: React.FC = () => {
                     tone="raised"
                     className="overflow-hidden"
                   >
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/90 px-5 py-3.5">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant bg-surface-container-low px-5 py-3.5">
                       <div>
-                        <h3 className="text-sm font-bold text-white">{advisorGroup.advisorName}</h3>
+                        <h3 className="text-body font-bold text-on-surface">{advisorGroup.advisorName}</h3>
                         {advisorGroup.advisorEmail && (
-                          <p className="text-xs text-slate-400">{advisorGroup.advisorEmail}</p>
+                          <p className="text-caption text-on-surface-variant">{advisorGroup.advisorEmail}</p>
                         )}
                       </div>
                       <Badge tone="indigo">{advisorGroup.students.length} assigned students</Badge>

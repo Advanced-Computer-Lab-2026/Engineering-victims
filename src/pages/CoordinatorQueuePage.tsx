@@ -83,18 +83,18 @@ export default function CoordinatorQueuePage() {
             icon={<Search className="w-4 h-4" />}
           />
         </div>
-        <div className="text-sm text-slate-400">
-          Showing <span className="text-white font-medium">{students.length}</span> students requiring attention
+        <div className="text-body text-on-surface-variant">
+          Showing <span className="text-on-surface font-medium">{students.length}</span> students requiring attention
         </div>
       </div>
 
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+        <div role="status" className="flex flex-col items-center justify-center py-20 text-on-surface-variant">
           <Loader2 className="w-8 h-8 animate-spin mb-2" />
           <p>Loading approval queue...</p>
         </div>
       ) : error ? (
-        <Card className="p-6 text-center text-rose-400">
+        <Card className="p-6 text-center text-error">
           <AlertCircle className="w-12 h-12 mx-auto mb-2" />
           <p>{error}</p>
         </Card>
@@ -108,24 +108,24 @@ export default function CoordinatorQueuePage() {
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-900/50 border-b border-slate-800">
+              <thead className="bg-surface-container-low border-b border-outline-variant">
                 <tr>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-slate-400">Student</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-slate-400">ID / Major</th>
-                  <th className="px-6 py-4 text-xs font-medium uppercase tracking-wider text-slate-400">Current Status</th>
-                  <th className="px-6 py-4 text-right text-xs font-medium uppercase tracking-wider text-slate-400">Action</th>
+                  <th className="px-6 py-4 text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Student</th>
+                  <th className="px-6 py-4 text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">ID / Major</th>
+                  <th className="px-6 py-4 text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Current Status</th>
+                  <th className="px-6 py-4 text-right text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800">
+              <tbody className="divide-y divide-outline-variant">
                 {students.map((student) => (
-                  <tr key={student.id} className="hover:bg-slate-800/40 transition-colors group">
+                  <tr key={student.id} className="hover:bg-surface-container transition-colors group">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-white">{student.fullName}</div>
-                      <div className="text-xs text-slate-500">{student.email}</div>
+                      <div className="font-medium text-on-surface">{student.fullName}</div>
+                      <div className="text-caption text-on-surface-variant">{student.email}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm text-slate-300">{student.studentId}</div>
-                      <div className="text-xs text-slate-500">{student.major}</div>
+                      <div className="text-body text-on-surface">{student.studentId}</div>
+                      <div className="text-caption text-on-surface-variant">{student.major}</div>
                     </td>
                     <td className="px-6 py-4">
                       <Badge tone="amber">

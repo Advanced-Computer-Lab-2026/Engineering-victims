@@ -1,0 +1,201 @@
+/* ==========================================================================
+   brand.css — PROJECT FILE
+   --------------------------------------------------------------------------
+   Palette and typeface for the University Schedule Management System.
+
+   Source color: indigo #4F46E5. Roles follow the Material 3 role names from
+   ui-system/brand.example.css. This file is the only place a project changes
+   colour or font; ui-system/tokens.css aliases these as --color-*.
+
+   The app is dark-only while the brand file still defines every role in both
+   schemes, as required by ui-system/check.sh and docs/using-the-system.md.
+   See decisions/002-indigo-dark-only.md.
+   ========================================================================== */
+
+:root {
+  /* ---------- Typeface ---------- */
+  --brand-font-sans: "Public Sans", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  --brand-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* ---------- Light roles --------------------------------------------- */
+  --brand-primary: #4f46e5;
+  --brand-on-primary: #ffffff;
+  --brand-primary-container: #e0e0ff;
+  --brand-on-primary-container: #13006b;
+
+  --brand-secondary: #5b5d72;
+  --brand-on-secondary: #ffffff;
+  --brand-secondary-container: #e0e1f9;
+  --brand-on-secondary-container: #181a2c;
+
+  --brand-tertiary: #77536d;
+  --brand-on-tertiary: #ffffff;
+  --brand-tertiary-container: #ffd8ee;
+  --brand-on-tertiary-container: #2d1228;
+
+  --brand-error: #ba1a1a;
+  --brand-on-error: #ffffff;
+  --brand-error-container: #ffdad6;
+  --brand-on-error-container: #410002;
+
+  --brand-success: #2f6b3a;
+  --brand-on-success: #ffffff;
+  --brand-success-container: #b7f0c0;
+  --brand-on-success-container: #00210a;
+
+  --brand-warning: #7a5900;
+  --brand-on-warning: #ffffff;
+  --brand-warning-container: #ffe08a;
+  --brand-on-warning-container: #261a00;
+
+  --brand-info: #005b8c;
+  --brand-on-info: #ffffff;
+  --brand-info-container: #c9e6ff;
+  --brand-on-info-container: #001e30;
+
+  --brand-surface: #faf8ff;
+  --brand-on-surface: #1b1b21;
+  --brand-surface-variant: #e3e1ec;
+  --brand-on-surface-variant: #46464f;
+
+  --brand-surface-container-lowest: #ffffff;
+  --brand-surface-container-low: #f4f3fa;
+  --brand-surface-container: #eeedf4;
+  --brand-surface-container-high: #e8e7ee;
+  --brand-surface-container-highest: #e3e2e9;
+
+  --brand-outline: #767680;
+  --brand-outline-variant: #c7c5d0;
+
+  --brand-inverse-surface: #303038;
+  --brand-inverse-on-surface: #f2eff7;
+  --brand-inverse-primary: #bac3ff;
+
+  --brand-scrim: #000000;
+  --brand-shadow: #000000;
+}
+
+/* ---------- Dark roles ------------------------------------------------
+   Both blocks are required. The app forces [data-theme="dark"] on <html>,
+   so the attribute block is the one that renders; the media query stays in
+   sync for completeness.
+   -------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --brand-primary: #a5b4fc;
+    --brand-on-primary: #1e1b4b;
+    --brand-primary-container: #312e81;
+    --brand-on-primary-container: #e0e7ff;
+
+    --brand-secondary: #bfc2dd;
+    --brand-on-secondary: #2d2f42;
+    --brand-secondary-container: #434659;
+    --brand-on-secondary-container: #dadcf5;
+
+    --brand-tertiary: #c9a5bf;
+    --brand-on-tertiary: #45263d;
+    --brand-tertiary-container: #5e3c55;
+    --brand-on-tertiary-container: #f7d8ec;
+
+    --brand-error: #ffb4ab;
+    --brand-on-error: #690005;
+    --brand-error-container: #93000a;
+    --brand-on-error-container: #ffdad6;
+
+    --brand-success: #7bd88f;
+    --brand-on-success: #003912;
+    --brand-success-container: #14522a;
+    --brand-on-success-container: #b7f0c0;
+
+    --brand-warning: #f5c84c;
+    --brand-on-warning: #3f2e00;
+    --brand-warning-container: #5c4500;
+    --brand-on-warning-container: #ffe08a;
+
+    --brand-info: #9ccbff;
+    --brand-on-info: #00344f;
+    --brand-info-container: #004c73;
+    --brand-on-info-container: #c9e6ff;
+
+    --brand-surface: #0b0f19;
+    --brand-on-surface: #e6e8f0;
+    --brand-surface-variant: #2a2e3d;
+    --brand-on-surface-variant: #a9aec2;
+
+    --brand-surface-container-lowest: #070a12;
+    --brand-surface-container-low: #10141f;
+    --brand-surface-container: #151a26;
+    --brand-surface-container-high: #1b2130;
+    --brand-surface-container-highest: #222939;
+
+    --brand-outline: #6b7285;
+    --brand-outline-variant: #343b4d;
+
+    --brand-inverse-surface: #e6e8f0;
+    --brand-inverse-on-surface: #1b1b21;
+    --brand-inverse-primary: #4f46e5;
+
+    --brand-scrim: #000000;
+    --brand-shadow: #000000;
+  }
+}
+
+[data-theme="dark"] {
+  --brand-primary: #a5b4fc;
+  --brand-on-primary: #1e1b4b;
+  --brand-primary-container: #312e81;
+  --brand-on-primary-container: #e0e7ff;
+
+  --brand-secondary: #bfc2dd;
+  --brand-on-secondary: #2d2f42;
+  --brand-secondary-container: #434659;
+  --brand-on-secondary-container: #dadcf5;
+
+  --brand-tertiary: #c9a5bf;
+  --brand-on-tertiary: #45263d;
+  --brand-tertiary-container: #5e3c55;
+  --brand-on-tertiary-container: #f7d8ec;
+
+  --brand-error: #ffb4ab;
+  --brand-on-error: #690005;
+  --brand-error-container: #93000a;
+  --brand-on-error-container: #ffdad6;
+
+  --brand-success: #7bd88f;
+  --brand-on-success: #003912;
+  --brand-success-container: #14522a;
+  --brand-on-success-container: #b7f0c0;
+
+  --brand-warning: #f5c84c;
+  --brand-on-warning: #3f2e00;
+  --brand-warning-container: #5c4500;
+  --brand-on-warning-container: #ffe08a;
+
+  --brand-info: #9ccbff;
+  --brand-on-info: #00344f;
+  --brand-info-container: #004c73;
+  --brand-on-info-container: #c9e6ff;
+
+  --brand-surface: #0b0f19;
+  --brand-on-surface: #e6e8f0;
+  --brand-surface-variant: #2a2e3d;
+  --brand-on-surface-variant: #a9aec2;
+
+  --brand-surface-container-lowest: #070a12;
+  --brand-surface-container-low: #10141f;
+  --brand-surface-container: #151a26;
+  --brand-surface-container-high: #1b2130;
+  --brand-surface-container-highest: #222939;
+
+  --brand-outline: #6b7285;
+  --brand-outline-variant: #343b4d;
+
+  --brand-inverse-surface: #e6e8f0;
+  --brand-inverse-on-surface: #1b1b21;
+  --brand-inverse-primary: #4f46e5;
+
+  --brand-scrim: #000000;
+  --brand-shadow: #000000;
+}

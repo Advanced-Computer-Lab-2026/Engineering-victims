@@ -11,7 +11,7 @@ const HistoryButtons: React.FC = () => {
   const { canGoBack, canGoForward, goBack, goForward } = useHistoryNavigation();
 
   const buttonClass =
-    'rounded-lg p-1.5 text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:bg-transparent disabled:text-slate-600';
+    'flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:bg-transparent disabled:text-on-surface-variant disabled:opacity-40';
 
   return (
     <div className="flex items-center gap-1" role="group" aria-label="Page history">
