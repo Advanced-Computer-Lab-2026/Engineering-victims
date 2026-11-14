@@ -23,5 +23,10 @@ export const fetchExtraHoursRequest = (id: string) => apiFetch<{ request: ExtraH
 export const decideExtraHoursRequest = (id: string, decision: 'Approved' | 'Rejected', responseNote: string) => apiFetch<{ message: string }>(`/api/extra-hours/review/${encodeURIComponent(id)}/decision`, {
   method: 'POST', body: JSON.stringify({ decision, responseNote }),
 });
-export type StudentExtraHoursRequest = Pick<ExtraHoursDetail, 'id' | 'reference' | 'decision' | 'decidedAt' | 'settlementStatus' | 'requestedHours' | 'totalCost' | 'currency' | 'items'> & { term: string };
+export type SettlementPreference = 'Pay Now' | 'Next Installment';
+export type StudentExtraHoursRequest = Pick<ExtraHoursDetail, 'id' | 'reference' | 'decision' | 'decidedAt' | 'settlementStatus' | 'requestedHours' | 'totalCost' | 'currency' | 'items'> & { term: string; version: number; settlementPreference: SettlementPreference | null; gatewayAttempt: string | null; paymentReference: string | null; activatedAt: string | null; activatedHours: number };
+export const payExtraHoursWallet = (id: string) => apiFetch<{ message: string }>(`/api/extra-hours/mine/${id}/pay-wallet`, { method: 'POST', body: '{}' });
+export const openExtraHoursCheckout = (id: string) => apiFetch<{ url: string | null; paymentId: string }>(`/api/extra-hours/mine/${id}/stripe-checkout`, { method: 'POST', body: '{}' });
+export const confirmExtraHoursCheckout = (id: string) => apiFetch<{ message: string }>(`/api/extra-hours/mine/payments/${id}/confirm`, { method: 'POST', body: '{}' });
+export const saveExtraHoursPreference = (id: string, preference: SettlementPreference, version: number) => apiFetch<{ message: string }>(`/api/extra-hours/mine/${encodeURIComponent(id)}/preference`, { method: 'POST', body: JSON.stringify({ preference, version }) });
 export const fetchMyExtraHoursRequests = (page = 1) => apiFetch<{ requests: StudentExtraHoursRequest[]; pagination: { page: number; limit: number; total: number; totalPages: number } }>(`/api/extra-hours/mine?page=${page}`);

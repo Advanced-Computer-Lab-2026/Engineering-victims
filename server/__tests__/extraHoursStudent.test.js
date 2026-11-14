@@ -1,10 +1,10 @@
 process.env.JWT_SECRET = 'student-extra-test';
 jest.mock('../models/User', () => ({ findById: jest.fn() }));
 jest.mock('../models/Student', () => ({ findOne: jest.fn() }));
-jest.mock('../models/ExtraHoursRequest', () => ({ find: jest.fn(), countDocuments: jest.fn() }));
+jest.mock('../models/ExtraHoursRequest', () => ({ find: jest.fn(), findOne: jest.fn(), findOneAndUpdate: jest.fn(), countDocuments: jest.fn() }));
 const express = require('express'), jwt = require('jsonwebtoken'), http = require('supertest');
 const User = require('../models/User'), Student = require('../models/Student'), Request = require('../models/ExtraHoursRequest');
-const app = express(); app.use('/mine', require('../routes/extraHoursStudentRoutes'));
+const app = express(); app.use(express.json()); app.use('/mine', require('../routes/extraHoursStudentRoutes'));
 const auth = (role = 'Student') => `Bearer ${jwt.sign({ userId: 'user', role }, process.env.JWT_SECRET)}`;
 const q = (value) => { const query = { select: () => query, populate: () => query, sort: jest.fn(() => query), skip: jest.fn(() => query), limit: () => query, lean: async () => value }; return query; };
 let rows, list;
@@ -59,4 +59,54 @@ test('deleted term does not hide historical itemized costs', async () => {
 test('safe database failure', async () => {
   Request.find.mockImplementation(() => { throw new Error('private database info'); });
   const result = await http(app).get('/mine').set('Authorization', auth()); expect(result.status).toBe(500); expect(result.text).not.toContain('private database info');
+});
+const requestId = '507f1f77bcf86cd799439012';
+const preferenceUrl = `/mine/${requestId}/preference`;
+const setupPreference = (overrides = {}) => {
+  Request.findOne.mockReturnValue(q({ _id: requestId, __v: 0, settlementPreference: null, settlementStatus: 'Awaiting Payment Choice', settlementOption: null, ...overrides }));
+  Request.findOneAndUpdate.mockReturnValue(q({ _id: requestId, __v: 1 }));
+};
+test.each(['Pay Now', 'Next Installment'])('FR90 saves %s without settlement or activation', async (preference) => {
+  setupPreference();
+  const result = await http(app).post(preferenceUrl).set('Authorization', auth()).send({ preference, version: 0 });
+  expect(result.status).toBe(200);
+  expect(Request.findOne).toHaveBeenCalledWith({ _id: requestId, student: 'own-student', decision: 'Approved' });
+  const [filter, update] = Request.findOneAndUpdate.mock.calls[0];
+  expect(filter).toMatchObject({ student: 'own-student', decision: 'Approved', __v: 0, settlementStatus: 'Awaiting Payment Choice', settlementOption: null });
+  expect(Object.keys(update.$set).sort()).toEqual(['settlementPreference', 'settlementPreferenceAt']);
+  expect(update.$set.settlementPreference).toBe(preference);
+  expect(update.$push.history).toMatchObject({ action: 'SettlementPreferenceSelected', actor: 'user', note: preference });
+  expect(result.body.message).toContain('Awaiting Payment Choice');
+});
+test('FR90 retry of unchanged preference is idempotent', async () => {
+  setupPreference({ settlementPreference: 'Pay Now' });
+  expect((await http(app).post(preferenceUrl).set('Authorization', auth()).send({ preference: 'Pay Now', version: 0 })).status).toBe(200);
+  expect(Request.findOneAndUpdate).not.toHaveBeenCalled();
+});
+test.each(['Paid', 'Deferred to Next Installment', 'Failed', 'Cancelled', 'Refunded', 'Not Applicable'])('FR90 %s cannot change preferences', async (settlementStatus) => {
+  setupPreference({ settlementStatus });
+  expect((await http(app).post(preferenceUrl).set('Authorization', auth()).send({ preference: 'Pay Now', version: 0 })).status).toBe(409);
+  expect(Request.findOneAndUpdate).not.toHaveBeenCalled();
+});
+test('FR90 other student or unapproved request is hidden', async () => {
+  Request.findOne.mockReturnValue(q(null));
+  expect((await http(app).post(preferenceUrl).set('Authorization', auth()).send({ preference: 'Pay Now', version: 0 })).status).toBe(404);
+  expect(Request.findOneAndUpdate).not.toHaveBeenCalled();
+});
+test.each([{ preference: 'Wallet', version: 0 }, { preference: 'Pay Now' }, { preference: 'Pay Now', version: -1 }, { preference: 'Pay Now', version: 0, settlementStatus: 'Paid' }, { preference: 'Pay Now', version: 0, studentId: 'other' }])('FR90 invalid body rejected %j', async (body) => {
+  expect((await http(app).post(preferenceUrl).set('Authorization', auth()).send(body)).status).toBe(400);
+  expect(Request.findOne).not.toHaveBeenCalled();
+});
+test.each(['Advisor', 'Coordinator', 'Administrator'])('FR90 %s cannot choose', async (role) => {
+  expect((await http(app).post(preferenceUrl).set('Authorization', auth(role)).send({ preference: 'Pay Now', version: 0 })).status).toBe(403);
+  expect(Request.findOne).not.toHaveBeenCalled();
+});
+test('FR90 stale version rejected', async () => {
+  setupPreference({ __v: 2 });
+  expect((await http(app).post(preferenceUrl).set('Authorization', auth()).send({ preference: 'Pay Now', version: 0 })).status).toBe(409);
+  expect(Request.findOneAndUpdate).not.toHaveBeenCalled();
+});
+test('FR90 concurrent update rejected', async () => {
+  setupPreference(); Request.findOneAndUpdate.mockReturnValue(q(null));
+  expect((await http(app).post(preferenceUrl).set('Authorization', auth()).send({ preference: 'Pay Now', version: 0 })).status).toBe(409);
 });

@@ -24,29 +24,33 @@ const serializeTransaction = (row) => ({
  */
 exports.getMyWallet = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('email').lean();
+    const user = await User.findById(req.user.userId).select('email role isActive').lean();
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+    if (!user.isActive || user.role !== 'Student') {
+      return res.status(403).json({ message: 'An active Student account is required.' });
     }
 
     // The login user and the directory record are linked by email, the same
     // way the profile page (FR 4.0) joins them.
-    const student = await Student.findOne({ email: user.email }).select('studentType').lean();
+    const student = await Student.findOne({ email: user.email }).select('studentType isActive').lean();
     if (!student) {
       return res.status(404).json({ message: 'No student record is linked to this account.' });
     }
-    if (student.studentType !== 'Advising Student') {
+    if (!student.isActive || student.studentType !== 'Advising Student') {
       return res.status(403).json({ message: 'The wallet is only available to Advising Students.' });
     }
 
     const wallet = await Wallet.findOne({ student: student._id }).lean();
     const transactions = wallet
-      ? await WalletTransaction.find({ wallet: wallet._id }).sort({ occurredAt: -1, createdAt: -1 }).lean()
+      ? await WalletTransaction.find({ wallet: wallet._id, student: student._id }).sort({ occurredAt: -1, createdAt: -1, _id: -1 }).lean()
       : [];
 
     const totalFor = (type) =>
       transactions.filter((row) => row.type === type).reduce((sum, row) => sum + row.amount, 0);
 
+    res.set('Cache-Control', 'no-store');
     res.status(200).json({
       // A student who has never had a refund has no wallet document yet; that
       // is an empty wallet, not an error.
@@ -63,6 +67,6 @@ exports.getMyWallet = async (req, res) => {
       transactions: transactions.map(serializeTransaction),
     });
   } catch (error) {
-    res.status(500).json({ message: 'Could not load your wallet', error: error.message });
+    res.status(500).json({ message: 'Could not load your wallet' });
   }
 };

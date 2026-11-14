@@ -51,6 +51,8 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
+// Signature verification requires the original bytes, before express.json().
+app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json', limit: '256kb' }), require('./routes/stripeWebhookRoutes'));
 app.use(express.json());
 app.use(morgan("dev"));
 

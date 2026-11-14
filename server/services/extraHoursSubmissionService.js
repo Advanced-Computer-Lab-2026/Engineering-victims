@@ -24,13 +24,14 @@ async function graduationAssessmentFor(student, now) {
     creditLimits: creditLimitsFor({ student, terms: plan.terms, gpa: inputs.gpa }), approvedExitExamCourseIds: exits, requireComplete: true });
   return validation.errors.length ? null : { withinOneYear: true, sourceReference: `GraduationPlan:${plan._id}` };
 }
-async function loadContext(studentId, termId, now = new Date()) {
-  const student = await Student.findById(studentId).lean();
+async function loadContext(studentId, termId, now = new Date(), session = null) {
+  const scoped = (query) => session ? query.session(session) : query;
+  const student = await scoped(Student.findById(studentId)).lean();
   if (!student?.isActive || student.studentType !== 'Advising Student') throw fail('An active advising student is required.', 404);
-  const rows = await Schedule.find({ studentId, ...(termId ? { termId } : {}) })
-    .populate({ path: 'slotId', populate: { path: 'offeringId', populate: { path: 'courseId' } } }).lean();
+  const rows = await scoped(Schedule.find({ studentId, ...(termId ? { termId } : {}) })
+    .populate({ path: 'slotId', populate: { path: 'offeringId', populate: { path: 'courseId' } } })).lean();
   const drafts = rows.filter((row) => ['Draft', 'Active'].includes(row.status));
-  const terms = await Term.find({ _id: { $in: [...new Set(drafts.map((row) => String(row.termId)))] } }).sort({ termStartDate: 1 }).lean();
+  const terms = await scoped(Term.find({ _id: { $in: [...new Set(drafts.map((row) => String(row.termId)))] } })).sort({ termStartDate: 1 }).lean();
   const term = termId ? terms.find((item) => String(item._id) === String(termId)) : terms.find((item) => item.advisingDeadline >= now) || terms[0];
   if (!term) throw fail('No editable advising draft exists. The draft-building workflow must provide one first.');
   const selected = new Map();
@@ -40,11 +41,16 @@ async function loadContext(studentId, termId, now = new Date()) {
     if (!course?.isActive || String(offering.termId) !== String(term._id) || offering.publicationStatus !== 'Published') throw fail('The draft contains an unavailable course or offering. Repair it first.');
     selected.set(String(course._id), course);
   }
-  const [records, offerings, graduationAssessment] = await Promise.all([
-    Record.find({ student: studentId }).populate('course').lean(),
-    Offering.find({ termId: term._id, publicationStatus: 'Published' }).populate('courseId').lean(),
-    graduationAssessmentFor(student, now),
-  ]);
+  const reads = [
+    () => scoped(Record.find({ student: studentId }).populate('course')).lean(),
+    () => scoped(Offering.find({ termId: term._id, publicationStatus: 'Published' }).populate('courseId')).lean(),
+    () => graduationAssessmentFor(student, now),
+  ];
+  // MongoDB does not support parallel operations within one transaction.
+  const values = [];
+  if (session) { for (const read of reads) values.push(await read()); }
+  else values.push(...await Promise.all(reads.map((read) => read())));
+  const [records, offerings, graduationAssessment] = values;
   const passed = new Set(records.filter((row) => row.status === 'Completed' && row.grade && row.grade !== 'F' && row.course).map((row) => String(row.course._id)));
   const courses = new Map();
   for (const offering of offerings) {

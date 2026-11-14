@@ -31,6 +31,7 @@ const WalletPage: React.FC = () => {
     try {
       setData(await fetchMyWallet());
     } catch (err) {
+      setData(null);
       setError(err as ApiError);
     } finally {
       setIsLoading(false);
@@ -56,6 +57,7 @@ const WalletPage: React.FC = () => {
             size="sm"
             onClick={() => load(true)}
             isLoading={isRefreshing}
+            disabled={isLoading || isRefreshing}
             icon={<RotateCcw className="h-4 w-4" aria-hidden />}
           >
             Refresh

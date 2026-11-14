@@ -32,6 +32,13 @@ const schema = new mongoose.Schema({
   decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   decidedAt: { type: Date, default: null },
   settlementOption: { type: String, enum: ['Wallet', 'Gateway', 'Next Installment'], default: null },
+  // FR 90 intent is separate from a confirmed payment or installment charge.
+  settlementPreference: { type: String, enum: ['Pay Now', 'Next Installment'], default: null },
+  settlementPreferenceAt: { type: Date, default: null },
+  gatewayAttempt: { type: mongoose.Schema.Types.ObjectId, ref: 'ExtraHoursPayment', default: null },
+  paymentReference: { type: String, default: null },
+  activatedAt: { type: Date, default: null },
+  activatedHours: { type: Number, default: 0, min: 0, max: 34 },
   settlementStatus: { type: String, enum: ['Not Applicable', 'Awaiting Payment Choice', 'Paid', 'Deferred to Next Installment', 'Failed', 'Cancelled', 'Refunded'], default: 'Not Applicable' },
   history: [{ action: String, actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, note: String, at: { type: Date, default: Date.now } }],
 }, { timestamps: true });
