@@ -4,7 +4,7 @@ const offeringController = require('../controllers/offeringController');
 const offeringDuplicateController = require('../controllers/offeringDuplicateController');
 const { authenticate, requireRole } = require('../middleware/authMiddleware');
 
-const staffReadOnly = [authenticate, requireRole('Coordinator', 'Administrator')];
+const staffReadOnly = [authenticate, requireRole('Advisor', 'Coordinator', 'Administrator')];
 const administratorOnly = [authenticate, requireRole('Administrator')];
 
 router.get('/', ...staffReadOnly, offeringController.getOfferings);
