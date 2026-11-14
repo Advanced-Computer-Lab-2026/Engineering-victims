@@ -39,6 +39,8 @@ const SwapRequest = require("./models/SwapRequest");
 const ScheduleActivityLog = require("./models/ScheduleActivityLog");
 const { startProbationWorker } = require("./services/probationService");
 const semesterStandingRoutes = require("./routes/semesterStandingRoutes");
+const extraHoursRoutes = require("./routes/extraHoursRoutes");
+const ExtraHoursRequest = require("./models/ExtraHoursRequest");
 
 // Create server/.env (and the MongoDB connection string) if it is missing.
 if (ensureEnvFile()) {
@@ -71,6 +73,7 @@ app.use("/api/exit-exam-requests", exitExamRequestRoutes);
 app.use("/api/mandatory-removal-requests", mandatoryRemovalRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/semester-standings", semesterStandingRoutes);
+app.use("/api/extra-hours", extraHoursRoutes);
 app.use("/api/swaps", swapRequestRoutes);
 app.use("/api/coordinator", coordinatorDashboardRoutes);
 app.use("/api/schedule-history", scheduleActivityRoutes);
@@ -131,6 +134,7 @@ async function startServer() {
       CalendarEvent.init(),
       SemesterStanding.init(),
       ProbationWarning.init(),
+      ExtraHoursRequest.init(),
       SwapRequest.init(),
       ScheduleActivityLog.init(),
     ]);
