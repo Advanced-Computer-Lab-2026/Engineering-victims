@@ -33,6 +33,7 @@ import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
 import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
 import ExitExamRequestsPage from './pages/ExitExamRequestsPage';
 import SemesterStandingsPage from './pages/SemesterStandingsPage';
+import ExtraHoursRequestsPage from './pages/ExtraHoursRequestsPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -104,6 +105,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/exit-exam-requests" element={<ExitExamRequestsPage />} />
+          <Route path="/extra-hours-requests" element={<ExtraHoursRequestsPage />} />
         </Route>
 
         {/* Req 89: students only. A Normal Student who types the URL is told

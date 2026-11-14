@@ -36,6 +36,7 @@ const schema = new mongoose.Schema({
   history: [{ action: String, actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, note: String, at: { type: Date, default: Date.now } }],
 }, { timestamps: true });
 schema.index({ requestingAdvisor: 1, decision: 1, createdAt: -1 });
+schema.index({ createdAt: -1, _id: -1 });
 schema.index({ requestingAdvisor: 1, submissionKey: 1 }, { unique: true, partialFilterExpression: { submissionKey: { $type: 'string' } } });
 schema.index({ settlementOption: 1, settlementStatus: 1, createdAt: -1 });
 schema.pre('validate', function (next) {

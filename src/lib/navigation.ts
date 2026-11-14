@@ -4,6 +4,7 @@ import {
   BookOpen,
   CalendarDays,
   CalendarRange,
+  ClipboardList,
   Contact,
   FileText,
   GraduationCap,
@@ -49,6 +50,10 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  {
+    to: '/extra-hours-requests', label: 'Extra-hours Requests', icon: ClipboardList,
+    roles: ['Coordinator'], description: 'Review extra-hours requests, eligibility checks and itemized costs.',
+  },
   {
     to: '/dashboard',
     label: 'Dashboard',
