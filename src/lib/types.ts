@@ -545,6 +545,48 @@ export interface StudentPreferencesResponse {
   preference: SchedulingPreferencesResponse['preference'];
 }
 
+export interface AdvisingScheduleDraftCourse {
+  id: string;
+  code: string;
+  name: string;
+  creditHours: number;
+  mandatory: boolean;
+}
+
+export interface AdvisingScheduleCourseOption extends Omit<AdvisingScheduleDraftCourse, 'mandatory'> {
+  courseType: 'Core' | 'Elective' | 'Huma';
+}
+
+export interface AdvisingScheduleDraftResponse {
+  student: {
+    id: string;
+    fullName: string;
+    studentId: string;
+    major: string;
+    currentSemester: number;
+    workflowStatus: string;
+  };
+  term: { id: string; label: string; academicYear: string; season: AcademicTermSeason };
+  terms: Array<{ id: string; label: string; academicYear: string; season: AcademicTermSeason }>;
+  draft: {
+    id: string;
+    termId: string;
+    courses: AdvisingScheduleDraftCourse[];
+    createdAt: string;
+    updatedAt: string;
+  } | null;
+  canEdit: boolean;
+  eligibleCourses: AdvisingScheduleCourseOption[];
+  creditHours: {
+    selected: number;
+    allowed: number;
+    extra: number;
+    remaining: number;
+    standardAllowance: number;
+    isProbation: boolean;
+  };
+}
+
 /** Req 33 — detailed view of a registered course's assigned slots. */
 export interface CourseSlotDetail {
   id: string;

@@ -437,6 +437,14 @@ const AdvisingStudentTableRow: React.FC<RowProps> = ({ student, onOpen }) => {
         >
           Schedule
         </CustomButton>
+        <CustomButton
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/advising-schedules/${student.id}/draft`)}
+          icon={<CalendarDays className="h-4 w-4" aria-hidden />}
+        >
+          Draft
+        </CustomButton>
       </td>
     </tr>
   );

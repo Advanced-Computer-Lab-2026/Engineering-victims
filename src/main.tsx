@@ -24,6 +24,7 @@ import AdvisingStudentsPage from './pages/AdvisingStudentsPage';
 import AcademicHistoryPage from './pages/AcademicHistoryPage';
 import TranscriptPage from './pages/TranscriptPage';
 import WeeklySchedulePage from './pages/WeeklySchedulePage';
+import AdvisingScheduleDraftPage from './pages/AdvisingScheduleDraftPage';
 import SchedulingPreferencesPage from './pages/SchedulingPreferencesPage';
 import MyRegisteredCoursesPage from './pages/MyRegisteredCoursesPage';
 import EligibleSwapGroupsPage from './pages/EligibleSwapGroupsPage';
@@ -78,6 +79,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             </ProtectedRoute>
           }
         >
+          <Route path="/advising-schedules/:studentId/draft" element={<AdvisingScheduleDraftPage />} />
           <Route path="/graduation-plans" element={<GraduationPlansRoute />} />
           <Route path="/graduation-plans/:planId" element={<GraduationPlanBuilderPage />} />
           {/* Req 43: Advisors see their assigned students' slot-change

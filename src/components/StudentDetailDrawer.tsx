@@ -414,6 +414,18 @@ const StudentDetailDrawer: React.FC<StudentDetailDrawerProps> = ({
                 variant="secondary"
                 size="sm"
                 fullWidth
+                onClick={() => navigate(`/advising-schedules/${student.id}/draft`)}
+                icon={<CalendarDays className="h-4 w-4" aria-hidden />}
+                className="mt-2"
+              >
+                Create or edit draft schedule
+              </CustomButton>
+            )}
+            {canViewSchedule && (
+              <CustomButton
+                variant="secondary"
+                size="sm"
+                fullWidth
                 onClick={() => navigate(`/schedule/${student.id}`)}
                 icon={<CalendarDays className="h-4 w-4" aria-hidden />}
                 className="mt-2"
