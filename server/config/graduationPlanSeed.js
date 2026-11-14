@@ -17,6 +17,7 @@ const DEMO_PLANS = [
     wasRejected: true,
   },
   { studentId: '64-20046', status: 'Draft' },
+  { studentId: '64-30011', status: 'Draft' },
 ];
 
 /**

@@ -50,19 +50,23 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
   const { user } = useSession();
   const isAdvisingStudent = user?.role === 'Student' && user.studentType === 'Advising Student';
   const [eligibility, setEligibility] = useState<SlotChangeEligibility | null>(null);
+  const [eligibilityError, setEligibilityError] = useState<string | null>(null);
   const [requestingSlot, setRequestingSlot] = useState<CourseSlotDetail | null>(null);
   const [submittedMessage, setSubmittedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId || !isAdvisingStudent) return;
     let cancelled = false;
+    setEligibilityError(null);
     fetchSlotChangeEligibility()
       .then((result) => {
         if (!cancelled) setEligibility(result);
       })
-      // Without eligibility the drawer simply stays read-only.
-      .catch(() => {
-        if (!cancelled) setEligibility(null);
+      .catch((err) => {
+        if (!cancelled) {
+          setEligibility(null);
+          setEligibilityError((err as ApiError).message || 'Could not check slot-change request eligibility.');
+        }
       });
     return () => {
       cancelled = true;
@@ -153,6 +157,11 @@ const CourseDetailDrawer: React.FC<CourseDetailDrawerProps> = ({ courseId, cours
                     {eligibility.canRequest && eligibility.term
                       ? `You can ask for a change to any of these slots until the end of ${formatDate(eligibility.term.advisingDeadline)}. Your advisor decides; the slot stays assigned until then.`
                       : eligibility.reason}
+                  </AlertBanner>
+                )}
+                {isAdvisingStudent && eligibilityError && (
+                  <AlertBanner tone="error" title="Could not check slot-change requests">
+                    {eligibilityError}
                   </AlertBanner>
                 )}
 

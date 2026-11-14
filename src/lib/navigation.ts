@@ -4,6 +4,7 @@ import {
   BookOpen,
   CalendarDays,
   CalendarRange,
+  ClipboardList,
   Contact,
   FileText,
   GraduationCap,
@@ -61,7 +62,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Pending-Work Dashboard',
     icon: Layers,
     roles: ['Coordinator', 'Administrator'],
-    description: 'Every student’s workflow status, blocking step and awaiting requests grouped by student type, request type and Advisor.',
+    description: "Every student's workflow status, blocking step and awaiting requests grouped by student type, request type and Advisor.",
   },
   {
     to: '/coordinator/queue',
@@ -110,6 +111,14 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Advisor', 'Coordinator'],
     description: 'Advisors build plans; Coordinators review submissions and track decisions.',
   },
+  // Req 43: Advisors see their assigned students' requests; Coordinators see all.
+  {
+    to: '/slot-change-review',
+    label: 'Slot-Change Requests',
+    icon: ClipboardList,
+    roles: ['Advisor', 'Coordinator'],
+    description: 'Advising-student slot-change requests, their statuses and outcomes.',
+  },
   {
     to: '/exit-exam-requests',
     label: 'Exit-exam Requests',
@@ -122,7 +131,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Semester Standings',
     icon: Scale,
     roles: ['Coordinator', 'Administrator'],
-    description: 'Finalize advising students’ semester GPA and review probation history.',
+    description: "Finalize advising students' semester GPA and review probation history.",
   },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.
@@ -198,6 +207,15 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Student'],
     studentTypes: ['Normal Student'],
     description: 'Submit a whole-schedule swap request, complete an open peer swap, or withdraw your request.',
+  },
+  // Req 41: Advising Students follow their slot-change requests and responses.
+  {
+    to: '/slot-change-requests',
+    label: 'My Slot-Change Requests',
+    icon: ClipboardList,
+    roles: ['Student'],
+    studentTypes: ['Advising Student'],
+    description: 'Your slot-change requests, their statuses and the Advisor or Coordinator response.',
   },
   // Req 54: staff reach a student's history from the student lists instead.
   {

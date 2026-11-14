@@ -27,6 +27,11 @@ const { seedScheduleGroups } = require('./scheduleSeed');
 const { seedAdvisingSchedules } = require('./advisingScheduleSeed');
 const { seedSchedulingPreferences } = require('./schedulingPreferenceSeed');
 const { seedGraduationPlans } = require('./graduationPlanSeed');
+const {
+  seedSlotChangeRequests,
+  seedExitExamRequests,
+  seedSemesterStandingHistory,
+} = require('./workflowDemoSeed');
 
 /**
  * The demo dataset.
@@ -77,7 +82,7 @@ const STAFF = [
  *   so no status in the filter ever returns an empty list;
  * - all 3 academic standings, including Dismissed;
  * - both account states (the inactive student is inactive at login too);
- * - two Advising Students with no advisor, so first-time assignment and the
+ * - an Advising Student with no advisor, so first-time assignment and the
  *   "Unassigned" filter have a real target, plus students spread over three
  *   advisors so the advisor filter and reassignment both have options;
  * - only Computer Science and DMET, because those are the only two majors the
@@ -98,7 +103,7 @@ const STUDENTS = [
   // ---- Advising Student: one row per status in ADVISING_STATUSES ----
   // advisingReason (req 52, 59) is spread across the rows so every option in
   // that filter has a real result, including the "no advising reason" option.
-  { fullName: 'Laila Hassan', email: 'laila.hassan@student.guc.edu.eg', password: 'LailaHassan2006', studentId: '64-20045', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 6, academicStanding: 'Probation', advisingReason: 'Probation', workflowStatus: 'Not Started', isActive: true, advisorEmail: null },
+  { fullName: 'Laila Hassan', email: 'laila.hassan@student.guc.edu.eg', password: 'LailaHassan2006', studentId: '64-20045', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 6, academicStanding: 'Probation', advisingReason: 'Probation', workflowStatus: 'Ready for Student Review', isActive: true, advisorEmail: 'mona.adel@guc.edu.eg' },
   { fullName: 'Omar Nabil', email: 'omar.nabil@student.guc.edu.eg', password: 'OmarNabil2006', studentId: '64-20046', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 6, academicStanding: 'Good Standing', advisingReason: 'Unattended courses', workflowStatus: 'Draft', isActive: true, advisorEmail: 'mona.adel@guc.edu.eg' },
   { fullName: 'Salma Ibrahim', email: 'salma.ibrahim@student.guc.edu.eg', password: 'SalmaIbrahim2006', studentId: '64-30010', studentType: 'Advising Student', major: 'DMET', currentSemester: 4, academicStanding: 'Good Standing', advisingReason: 'More than 2 failed courses in a season', workflowStatus: 'Ready for Student Review', isActive: true, advisorEmail: 'karim.fahmy@guc.edu.eg' },
   { fullName: 'Rana Adel', email: 'rana.adel@student.guc.edu.eg', password: 'RanaAdel2006', studentId: '64-30012', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 5, academicStanding: 'Good Standing', advisingReason: 'Unattended courses', workflowStatus: 'Change Request Pending', isActive: true, advisorEmail: 'mona.adel@guc.edu.eg' },
@@ -114,7 +119,7 @@ const STUDENTS = [
   // A second unassigned advising student, so assigning one does not empty the
   // "Unassigned" filter. Left with no advising reason so that option in the
   // req-52 filter is not a dead choice either.
-  { fullName: 'Hassan Rifaat', email: 'hassan.rifaat@student.guc.edu.eg', password: 'HassanRifaat2006', studentId: '65-60015', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 2, academicStanding: 'Good Standing', advisingReason: null, workflowStatus: 'Draft', isActive: true, advisorEmail: 'mona.adel@guc.edu.eg' },
+  { fullName: 'Hassan Rifaat', email: 'hassan.rifaat@student.guc.edu.eg', password: 'HassanRifaat2006', studentId: '65-60015', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 2, academicStanding: 'Good Standing', advisingReason: null, workflowStatus: 'Ready for Student Review', isActive: true, advisorEmail: 'mona.adel@guc.edu.eg' },
   { fullName: 'Yasmin Adly', email: 'yasmin.adly@student.guc.edu.eg', password: 'YasminAdly2006', studentId: '65-60016', studentType: 'Advising Student', major: 'DMET', currentSemester: 8, academicStanding: 'Good Standing', advisingReason: 'More than 2 failed courses in a season', workflowStatus: 'Processed', isActive: true, advisorEmail: 'karim.fahmy@guc.edu.eg' },
 ];
 
@@ -734,6 +739,9 @@ const seed = async () => {
   // Req 54: completed (graded) and current courses for the Advising Students.
   const courseRecords = await seedAcademicHistory({ students, courses });
   const graduationPlans = await seedGraduationPlans({ students, users: created });
+  const slotChangeRequests = await seedSlotChangeRequests({ students, terms, courses });
+  const exitExamRequests = await seedExitExamRequests({ students, users: created });
+  const semesterStandings = await seedSemesterStandingHistory({ students, terms, users: created });
 
   // Req 35-39: the swap requests the swaps screen reads, for the students the
   // seed marks with a swap workflowStatus. Built through the same lazy seeder
@@ -804,6 +812,9 @@ const seed = async () => {
     walletTransactions,
     courseRecords,
     graduationPlans: graduationPlans.length,
+    slotChangeRequests,
+    exitExamRequests,
+    semesterStandings,
     notifications: notifications.length,
   };
 };
@@ -833,7 +844,7 @@ const isSeeded = async () => {
  * skip one that already has.
  *
  * The skip is the whole point. Boot used to call seed() unconditionally, so
- * every restart — including a dev-watcher restart triggered by saving a file —
+ * every restart — including a nodemon restart triggered by saving a file —
  * wiped the database mid-session. Now a restart is harmless, and
  * `node seed/seed.cjs` remains the deliberate way to get a clean slate.
  *

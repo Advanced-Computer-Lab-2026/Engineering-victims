@@ -615,6 +615,113 @@ export interface SlotChangeRequestSummary {
   submittedAt: string;
 }
 
+/** Req 41 — the Advisor or Coordinator decision on a request. */
+export interface SlotChangeResponse {
+  note: string;
+  /** Null when the responder's account no longer exists. */
+  respondedBy: { name: string; role: Role } | null;
+  respondedAt: string | null;
+  /** The approved replacement slot; null for a rejection. */
+  replacementSlot: SlotChangeRequestSummary['currentSlot'] | null;
+}
+
+/** Req 41 — one of the student's own slot-change requests. */
+export interface SlotChangeRequestItem extends Omit<SlotChangeRequestSummary, 'course'> {
+  /** Null when the course has since been deleted. */
+  course: SlotChangeRequestSummary['course'] | null;
+  term: { id: string; label: string } | null;
+  withdrawnAt: string | null;
+  /** Present only once the request is Approved or Rejected. */
+  response: SlotChangeResponse | null;
+}
+
+/** Req 43 — a request as an Advisor or Coordinator sees it in the list. */
+export interface StaffSlotChangeRequestItem extends SlotChangeRequestItem {
+  /** Null when the student record was deleted. */
+  student: { id: string; studentId: string; fullName: string } | null;
+  /** The student's current Advisor; null when unassigned. */
+  advisor: { id: string; fullName: string } | null;
+}
+
+/** Req 43 — 'assigned' for an Advisor's own students, 'all' for a Coordinator. */
+export interface StaffSlotChangeRequestList {
+  scope: 'assigned' | 'all';
+  requests: StaffSlotChangeRequestItem[];
+}
+
+/** Req 47 — one slot as compared in the details drawer. */
+export interface SlotComparisonTimes {
+  groupNumber: number;
+  dayOfWeek: WeekDay;
+  startTime: string;
+  endTime: string;
+  room: string;
+}
+
+/** Req 47 — why an alternative cannot be offered. */
+export type SlotAlternativeReason = 'full' | 'clash' | 'already-assigned' | 'timetable-unavailable';
+
+/** Req 47 — another group of the same course offering and component. */
+export interface SlotAlternative extends SlotComparisonTimes {
+  id: string;
+  maxCapacity: number;
+  assignedCount: number;
+  /** maxCapacity - assignedCount, never negative. */
+  remainingSeats: number;
+  isFull: boolean;
+  /** The student's other assigned slots this group overlaps. */
+  clashes: (SlotComparisonTimes & {
+    slotId: string;
+    course: { code: string; name: string } | null;
+    slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  })[];
+  isEligible: boolean;
+  reasons: SlotAlternativeReason[];
+}
+
+/** Req 47 — the current slot beside its alternatives, read-only. */
+export interface SlotChangeComparison {
+  requestId: string;
+  status: SlotChangeRequestStatus;
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  /** False when the student record is gone, so clashes could not be checked. */
+  timetableChecked: boolean;
+  current: SlotComparisonTimes & {
+    id: string;
+    /** True when the slot was deleted; times then come from the request. */
+    missing: boolean;
+    maxCapacity: number | null;
+    assignedCount: number | null;
+    remainingSeats: number | null;
+  };
+  alternatives: SlotAlternative[];
+  summary: { total: number; eligible: number; full: number; clashing: number };
+}
+
+/** Req 48 — the outcome of approving or rejecting; `request` is null only if re-reading it failed. */
+export interface SlotChangeDecisionResult {
+  message: string;
+  request: StaffSlotChangeRequestItem | null;
+}
+
+/** Req 46 — one request opened from the staff list; `request` has the list row's shape. */
+export interface StaffSlotChangeRequestDetails {
+  scope: 'assigned' | 'all';
+  request: StaffSlotChangeRequestItem;
+}
+
+/**
+ * Req 45 — choices for the staff list filters, limited to the caller's scope:
+ * a Coordinator gets every Advisor plus "Unassigned", an Advisor only
+ * themselves; courses are those that appear in visible requests.
+ */
+export interface StaffSlotChangeFilterOptions {
+  statuses: SlotChangeRequestStatus[];
+  advisors: { id: string; fullName: string; email: string }[];
+  includesUnassigned: boolean;
+  courses: { id: string; code: string; name: string }[];
+}
+
 /** Req 34 — eligible groups for whole-schedule swap. */
 export interface EligibleSwapGroup {
   studyGroup: string;
