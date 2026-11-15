@@ -4,6 +4,8 @@ import { fetchUnreadCount } from '../lib/notificationsService';
 
 interface UnreadCountState {
   unreadCount: number | null;
+  isLoading: boolean;
+  error: string | null;
   refresh: () => void;
 }
 
@@ -16,14 +18,20 @@ interface UnreadCountState {
  */
 export const useUnreadCount = (): UnreadCountState => {
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     fetchUnreadCount()
-      .then((response) => setUnreadCount(response.unreadCount))
-      .catch((err: ApiError) => {
-        // A signed-out or unreachable session shows no badge rather than a stale one.
-        if (err.status === 401) setUnreadCount(null);
-      });
+      .then((response) => {
+        setUnreadCount(response.unreadCount);
+        setError(null);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof ApiError && err.status === 401) setUnreadCount(null);
+        setError(err instanceof ApiError ? err.message : 'Could not load unread notifications.');
+      })
+      .finally(() => setIsLoading(false));
   }, []);
 
   useEffect(() => {
@@ -43,7 +51,7 @@ export const useUnreadCount = (): UnreadCountState => {
     };
   }, [refresh]);
 
-  return { unreadCount, refresh };
+  return { unreadCount, isLoading, error, refresh };
 };
 
 export default useUnreadCount;
