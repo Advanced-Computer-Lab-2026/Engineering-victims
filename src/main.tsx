@@ -35,6 +35,7 @@ import ExitExamRequestsPage from './pages/ExitExamRequestsPage';
 import SemesterStandingsPage from './pages/SemesterStandingsPage';
 import ExtraHoursRequestsPage from './pages/ExtraHoursRequestsPage';
 import MyExtraHoursRequestsPage from './pages/MyExtraHoursRequestsPage';
+import InstallmentBillingPage from './pages/InstallmentBillingPage';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -43,6 +44,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route element={<ProtectedRoute roles={['Student', 'Coordinator', 'Administrator']}><AppLayout /></ProtectedRoute>}>
+          <Route path="/billing" element={<InstallmentBillingPage />} />
+        </Route>
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 

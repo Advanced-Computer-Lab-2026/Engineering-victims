@@ -127,4 +127,4 @@ async function confirmCheckout(paymentId, studentId = null, verifiedSessionId = 
     return { message: 'Your payment was refunded because eligibility or slot availability changed. No extra hours were activated.' };
   }
 }
-module.exports = { payWallet, startCheckout, confirmCheckout, stripeClient, atomic };
+module.exports = { payWallet, startCheckout, confirmCheckout, stripeClient, atomic, owned, payable, lockStudent };

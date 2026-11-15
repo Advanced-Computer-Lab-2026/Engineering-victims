@@ -50,6 +50,8 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  { to: '/billing', label: 'Installment Billing', labels: { Student: 'My Installments' }, icon: Wallet,
+    roles: ['Student', 'Coordinator', 'Administrator'], description: 'University installments, charges and recorded payments.' },
   {
     to: '/my-extra-hours-requests', label: 'My Extra-hours Requests', icon: ClipboardList,
     roles: ['Student'], studentTypes: ['Advising Student'], description: 'View approved extra-hours requests and itemized costs.',

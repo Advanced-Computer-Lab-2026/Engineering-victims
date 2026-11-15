@@ -13,6 +13,8 @@ const Wallet = require('../models/Wallet'), Ledger = require('../models/WalletTr
 require('../models/GraduationPlan'); require('../models/ExitExamRequest'); require('../models/CourseRecord');
 const { prepareExtraHoursRequest } = require('../services/extraHoursService');
 const app = express(); app.use(express.json()); app.use('/api/extra-hours', require('../routes/extraHoursRoutes'));
+app.use('/api/billing', require('../routes/installmentBillingRoutes'));
+const Installment = require('../models/UniversityInstallment'), Deferred = require('../models/DeferredExtraHoursCharge'), BillingLedger = require('../models/InstallmentLedgerEntry');
 let repl, student, user, advisor, term, request, token, extraSlot, stripe, checkout;
 const walletUrl = () => `/api/extra-hours/mine/${request._id}/pay-wallet`;
 const checkoutUrl = () => `/api/extra-hours/mine/${request._id}/stripe-checkout`;
@@ -168,4 +170,122 @@ test('standalone database blocks payment before any financial mutation', async (
   jest.spyOn(mongoose.connection.db, 'admin').mockReturnValue({ command: async () => ({ isWritablePrimary: true }) });
   expect((await http(app).post(walletUrl()).set('Authorization', token).send({})).status).toBe(503);
   expect(await Ledger.countDocuments()).toBe(0); expect((await Wallet.findOne({ student: student._id })).balance).toBe(3000);
+});
+async function setupBilling() {
+  const coordinator = await User.create({ fullName: 'Coordinator', email: 'billing@guc.edu.eg', password: 'test', role: 'Coordinator' });
+  const staffToken = `Bearer ${jwt.sign({ userId: String(coordinator._id), role: 'Coordinator' }, process.env.JWT_SECRET)}`;
+  const entries = [30, 60].map((days, index) => ({ label: `Installment ${index + 1}`, dueDate: new Date(Date.now() + days * 86400000).toISOString().slice(0, 10), baseAmount: index === 0 ? 20000 : 10000 }));
+  const plan = await http(app).post('/api/billing/plans').set('Authorization', staffToken).send({ name: 'Official tuition plan', academicYear: '2026/2027', entries });
+  expect(plan.status).toBe(201);
+  const assigned = await http(app).post('/api/billing/assign').set('Authorization', staffToken).send({ studentId: String(student._id), planId: plan.body.id });
+  expect(assigned.status).toBe(200);
+  const rows = await http(app).get('/api/billing/installments').set('Authorization', token);
+  expect(rows.status).toBe(200);
+  return { staffToken, coordinator, planId: plan.body.id, installments: rows.body.installments };
+}
+async function deferralPreview() {
+  await http(app).post(`/api/extra-hours/mine/${request._id}/preference`).set('Authorization', token).send({ preference: 'Next Installment', version: 0 });
+  const result = await http(app).get(`/api/extra-hours/mine/${request._id}/next-installment`).set('Authorization', token);
+  expect(result.status).toBe(200);
+  return { installmentId: result.body.installment.id, version: result.body.version };
+}
+const deferUrl = () => `/api/extra-hours/mine/${request._id}/defer`;
+test('billing assignment snapshots tuition and repeating it never duplicates installments', async () => {
+  const fixture = await setupBilling();
+  expect(fixture.installments.map((item) => item.baseAmount)).toEqual([20000, 10000]);
+  const repeated = await http(app).post('/api/billing/assign').set('Authorization', fixture.staffToken).send({ studentId: String(student._id), planId: fixture.planId });
+  expect(repeated.status).toBe(200); expect(await Installment.countDocuments()).toBe(2);
+  const another = await http(app).post('/api/billing/plans').set('Authorization', fixture.staffToken).send({ name: 'Other plan', academicYear: '2026/2027', entries: [{ label: 'Other', dueDate: '2099-01-01', baseAmount: 5 }] });
+  expect((await http(app).post('/api/billing/assign').set('Authorization', fixture.staffToken).send({ studentId: String(student._id), planId: another.body.id })).status).toBe(409);
+});
+test('billing adjustments and external payments derive partial/paid balances with idempotent history', async () => {
+  const { randomUUID } = require('crypto'); const fixture = await setupBilling(), id = fixture.installments[0].id;
+  const add = (body) => http(app).post(`/api/billing/installments/${id}/entries`).set('Authorization', fixture.staffToken).send(body);
+  expect((await add({ kind: 'Adjustment', amount: -500, reason: 'Approved tuition discount', submissionKey: randomUUID() })).status).toBe(200);
+  const body = { kind: 'Payment', amount: 1000, reason: 'Bank payment verified', externalReference: 'BANK-001', submissionKey: randomUUID() };
+  expect((await add(body)).status).toBe(200); expect((await add(body)).status).toBe(200);
+  let result = await http(app).get('/api/billing/installments').set('Authorization', token);
+  expect(result.body.installments[0]).toMatchObject({ total: 19500, paid: 1000, amountDue: 18500, status: 'Partially Paid' });
+  expect(await BillingLedger.countDocuments()).toBe(2);
+  expect((await add({ ...body, submissionKey: randomUUID() })).status).toBe(409);
+  expect((await add({ ...body, amount: 19000, externalReference: 'BANK-002', submissionKey: randomUUID() })).status).toBe(422);
+  expect((await add({ ...body, amount: 18500, externalReference: 'BANK-003', submissionKey: randomUUID() })).status).toBe(200);
+  result = await http(app).get('/api/billing/installments').set('Authorization', token);
+  expect(result.body.installments[0]).toMatchObject({ amountDue: 0, status: 'Paid' });
+  expect((await Wallet.findOne({ student: student._id })).balance).toBe(3000); expect(await Ledger.countDocuments()).toBe(0);
+});
+test('student billing actions and ownership overrides are blocked', async () => {
+  await setupBilling();
+  expect((await http(app).get(`/api/billing/installments?studentId=${student._id}`).set('Authorization', token)).status).toBe(400);
+  expect((await http(app).get('/api/billing/plans').set('Authorization', token)).status).toBe(403);
+  expect((await http(app).post('/api/billing/assign').set('Authorization', token).send({ studentId: String(student._id), planId: String(term._id) })).status).toBe(403);
+  expect((await http(app).get('/api/billing/installments')).status).toBe(401);
+});
+test('stale staff tokens cannot manage billing', async () => {
+  const fixture = await setupBilling(); await User.updateOne({ _id: fixture.coordinator._id }, { $set: { isActive: false } });
+  expect((await http(app).get('/api/billing/plans').set('Authorization', fixture.staffToken)).status).toBe(403);
+});
+test('FR92 confirmation links a real installment and activates once without wallet/gateway payment', async () => {
+  const fixture = await setupBilling(), body = await deferralPreview();
+  expect(body.installmentId).toBe(fixture.installments[0].id);
+  const results = await Promise.all([1, 2].map(() => http(app).post(deferUrl()).set('Authorization', token).send(body)));
+  expect(results.map((result) => result.status)).toEqual([200, 200]);
+  expect(await Deferred.countDocuments()).toBe(1); const charge = await Deferred.findOne({});
+  expect(String(charge.installment)).toBe(body.installmentId); expect(charge.amount).toBe(2400); expect(charge.status).toBe('Outstanding');
+  const saved = await Request.findById(request._id); expect(saved.settlementStatus).toBe('Deferred to Next Installment'); expect(saved.activatedHours).toBe(3);
+  expect(await Schedule.countDocuments({ slotId: extraSlot._id, status: 'Active' })).toBe(1);
+  expect((await Wallet.findOne({ student: student._id })).balance).toBe(3000); expect(await Payment.countDocuments()).toBe(0); expect(await Ledger.countDocuments()).toBe(0);
+  expect(stripe.checkout.sessions.create).not.toHaveBeenCalled();
+  const billing = await http(app).get('/api/billing/installments').set('Authorization', token);
+  expect(billing.body.installments[0]).toMatchObject({ baseAmount: 20000, deferredAmount: 2400, total: 22400, paid: 0, amountDue: 22400 });
+  const list = await http(app).get('/api/extra-hours/mine').set('Authorization', token);
+  expect(list.body.requests[0].deferredCharge.reference).toBe(charge.reference);
+});
+test('FR92 missing installment blocks confirmation without guessing a date', async () => {
+  const result = await http(app).get(`/api/extra-hours/mine/${request._id}/next-installment`).set('Authorization', token);
+  expect(result.status).toBe(409); expect(await Deferred.countDocuments()).toBe(0); expect(await Schedule.countDocuments()).toBe(3);
+});
+test('FR92 stale installment selection and client-supplied amount are rejected', async () => {
+  const fixture = await setupBilling(), body = await deferralPreview();
+  expect((await http(app).post(deferUrl()).set('Authorization', token).send({ ...body, installmentId: fixture.installments[1].id })).status).toBe(409);
+  expect((await http(app).post(deferUrl()).set('Authorization', token).send({ ...body, amount: 1 })).status).toBe(400);
+  expect(await Deferred.countDocuments()).toBe(0);
+});
+test('FR92 activation failure rolls back charge, request and installment together', async () => {
+  await setupBilling(); const body = await deferralPreview();
+  const before = await Installment.findById(body.installmentId).lean();
+  jest.spyOn(Schedule, 'create').mockRejectedValueOnce(new Error('activation failure'));
+  expect((await http(app).post(deferUrl()).set('Authorization', token).send(body)).status).toBe(500);
+  expect(await Deferred.countDocuments()).toBe(0); expect((await Request.findById(request._id)).settlementStatus).toBe('Awaiting Payment Choice');
+  expect((await Installment.findById(body.installmentId)).__v).toBe(before.__v); expect((await Slot.findById(extraSlot._id)).assignedCount).toBe(0);
+});
+test('FR92 wallet payment racing deferral never creates two settlement methods', async () => {
+  await setupBilling(); const body = await deferralPreview();
+  const results = await Promise.all([http(app).post(deferUrl()).set('Authorization', token).send(body), http(app).post(walletUrl()).set('Authorization', token).send({})]);
+  expect(results.map((result) => result.status).sort()).toEqual([200, 409]);
+  expect(await Deferred.countDocuments() + await Payment.countDocuments()).toBe(1);
+  expect(await Schedule.countDocuments({ slotId: extraSlot._id })).toBe(1);
+});
+test('billing supports Normal Students and isolates their installments from other students', async () => {
+  const fixture = await setupBilling();
+  const normal = await Student.create({ fullName: 'Normal Student', email: 'normal@student.guc.edu.eg', studentId: '64-99994', studentType: 'Normal Student', workflowStatus: 'Schedule Assigned' });
+  const normalUser = await User.create({ fullName: normal.fullName, email: normal.email, password: 'test', role: 'Student' });
+  const normalToken = `Bearer ${jwt.sign({ userId: String(normalUser._id), role: 'Student' }, process.env.JWT_SECRET)}`;
+  let result = await http(app).get('/api/billing/installments').set('Authorization', normalToken); expect(result.body.installments).toEqual([]);
+  expect((await http(app).post('/api/billing/assign').set('Authorization', fixture.staffToken).send({ studentId: String(normal._id), planId: fixture.planId })).status).toBe(200);
+  result = await http(app).get('/api/billing/installments').set('Authorization', normalToken); expect(result.body.installments).toHaveLength(2);
+  expect(result.body.installments[0].id).not.toBe(fixture.installments[0].id);
+});
+test('FR92 skips overdue and fully paid installments when identifying the next installment', async () => {
+  const fixture = await setupBilling();
+  await Installment.updateOne({ _id: fixture.installments[0].id }, { $set: { dueDate: new Date(Date.now() - 86400000) } });
+  let preview = await http(app).get(`/api/extra-hours/mine/${request._id}/next-installment`).set('Authorization', token);
+  expect(preview.body.installment.id).toBe(fixture.installments[1].id);
+  await Installment.updateOne({ _id: fixture.installments[1].id }, { $set: { status: 'Paid' } });
+  preview = await http(app).get(`/api/extra-hours/mine/${request._id}/next-installment`).set('Authorization', token); expect(preview.status).toBe(409);
+});
+test.each([0.001, 0.00000000001, 12.345])('billing rejects non-currency amount %s', async (amount) => {
+  const fixture = await setupBilling();
+  const result = await http(app).post(`/api/billing/installments/${fixture.installments[0].id}/entries`).set('Authorization', fixture.staffToken).send({ kind: 'Payment', amount, reason: 'Test', externalReference: 'BAD-AMOUNT', submissionKey: require('crypto').randomUUID() });
+  expect(result.status).toBe(400); expect(await BillingLedger.countDocuments()).toBe(0);
 });

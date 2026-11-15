@@ -37,6 +37,7 @@ const schema = new mongoose.Schema({
   settlementPreferenceAt: { type: Date, default: null },
   gatewayAttempt: { type: mongoose.Schema.Types.ObjectId, ref: 'ExtraHoursPayment', default: null },
   paymentReference: { type: String, default: null },
+  deferredCharge: { type: mongoose.Schema.Types.ObjectId, ref: 'DeferredExtraHoursCharge', default: null },
   activatedAt: { type: Date, default: null },
   activatedHours: { type: Number, default: 0, min: 0, max: 34 },
   settlementStatus: { type: String, enum: ['Not Applicable', 'Awaiting Payment Choice', 'Paid', 'Deferred to Next Installment', 'Failed', 'Cancelled', 'Refunded'], default: 'Not Applicable' },

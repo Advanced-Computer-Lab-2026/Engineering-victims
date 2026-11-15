@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const Request = require('../models/ExtraHoursRequest');
 const { payWallet, startCheckout, confirmCheckout } = require('../services/extraHoursPaymentService');
+const { previewDeferral, confirmDeferral, serializeCharge } = require('../services/extraHoursDeferralService');
 
 router.use(authenticate, requireRole('Student'));
 router.use(async (req, res, next) => {
@@ -27,7 +28,8 @@ router.get('/', async (req, res) => {
     const { page } = parsed.data, limit = 20;
     const filter = { student: student._id, decision: 'Approved' };
     const [rows, total] = await Promise.all([
-      Request.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).populate('term', 'academicYear season').lean(),
+      Request.find(filter).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).populate('term', 'academicYear season')
+        .populate({ path: 'deferredCharge', match: { student: student._id }, select: 'reference amount currency status confirmedAt installment installmentReference installmentLabel dueDate' }).lean(),
       Request.countDocuments(filter),
     ]);
     res.set('Cache-Control', 'no-store');
@@ -36,6 +38,7 @@ router.get('/', async (req, res) => {
       decision: row.decision, decidedAt: row.decidedAt, settlementStatus: row.settlementStatus,
       settlementPreference: row.settlementPreference ?? null,
       gatewayAttempt: row.gatewayAttempt ?? null, paymentReference: row.paymentReference ?? null, activatedAt: row.activatedAt ?? null, activatedHours: row.activatedHours ?? 0,
+      deferredCharge: row.deferredCharge?.reference ? serializeCharge(row.deferredCharge) : null,
       requestedHours: row.requestedHours, totalCost: row.totalCost, currency: row.currency,
       items: row.items.map((item) => ({ courseId: item.course, code: item.code, name: item.name,
         creditHours: item.creditHours, requestedHours: item.requestedHours, classification: item.classification,
@@ -74,4 +77,15 @@ const paymentAction = (action) => async (req, res) => {
 router.post('/:id/pay-wallet', paymentAction(payWallet));
 router.post('/:id/stripe-checkout', paymentAction(startCheckout));
 router.post('/payments/:id/confirm', paymentAction((id, studentId) => confirmCheckout(id, studentId)));
+router.get('/:id/next-installment', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid extra-hours request ID.' });
+  try { res.json(await previewDeferral(req.params.id, req.extraHoursStudent._id)); }
+  catch (error) { res.status(error.status || 500).json({ message: error.status ? error.message : 'Could not load the next installment.' }); }
+});
+router.post('/:id/defer', async (req, res) => {
+  const parsed = z.object({ installmentId: z.string().regex(/^[a-fA-F0-9]{24}$/), version: z.number().int().min(0) }).strict().safeParse(req.body);
+  if (!mongoose.isValidObjectId(req.params.id) || !parsed.success) return res.status(400).json({ message: 'Review a valid installment and request version before confirming.' });
+  try { res.json(await confirmDeferral(req.params.id, req.extraHoursStudent._id, req.user.userId, parsed.data)); }
+  catch (error) { res.status(error.status || 500).json({ message: error.status ? error.message : 'Could not confirm deferral. Refresh and check its status before retrying.' }); }
+});
 module.exports = router;

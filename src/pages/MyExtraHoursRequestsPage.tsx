@@ -7,7 +7,7 @@ import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { fetchMyWallet } from '../lib/walletService';
-import { fetchMyExtraHoursRequests, saveExtraHoursPreference, payExtraHoursWallet, openExtraHoursCheckout, confirmExtraHoursCheckout, type SettlementPreference, type StudentExtraHoursRequest } from '../lib/extraHoursReviewService';
+import { fetchMyExtraHoursRequests, saveExtraHoursPreference, payExtraHoursWallet, openExtraHoursCheckout, confirmExtraHoursCheckout, previewExtraHoursDeferral, confirmExtraHoursDeferral, type DeferralPreview, type SettlementPreference, type StudentExtraHoursRequest } from '../lib/extraHoursReviewService';
 
 const money = (value: number) => `EGP ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const PayNow: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void }> = ({ request, onSaved }) => {
@@ -63,6 +63,17 @@ const PayNow: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void 
       </>} />
   </div>;
 };
+const DeferCharge: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void }> = ({ request, onSaved }) => {
+  const [preview, setPreview] = useState<DeferralPreview | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
+  return <div className="space-y-3">
+    <p className="text-sm text-slate-300">Add the approved amount to your next assigned university installment. It remains an outstanding charge; no wallet or card payment is taken.</p>
+    {error && <AlertBanner tone="error">{error}</AlertBanner>}
+    <CustomButton type="button" size="sm" disabled={busy || Boolean(request.gatewayAttempt)} onClick={() => { setBusy(true); setError(null); void previewExtraHoursDeferral(request.id).then(setPreview).catch((error) => setError(error instanceof Error ? error.message : 'Could not load installment.')).finally(() => setBusy(false)); }}>Review installment deferral</CustomButton>
+    <ConfirmDialog open={Boolean(preview)} title="Confirm installment deferral" tone="warning" confirmLabel="Confirm deferral" isLoading={busy} onCancel={() => { if (!busy) setPreview(null); }}
+      message={<>Request: {request.reference}<br />Add {money(preview?.amount ?? 0)} to {preview?.installment.label}.<br />Installment reference: {preview?.installment.reference}<br />Due: {preview ? new Date(preview.installment.dueDate).toLocaleDateString() : ''}<br />This creates an outstanding charge and immediately activates your approved hours and courses. It is not a paid receipt. No wallet or card will be charged.</>}
+      onConfirm={() => { if (!preview || busy) return; setBusy(true); setError(null); void confirmExtraHoursDeferral(request.id, preview.installment.id, preview.version).then(() => { setPreview(null); onSaved(); }).catch((error) => { setError(error instanceof Error ? error.message : 'Could not confirm deferral.'); setPreview(null); }).finally(() => setBusy(false)); }} />
+  </div>;
+};
 const SettlementChoice: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void }> = ({ request, onSaved }) => {
   const [choice, setChoice] = useState<SettlementPreference | ''>(request.settlementPreference ?? '');
   const [saving, setSaving] = useState(false), [error, setError] = useState<string | null>(null);
@@ -80,12 +91,13 @@ const SettlementChoice: React.FC<{ request: StudentExtraHoursRequest; onSaved: (
       <label className="flex gap-2 text-sm text-slate-300"><input type="radio" name={`choice-${request.id}`} value="Pay Now" checked={choice === 'Pay Now'} onChange={() => setChoice('Pay Now')} />Pay now</label>
       <label className="flex gap-2 text-sm text-slate-300"><input type="radio" name={`choice-${request.id}`} value="Next Installment" checked={choice === 'Next Installment'} onChange={() => setChoice('Next Installment')} />Add to my next university installment</label>
     </fieldset>
-    <p className="text-xs text-slate-400">Saving a preference does not settle this request. Pay now below after saving that preference. Installment confirmation is not available yet.</p>
+    <p className="text-xs text-slate-400">Saving a preference does not settle this request. Review and confirm the selected option below.</p>
     {request.settlementPreference && <p className="text-sm text-slate-300">Saved preference: {request.settlementPreference}</p>}
     {error && <AlertBanner tone="error">{error} Refresh the page before retrying.</AlertBanner>}
     {saved && <AlertBanner tone="success">{saved}</AlertBanner>}
     <CustomButton type="submit" size="sm" disabled={saving || Boolean(request.gatewayAttempt) || !choice || choice === request.settlementPreference}>{saving ? 'Saving…' : 'Save preference'}</CustomButton>
     {request.settlementPreference === 'Pay Now' && <PayNow request={request} onSaved={onSaved} />}
+    {request.settlementPreference === 'Next Installment' && <DeferCharge request={request} onSaved={onSaved} />}
   </form>;
 };
 const MyExtraHoursRequestsPage: React.FC = () => {
@@ -128,6 +140,7 @@ const MyExtraHoursRequestsPage: React.FC = () => {
           <p className="text-sm text-slate-300">{row.term} · {row.decision} · {row.settlementStatus}</p>
           <p className="text-xs text-slate-400">Approved: {row.decidedAt ? new Date(row.decidedAt).toLocaleString() : 'Not recorded'}</p>
           {row.paymentReference && <p className="text-sm text-emerald-300">Payment reference: {row.paymentReference}</p>}
+          {row.deferredCharge && <div className="space-y-1 text-sm text-slate-300"><p className="font-semibold text-amber-300">Deferred charge — {row.deferredCharge.status}; not a paid receipt</p><p className="break-all">{row.deferredCharge.reference} · {money(row.deferredCharge.amount)}</p><p>{row.deferredCharge.installment.label} · Due {new Date(row.deferredCharge.installment.dueDate).toLocaleDateString()}</p></div>}
           {row.activatedAt && <p className="text-sm text-emerald-300">{row.activatedHours} extra hours and requested courses activated {new Date(row.activatedAt).toLocaleString()}</p>}
           <div className="overflow-x-auto"><table className="w-full min-w-[40rem] text-left text-sm text-slate-300"><caption className="sr-only">Courses and itemized costs for {row.reference}</caption>
             <thead><tr>{['Course', 'Course credit hours', 'Requested extra hours', 'Type', 'Price per hour', 'Subtotal'].map((label) => <th key={label} className="p-2">{label}</th>)}</tr></thead>

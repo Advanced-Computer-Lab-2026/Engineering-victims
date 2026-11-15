@@ -76,6 +76,7 @@ app.use("/api/mandatory-removal-requests", mandatoryRemovalRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/semester-standings", semesterStandingRoutes);
 app.use("/api/extra-hours", extraHoursRoutes);
+app.use('/api/billing', require('./routes/installmentBillingRoutes'));
 app.use("/api/swaps", swapRequestRoutes);
 app.use("/api/coordinator", coordinatorDashboardRoutes);
 app.use("/api/schedule-history", scheduleActivityRoutes);

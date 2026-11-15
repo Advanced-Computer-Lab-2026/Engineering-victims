@@ -24,7 +24,12 @@ export const decideExtraHoursRequest = (id: string, decision: 'Approved' | 'Reje
   method: 'POST', body: JSON.stringify({ decision, responseNote }),
 });
 export type SettlementPreference = 'Pay Now' | 'Next Installment';
-export type StudentExtraHoursRequest = Pick<ExtraHoursDetail, 'id' | 'reference' | 'decision' | 'decidedAt' | 'settlementStatus' | 'requestedHours' | 'totalCost' | 'currency' | 'items'> & { term: string; version: number; settlementPreference: SettlementPreference | null; gatewayAttempt: string | null; paymentReference: string | null; activatedAt: string | null; activatedHours: number };
+export interface InstallmentSummary { id: string; reference: string; label: string; dueDate: string }
+export interface DeferredCharge { reference: string; amount: number; currency: string; status: string; confirmedAt: string; installment: InstallmentSummary }
+export interface DeferralPreview { version: number; amount: number; currency: string; installment: InstallmentSummary }
+export const previewExtraHoursDeferral = (id: string) => apiFetch<DeferralPreview>(`/api/extra-hours/mine/${id}/next-installment`);
+export const confirmExtraHoursDeferral = (id: string, installmentId: string, version: number) => apiFetch<{ message: string; charge: DeferredCharge }>(`/api/extra-hours/mine/${id}/defer`, { method: 'POST', body: JSON.stringify({ installmentId, version }) });
+export type StudentExtraHoursRequest = Pick<ExtraHoursDetail, 'id' | 'reference' | 'decision' | 'decidedAt' | 'settlementStatus' | 'requestedHours' | 'totalCost' | 'currency' | 'items'> & { term: string; version: number; settlementPreference: SettlementPreference | null; gatewayAttempt: string | null; paymentReference: string | null; activatedAt: string | null; activatedHours: number; deferredCharge: DeferredCharge | null };
 export const payExtraHoursWallet = (id: string) => apiFetch<{ message: string }>(`/api/extra-hours/mine/${id}/pay-wallet`, { method: 'POST', body: '{}' });
 export const openExtraHoursCheckout = (id: string) => apiFetch<{ url: string | null; paymentId: string }>(`/api/extra-hours/mine/${id}/stripe-checkout`, { method: 'POST', body: '{}' });
 export const confirmExtraHoursCheckout = (id: string) => apiFetch<{ message: string }>(`/api/extra-hours/mine/payments/${id}/confirm`, { method: 'POST', body: '{}' });

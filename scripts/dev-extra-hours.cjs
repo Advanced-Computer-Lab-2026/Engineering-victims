@@ -48,6 +48,7 @@ async function main() {
   console.log('Wallet: wallet.extra-hours@student.guc.edu.eg — EGP 3000; request EGP 2400.');
   console.log('Stripe: stripe.extra-hours@student.guc.edu.eg — separate approved request.');
   console.log('Insufficient: insufficient.extra-hours@student.guc.edu.eg — EGP 100; payment must be blocked.');
+  console.log('Deferral: deferred.extra-hours@student.guc.edu.eg — approved EGP 2400 request and assigned tuition installments.');
   console.log('Coordinator: coordinator.extra-hours@guc.edu.eg; Advisor: advisor.extra-hours@guc.edu.eg.');
   console.log(`Stripe test key: ${testKey ? 'configured' : 'not configured; wallet testing still works'}.`);
   console.log(`Forward Stripe events to http://localhost:${apiPort}/api/payments/stripe/webhook.`);
