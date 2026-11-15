@@ -234,7 +234,10 @@ const withId = (doc) => ({ ...doc, id: String(doc._id) });
 exports.getOfferings = async (req, res) => {
   try {
     const { termId } = req.query;
-    const filter = termId ? { termId } : {};
+    const filter = {
+      ...(termId ? { termId } : {}),
+      ...(req.user.role === 'Advisor' ? { publicationStatus: 'Published' } : {}),
+    };
 
     const offerings = await CourseOffering.find(filter)
       .populate('courseId', 'code name')
@@ -255,6 +258,9 @@ exports.getOfferingDetails = async (req, res) => {
       .lean();
 
     if (!offering) {
+      return res.status(404).json({ message: 'Offering not found' });
+    }
+    if (req.user.role === 'Advisor' && offering.publicationStatus !== 'Published') {
       return res.status(404).json({ message: 'Offering not found' });
     }
 

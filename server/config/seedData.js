@@ -215,13 +215,15 @@ const OFFERINGS = [
   { term: SPRING, code: 'ELCT 201', publicationStatus: 'Published' },
   { term: SPRING, code: 'MATH 401', publicationStatus: 'Published' },
   { term: SPRING, code: 'CSEN 604', publicationStatus: 'Published' },
-  { term: SPRING, code: 'CSEN 403', publicationStatus: 'Draft' },
+  { term: SPRING, code: 'CSEN 403', publicationStatus: 'Published' },
   { term: SPRING, code: 'CSIS 402', publicationStatus: 'Draft' },
-  { term: SPRING, code: 'ELCT 401', publicationStatus: 'Draft' },
-  { term: SPRING, code: 'CSEN 602', publicationStatus: 'Draft' },
+  { term: SPRING, code: 'ELCT 401', publicationStatus: 'Published' },
+  { term: SPRING, code: 'CSEN 602', publicationStatus: 'Published' },
   { term: SPRING, code: 'DMET 603', publicationStatus: 'Draft' },
-  { term: SPRING, code: 'DMET 601', publicationStatus: 'Draft' },
-  { term: SPRING, code: 'CSEN 907', publicationStatus: 'Draft' },
+  { term: SPRING, code: 'DMET 601', publicationStatus: 'Published' },
+  // The elective the semester-8 students can still add: their progression
+  // reaches 9 in this term, and an elective is never an unattended course.
+  { term: SPRING, code: 'CSEN 907', publicationStatus: 'Published' },
 
   // Closed term, so the term selector is not a choice between "now" and "empty".
   { term: PAST_SPRING, code: 'MATH 203', publicationStatus: 'Published' },
@@ -278,7 +280,10 @@ const SLOT_TYPES = [
  * eligibleMajors stays the course's own majors; the seeded roster only contains
  * the two majors the catalogue serves, so there is no gap to paper over there.
  */
-const ALL_SEMESTERS = ['1', '2', '3', '4', '5', '6', '7', '8'];
+// The semesters an offering is open to. The catalogue runs to semester 10, and
+// a student one term past semester 8 progresses to 9, so anything shorter
+// silently locks the semester-8 students out of every offering.
+const ALL_SEMESTERS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10'];
 
 /**
  * Per-status notifications. One unread row so the badge and "mark as read" have
@@ -737,7 +742,7 @@ const seed = async () => {
   // Req 89: wallet history for the Advising Students.
   const walletTransactions = await seedWallets(students);
   // Req 54: completed (graded) and current courses for the Advising Students.
-  const courseRecords = await seedAcademicHistory({ students, courses });
+  const courseRecords = await seedAcademicHistory({ students, courses, offerings });
   const graduationPlans = await seedGraduationPlans({ students, users: created });
   const slotChangeRequests = await seedSlotChangeRequests({ students, terms, courses });
   const exitExamRequests = await seedExitExamRequests({ students, users: created });

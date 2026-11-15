@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarDays,
+  FilePen,
   GraduationCap,
   ListFilter,
   Loader2,
@@ -433,6 +434,14 @@ const AdvisingStudentTableRow: React.FC<RowProps> = ({ student, onOpen }) => {
           icon={<CalendarDays className="h-4 w-4" aria-hidden />}
         >
           Schedule
+        </CustomButton>
+        <CustomButton
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate(`/advising-schedules/${student.id}/draft`)}
+          icon={<FilePen className="h-4 w-4" aria-hidden />}
+        >
+          Draft
         </CustomButton>
       </td>
     </tr>
