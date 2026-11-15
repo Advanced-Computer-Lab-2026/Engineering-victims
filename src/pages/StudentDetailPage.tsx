@@ -8,6 +8,7 @@ import {
   CircleAlert,
   GraduationCap,
   Hash,
+  Hourglass,
   Loader2,
   Mail,
   ScrollText,
@@ -15,9 +16,10 @@ import {
   UserRound,
 } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
-import { formatDate, formatRelative } from '../lib/studentsService';
+import { formatDate, formatRelative, pendingRequestFor } from '../lib/studentsService';
 import type { StudentDetailResponse } from '../lib/types';
 import { useSession } from '../hooks/useSession';
+import { usePageTitle } from '../hooks/usePageTitle';
 import StudentScheduleHistorySection from '../components/StudentScheduleHistorySection';
 import AdvisingOverviewPanel from '../components/AdvisingOverviewPanel';
 import PageHeader from '../components/PageHeader';
@@ -72,6 +74,9 @@ const StudentDetailPage: React.FC = () => {
   const [selectedAdvisorId, setSelectedAdvisorId] = useState<string>('');
   const [isSavingAdvisor, setIsSavingAdvisor] = useState(false);
   const [advisorError, setAdvisorError] = useState<string | null>(null);
+
+  // The record's own name reads better in the tab than the directory label.
+  usePageTitle(data?.student.fullName ?? 'Student details');
 
   const canManage = role === 'Administrator';
   const canAssignAdvisor =
@@ -186,6 +191,8 @@ const StudentDetailPage: React.FC = () => {
 
   const student = data?.student;
   const isAdvisingStudent = student?.studentType === 'Advising Student';
+  const isMyStudent = role === 'Advisor' && student?.assignedAdvisor?.id === user?.id;
+  const pendingRequest = student ? pendingRequestFor(student.workflowStatus) : 'None';
 
   return (
     <>
@@ -227,6 +234,16 @@ const StudentDetailPage: React.FC = () => {
                   Academic history
                 </CustomButton>
               )}
+              {isAdvisingStudent && role === 'Advisor' && (
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(`/graduation-plans?studentId=${student.id}`)}
+                  icon={<GraduationCap className="h-4 w-4" aria-hidden />}
+                >
+                  Graduation plan
+                </CustomButton>
+              )}
             </div>
           ) : undefined
         }
@@ -262,6 +279,7 @@ const StudentDetailPage: React.FC = () => {
                   <Badge tone={STANDING_TONE[student.academicStanding] ?? 'neutral'}>
                     {student.academicStanding}
                   </Badge>
+                  {isMyStudent && <Badge tone="indigo">Your student</Badge>}
                 </div>
 
                 <h2 className="mt-5 text-h3 font-bold text-on-surface">Academic</h2>
@@ -375,6 +393,13 @@ const StudentDetailPage: React.FC = () => {
                     <Badge tone="indigo" dot>
                       {student.workflowStatus}
                     </Badge>
+                  </DetailRow>
+                  <DetailRow icon={<Hourglass className="h-4 w-4" />} label="Pending request">
+                    {pendingRequest === 'None' ? (
+                      <span className="text-on-surface-variant">None</span>
+                    ) : (
+                      <Badge tone="amber">{pendingRequest}</Badge>
+                    )}
                   </DetailRow>
                   <DetailRow icon={<CircleAlert className="h-4 w-4" />} label="Blocking step">
                     {student.blockingStep ?? <span className="text-on-surface-variant">None</span>}

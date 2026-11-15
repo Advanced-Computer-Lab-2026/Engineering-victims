@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   Eye,
@@ -10,7 +11,6 @@ import {
   UserCog,
   Users,
 } from 'lucide-react';
-import { useSession } from '../hooks/useSession';
 import { ApiError } from '../lib/api';
 import {
   getPendingWorkDashboard,
@@ -18,7 +18,6 @@ import {
   type PendingWorkStudent,
 } from '../lib/coordinatorDashboardService';
 import PageHeader from '../components/PageHeader';
-import StudentDetailDrawer from '../components/StudentDetailDrawer';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -50,10 +49,9 @@ const STATE_TONE: Record<string, BadgeTone> = {
  * overwritten by an Advisor.
  */
 const PendingWorkDashboardPage: React.FC = () => {
-  const { user } = useSession();
+  const navigate = useNavigate();
   const [data, setData] = useState<PendingWorkDashboardResponse | null>(null);
   const [grouping, setGrouping] = useState<GroupingMode>('studentType');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +126,7 @@ const PendingWorkDashboardPage: React.FC = () => {
                 <CustomButton
                   variant="ghost"
                   size="sm"
-                  onClick={() => setSelectedStudentId(st.id)}
+                  onClick={() => navigate(`/students/${st.id}`)}
                   icon={<Eye className="h-4 w-4" aria-hidden />}
                 >
                   Open
@@ -343,7 +341,7 @@ const PendingWorkDashboardPage: React.FC = () => {
                               <CustomButton
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => setSelectedStudentId(item.studentObjectId)}
+                                onClick={() => navigate(`/students/${item.studentObjectId}`)}
                               >
                                 Inspect
                               </CustomButton>
@@ -390,13 +388,6 @@ const PendingWorkDashboardPage: React.FC = () => {
           )}
         </div>
       ) : null}
-
-      <StudentDetailDrawer
-        studentId={selectedStudentId}
-        role={user?.role ?? null}
-        onClose={() => setSelectedStudentId(null)}
-        onStatusChange={() => loadDashboard(true)}
-      />
     </>
   );
 };

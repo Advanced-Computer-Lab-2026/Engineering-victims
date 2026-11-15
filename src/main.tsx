@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import StudentsPage from './pages/StudentsPage';
+import StudentDetailPage from './pages/StudentDetailPage';
 import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
@@ -60,6 +61,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/students" element={<StudentsPage />} />
+          {/* Req 9, 53: one student's full record. A route rather than a side
+              drawer so the academic history and advising tables fit. */}
+          <Route path="/students/:studentId" element={<StudentDetailPage />} />
         </Route>
 
         {/* Req 50: every advising student, for Advisors only. */}

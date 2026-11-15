@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, Loader2, RotateCcw, ScrollText, Search } from 'lucide-react';
-import { useSession } from '../hooks/useSession';
 import { ApiError } from '../lib/api';
 import {
   getGlobalScheduleHistory,
@@ -8,7 +8,6 @@ import {
   type ScheduleActivityEntry,
 } from '../lib/scheduleActivityService';
 import PageHeader from '../components/PageHeader';
-import StudentDetailDrawer from '../components/StudentDetailDrawer';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -29,14 +28,13 @@ import Select from '../components/ui/Select';
  *            member's name or GUC email.
  */
 const ScheduleActivityHistoryPage: React.FC = () => {
-  const { user } = useSession();
+  const navigate = useNavigate();
   const [logs, setLogs] = useState<ScheduleActivityEntry[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [actionFilter, setActionFilter] = useState<ScheduleActivityAction | ''>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,7 +228,7 @@ const ScheduleActivityHistoryPage: React.FC = () => {
                         <CustomButton
                           variant="ghost"
                           size="sm"
-                          onClick={() => setSelectedStudentId(entry.studentObjectId)}
+                          onClick={() => navigate(`/students/${entry.studentObjectId}`)}
                           icon={<Eye className="h-4 w-4" aria-hidden />}
                         >
                           Advising Details
@@ -244,13 +242,6 @@ const ScheduleActivityHistoryPage: React.FC = () => {
           </div>
         </Card>
       )}
-
-      <StudentDetailDrawer
-        studentId={selectedStudentId}
-        role={user?.role ?? null}
-        onClose={() => setSelectedStudentId(null)}
-        onStatusChange={() => loadHistory(true)}
-      />
     </>
   );
 };

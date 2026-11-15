@@ -14,7 +14,6 @@ import {
   X,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import AdvisingStudentDetailDrawer from '../components/AdvisingStudentDetailDrawer';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -54,6 +53,7 @@ const toOptions = (values: string[] | undefined) => (values ?? []).map((value) =
  * choice that narrows the list back down to them.
  */
 const AdvisingStudentsPage: React.FC = () => {
+  const navigate = useNavigate();
   const [data, setData] = useState<AdvisingStudentsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,7 +67,6 @@ const AdvisingStudentsPage: React.FC = () => {
    */
   const [filterOptions, setFilterOptions] = useState<AdvisingFilterOptions | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const isFirstLoad = useRef(true);
   /**
@@ -334,7 +333,7 @@ const AdvisingStudentsPage: React.FC = () => {
                   <AdvisingStudentTableRow
                     key={student.id}
                     student={student}
-                    onOpen={() => setSelectedId(student.id)}
+                    onOpen={() => navigate(`/students/${student.id}`)}
                   />
                 ))}
               </tbody>
@@ -343,8 +342,6 @@ const AdvisingStudentsPage: React.FC = () => {
         </Card>
       )}
 
-      {/* Req 53: the advising details of the selected student, over the list. */}
-      <AdvisingStudentDetailDrawer studentId={selectedId} onClose={() => setSelectedId(null)} />
     </>
   );
 };

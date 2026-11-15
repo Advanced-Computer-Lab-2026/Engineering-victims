@@ -34,11 +34,11 @@ const formatDateTime = (value: string) => new Date(value).toLocaleString();
 /** Req 41: the Advisor or Coordinator response, or what the student waits for. */
 const ResponseBlock: React.FC<{ item: SlotChangeRequestItem }> = ({ item }) => {
   if (item.status === 'Pending') {
-    return <p className="text-xs text-slate-400">Waiting for an Advisor or Coordinator response.</p>;
+    return <p className="text-caption text-on-surface-variant">Waiting for an Advisor or Coordinator response.</p>;
   }
   if (item.status === 'Withdrawn') {
     return (
-      <p className="text-xs text-slate-400">
+      <p className="text-caption text-on-surface-variant">
         You withdrew this request{item.withdrawnAt ? ` on ${formatDateTime(item.withdrawnAt)}` : ''}.
       </p>
     );
@@ -46,26 +46,26 @@ const ResponseBlock: React.FC<{ item: SlotChangeRequestItem }> = ({ item }) => {
 
   const { response } = item;
   return (
-    <div className="space-y-2 rounded-lg border border-slate-800 bg-slate-900/50 p-3">
-      <p className="flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+    <div className="space-y-2 rounded-lg border border-outline-variant bg-surface-container-low p-3">
+      <p className="flex flex-wrap items-center gap-1.5 text-caption text-on-surface-variant">
         <MessageSquare className="h-3.5 w-3.5" aria-hidden />
         {response?.respondedBy ? (
           <>
-            <span className="font-semibold text-slate-200">{response.respondedBy.role}</span>
+            <span className="font-semibold text-on-surface">{response.respondedBy.role}</span>
             <span>· {response.respondedBy.name}</span>
           </>
         ) : (
-          <span className="font-semibold text-slate-200">Advisor or Coordinator</span>
+          <span className="font-semibold text-on-surface">Advisor or Coordinator</span>
         )}
         {response?.respondedAt && <span>· {formatDateTime(response.respondedAt)}</span>}
       </p>
 
-      <p className="text-sm text-slate-200">
-        {response?.note ? response.note : <span className="italic text-slate-400">No response note was given.</span>}
+      <p className="text-body text-on-surface">
+        {response?.note ? response.note : <span className="italic text-on-surface-variant">No response note was given.</span>}
       </p>
 
       {item.status === 'Approved' && (
-        <p className="text-xs text-emerald-300">
+        <p className="text-caption text-success">
           {response?.replacementSlot ? (
             <>
               Replacement slot: <span className="font-semibold">{slotLabel(response.replacementSlot)}</span>
@@ -172,7 +172,7 @@ const MySlotChangeRequestsPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading your slot-change requests...
         </Card>
@@ -186,15 +186,15 @@ const MySlotChangeRequestsPage: React.FC = () => {
         )
       ) : (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+          <h2 className="text-body font-semibold uppercase tracking-eyebrow text-on-surface-variant">
             All requests ({requests.length})
           </h2>
           {requests.map((item) => (
             <Card key={item.id} tone="raised" className="space-y-3 p-4">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <span className="font-mono text-sm font-bold text-indigo-300">{item.course?.code ?? 'Course removed'}</span>
-                  {item.course && <span className="text-sm text-slate-200">{item.course.name}</span>}
+                  <span className="font-mono text-body font-bold text-primary">{item.course?.code ?? 'Course removed'}</span>
+                  {item.course && <span className="text-body text-on-surface">{item.course.name}</span>}
                   <Badge tone={SLOT_TONE[item.slotType]}>{item.slotType}</Badge>
                   <Badge tone={STATUS_TONE[item.status]} dot>
                     {item.status}
@@ -213,24 +213,24 @@ const MySlotChangeRequestsPage: React.FC = () => {
                 )}
               </div>
 
-              <p className="text-xs text-slate-400">
+              <p className="text-caption text-on-surface-variant">
                 {item.term ? `${item.term.label} · ` : ''}Submitted {formatDateTime(item.submittedAt)}
               </p>
 
-              <div className="flex flex-wrap items-center gap-2 text-sm text-slate-300">
-                <span className="text-xs uppercase tracking-wide text-slate-500">Current slot</span>
+              <div className="flex flex-wrap items-center gap-2 text-body text-on-surface-variant">
+                <span className="text-caption uppercase tracking-eyebrow text-on-surface-variant">Current slot</span>
                 <span>{slotLabel(item.currentSlot)}</span>
                 {item.status === 'Approved' && item.response?.replacementSlot && (
                   <>
-                    <ArrowRight className="h-4 w-4 text-emerald-400" aria-label="replaced by" />
-                    <span className="text-emerald-300">{slotLabel(item.response.replacementSlot)}</span>
+                    <ArrowRight className="h-4 w-4 text-success" aria-label="replaced by" />
+                    <span className="text-success">{slotLabel(item.response.replacementSlot)}</span>
                   </>
                 )}
               </div>
 
               {item.preferenceNote && (
-                <p className="text-xs text-slate-400">
-                  Your note: <span className="text-slate-300">{item.preferenceNote}</span>
+                <p className="text-caption text-on-surface-variant">
+                  Your note: <span className="text-on-surface">{item.preferenceNote}</span>
                 </p>
               )}
 
@@ -248,7 +248,7 @@ const MySlotChangeRequestsPage: React.FC = () => {
           withdrawTarget && (
             <>
               Your request to change{' '}
-              <span className="font-semibold text-slate-200">
+              <span className="font-semibold text-on-surface">
                 {withdrawTarget.course?.code ?? 'this course'} {withdrawTarget.slotType} (
                 {slotLabel(withdrawTarget.currentSlot)})
               </span>{' '}
