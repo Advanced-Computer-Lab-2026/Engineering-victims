@@ -287,7 +287,7 @@ VITE_API_URL=http://localhost:8000
 
 The server seeds **only when the database is empty**. A first run against a
 fresh database populates it; every run after that is left exactly as it is, so
-restarting the server — or saving a file, which makes `bun --watch` restart it —
+restarting the server — or saving a file, which makes `nodemon` restart it —
 never destroys data.
 
 To wipe and rebuild the demo data on purpose:
