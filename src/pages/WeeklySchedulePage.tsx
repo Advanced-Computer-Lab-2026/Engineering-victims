@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, Clock, Coffee, Download, Eye, FileText, Loader2, MapPin, Printer, RotateCcw, UserRound } from 'lucide-react';
+import { CalendarDays, Clock, Coffee, Download, Eye, FileText, Loader2, MapPin, Printer, RotateCcw, UserRound } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import PageHeader from '../components/PageHeader';
@@ -90,7 +90,6 @@ const WeeklySchedulePage: React.FC = () => {
     return [...blocks.values()].sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
   }, [data]);
 
-  const backTo = user?.role === 'Advisor' ? '/advising-students' : '/students';
   const student = data?.student;
   const stage = data?.stage ? STAGE_INFO[data.stage] : null;
   const canViewPreferences =
@@ -485,16 +484,6 @@ const WeeklySchedulePage: React.FC = () => {
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
           <div className="flex gap-2">
-            {!isOwn && (
-              <CustomButton
-                variant="secondary"
-                size="sm"
-                onClick={() => navigate(backTo)}
-                icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
-              >
-                Back to students
-              </CustomButton>
-            )}
             {!isOwn &&
               student?.studentType === 'Advising Student' &&
               (user?.role === 'Advisor' || user?.role === 'Coordinator') && (

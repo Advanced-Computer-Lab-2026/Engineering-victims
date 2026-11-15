@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   CalendarRange,
   CheckCircle2,
   CircleAlert,
@@ -291,14 +290,6 @@ const GraduationPlanBuilderPage: React.FC = () => {
         <AlertBanner tone="error" title="Graduation plan">
           {error ?? 'This graduation plan could not be opened.'}
         </AlertBanner>
-        <CustomButton
-          variant="secondary"
-          className="mt-4"
-          icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
-          onClick={() => navigate('/graduation-plans')}
-        >
-          Back to plans
-        </CustomButton>
       </>
     );
   }
@@ -333,20 +324,10 @@ const GraduationPlanBuilderPage: React.FC = () => {
         }
       />
 
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <CustomButton
-          variant="ghost"
-          size="sm"
-          icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
-          onClick={() => navigate('/graduation-plans')}
-        >
-          All plans
-        </CustomButton>
-        <p className="text-caption text-on-surface-variant">
-          Updated {formatRelative(plan.updatedAt)}
-          {plan.submittedAt ? ` · Submitted ${formatDate(plan.submittedAt)}` : ''}
-        </p>
-      </div>
+      <p className="mb-4 text-caption text-on-surface-variant">
+        Updated {formatRelative(plan.updatedAt)}
+        {plan.submittedAt ? ` · Submitted ${formatDate(plan.submittedAt)}` : ''}
+      </p>
 
       {!isDraft && (
         <div className="mb-4">

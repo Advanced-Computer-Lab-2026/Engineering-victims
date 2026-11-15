@@ -4,7 +4,6 @@ import {
   BadgeCheck,
   Building2,
   CalendarDays,
-  ChevronLeft,
   CircleAlert,
   FilePen,
   GraduationCap,
@@ -87,12 +86,6 @@ const StudentDetailPage: React.FC = () => {
   // Req 31: Advisors and Coordinators see Advising Students' schedules; an
   // Administrator has read-only access to every student's.
   const canViewSchedule = role === 'Administrator' || canViewHistory;
-
-  const goBack = () => {
-    const idx = (window.history.state as { idx?: number } | null)?.idx ?? 0;
-    if (idx > 0) navigate(-1);
-    else navigate('/students');
-  };
 
   useEffect(() => {
     if (!studentId) return;
@@ -197,17 +190,6 @@ const StudentDetailPage: React.FC = () => {
 
   return (
     <>
-      <div className="mb-2 -ml-2">
-        <CustomButton
-          variant="ghost"
-          size="sm"
-          onClick={goBack}
-          icon={<ChevronLeft className="h-4 w-4" aria-hidden />}
-        >
-          Back
-        </CustomButton>
-      </div>
-
       <PageHeader
         title={student?.fullName ?? 'Student details'}
         description={student ? `${student.studentId} · ${student.major}` : 'Loading student record...'}

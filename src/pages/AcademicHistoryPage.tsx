@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  ArrowLeft,
   BookCheck,
   BookOpen,
   CalendarDays,
@@ -128,10 +127,6 @@ const AcademicHistoryPage: React.FC = () => {
     };
   }, [studentId]);
 
-  // An in-app way back to the list the staff member came from, so they never
-  // depend on the browser's back button.
-  const backTo = user?.role === 'Advisor' ? '/advising-students' : '/students';
-
   const completedByTerm = useMemo(() => {
     const groups = new Map<string, CompletedCourse[]>();
     (data?.completed ?? []).forEach((row) => {
@@ -178,39 +173,25 @@ const AcademicHistoryPage: React.FC = () => {
         description="Completed courses with grades, current courses and the courses still remaining."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
-          (!isOwn || student) && (
+          student && (
             <div className="flex flex-wrap gap-2">
-              {!isOwn && (
-                <CustomButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigate(backTo)}
-                  icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
-                >
-                  Back to students
-                </CustomButton>
-              )}
               {/* Req 55: the same student's transcript, year by year. */}
-              {student && (
-                <CustomButton
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => navigate(studentId ? `/transcript/${studentId}` : '/transcript')}
-                  icon={<FileText className="h-4 w-4" aria-hidden />}
-                >
-                  View transcript
-                </CustomButton>
-              )}
-              {student && (
-                <CustomButton
-                  size="sm"
-                  onClick={handleDownload}
-                  isLoading={isDownloading}
-                  icon={<Download className="h-4 w-4" aria-hidden />}
-                >
-                  Download PDF
-                </CustomButton>
-              )}
+              <CustomButton
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate(studentId ? `/transcript/${studentId}` : '/transcript')}
+                icon={<FileText className="h-4 w-4" aria-hidden />}
+              >
+                View transcript
+              </CustomButton>
+              <CustomButton
+                size="sm"
+                onClick={handleDownload}
+                isLoading={isDownloading}
+                icon={<Download className="h-4 w-4" aria-hidden />}
+              >
+                Download PDF
+              </CustomButton>
             </div>
           )
         }

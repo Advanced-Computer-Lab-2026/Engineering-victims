@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, BookOpen, Loader2, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { BookOpen, Loader2, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -38,7 +38,6 @@ const CreditHourTile: React.FC<{ label: string; value: number; detail?: string; 
 
 const AdvisingScheduleDraftPage: React.FC = () => {
   const { studentId } = useParams<{ studentId: string }>();
-  const navigate = useNavigate();
   const [data, setData] = useState<AdvisingScheduleDraftResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -159,16 +158,6 @@ const AdvisingScheduleDraftPage: React.FC = () => {
         title={data?.student ? `Draft schedule for ${data.student.fullName}` : 'Advising draft schedule'}
         description="Create and continue editing an incomplete advising schedule. Review your changes, then save them as a draft."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
-        meta={
-          <CustomButton
-            variant="secondary"
-            size="sm"
-            onClick={() => navigate(-1)}
-            icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
-          >
-            Back
-          </CustomButton>
-        }
       />
 
       {error && (

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CalendarDays, Loader2, ScrollText } from 'lucide-react';
+import { CalendarDays, Loader2, ScrollText } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
@@ -8,7 +8,6 @@ import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
-import { useSession } from '../hooks/useSession';
 import { ApiError } from '../lib/api';
 import { fetchMyTranscript, fetchStudentTranscript } from '../lib/academicHistoryService';
 import type { TranscriptResponse, TranscriptSession } from '../lib/types';
@@ -42,7 +41,6 @@ const TranscriptPage: React.FC = () => {
   const { studentId } = useParams<{ studentId?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const year = searchParams.get('year') ?? undefined;
-  const { user } = useSession();
   const navigate = useNavigate();
   const [data, setData] = useState<TranscriptResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
@@ -73,7 +71,6 @@ const TranscriptPage: React.FC = () => {
   }, [studentId, year]);
 
   const historyPath = studentId ? `/academic-history/${studentId}` : '/academic-history';
-  const backTo = user?.role === 'Advisor' ? '/advising-students' : '/students';
   const student = data?.student;
 
   return (
@@ -83,26 +80,14 @@ const TranscriptPage: React.FC = () => {
         description="Pick an attended academic year to see its Winter, Spring, Summer and makeup results."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
         meta={
-          <div className="flex flex-wrap gap-2">
-            {!isOwn && (
-              <CustomButton
-                variant="secondary"
-                size="sm"
-                onClick={() => navigate(backTo)}
-                icon={<ArrowLeft className="h-4 w-4" aria-hidden />}
-              >
-                Back to students
-              </CustomButton>
-            )}
-            <CustomButton
-              variant="secondary"
-              size="sm"
-              onClick={() => navigate(historyPath)}
-              icon={<ScrollText className="h-4 w-4" aria-hidden />}
-            >
-              Academic history
-            </CustomButton>
-          </div>
+          <CustomButton
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate(historyPath)}
+            icon={<ScrollText className="h-4 w-4" aria-hidden />}
+          >
+            Academic history
+          </CustomButton>
         }
       />
 
