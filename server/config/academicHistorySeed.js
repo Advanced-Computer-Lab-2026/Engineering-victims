@@ -9,7 +9,12 @@ const CourseRecord = require('../models/CourseRecord');
  *
  * - every non-elective course of their major from an earlier semester is
  *   Completed, in the term that semester fell in;
- * - every course of their current semester is In Progress this term;
+ * - every course of their current semester that no term publishes is In
+ *   Progress this term;
+ * - the current-semester courses some term has published are left with no
+ *   record at all. Req 62's draft only offers courses the student has not
+ *   attempted, so without this every student's own semester would already be
+ *   In Progress and the advisor would have nothing to add.
  * - grades follow academic standing, so a Probation student's GPA is visibly
  *   weaker than a Good Standing one's, and each Probation student has one
  *   failed course that shows up again under remaining courses.
@@ -68,10 +73,20 @@ const gradeFor = (student, course) => {
 };
 
 /** Rebuilds every Advising Student's course records. Returns the number of rows. */
-const seedAcademicHistory = async ({ students, courses }) => {
+const seedAcademicHistory = async ({ students, courses, offerings = [] }) => {
   await CourseRecord.deleteMany({});
 
   const rows = [];
+
+  // The courses some term has published. These are the only current-semester
+  // courses an advisor could add to a draft, so they are the ones left without
+  // a record; a course no term publishes cannot be added anywhere and stays In
+  // Progress.
+  const publishedCourseIds = new Set(
+    offerings
+      .filter((offering) => offering.publicationStatus === 'Published')
+      .map((offering) => String(offering.courseId))
+  );
 
   students
     .filter((student) => student.studentType === 'Advising Student')
@@ -84,7 +99,11 @@ const seedAcademicHistory = async ({ students, courses }) => {
       );
 
       const completed = ownCourses.filter((course) => course.recommendedSemester < student.currentSemester);
-      const current = ownCourses.filter((course) => course.recommendedSemester === student.currentSemester);
+      const enrolled = ownCourses.filter(
+        (course) =>
+          course.recommendedSemester === student.currentSemester &&
+          !publishedCourseIds.has(String(course._id))
+      );
 
       // The failed course: the first core course of the latest finished semester.
       const failed =
@@ -107,7 +126,7 @@ const seedAcademicHistory = async ({ students, courses }) => {
         });
       });
 
-      current.forEach((course) => {
+      enrolled.forEach((course) => {
         rows.push({
           student: student._id,
           course: course._id,
