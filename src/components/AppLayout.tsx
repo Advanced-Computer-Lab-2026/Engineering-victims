@@ -54,7 +54,15 @@ const AppLayout: React.FC = () => {
         <div className="-ml-1.5 mb-3">
           <HistoryButtons />
         </div>
-        <Outlet />
+        <React.Suspense
+          fallback={
+            <div className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant" role="status">
+              Loading page...
+            </div>
+          }
+        >
+          <Outlet />
+        </React.Suspense>
       </main>
     </div>
   );

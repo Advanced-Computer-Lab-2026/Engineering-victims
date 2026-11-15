@@ -22,6 +22,7 @@
 ## Table of Contents
 
 - [Overview](#-overview)
+- [UI/UX Principles](#uiux-principles)
 - [Motivation](#-motivation)
 - [Screenshots](#-screenshots)
 - [Tech Stack](#-tech-stack)
@@ -54,6 +55,19 @@ It replaces the fragmented mix of spreadsheets, email threads, and manual adviso
 | **Advisor** | Assigned-student roster ("My Students"), draft schedule builder, validation engine, graduation planning |
 | **Coordinator** | Review queues, approval workflows, financial oversight |
 | **Administrator** | Course catalogue, offerings, terms, user management |
+
+---
+
+## UI/UX Principles
+
+The [UI/UX workshop slides](./UI_UX%20Slides.pdf) expand on these principles:
+
+- **Design around the user's journey.** Identify who is using a screen, their goal, what they need to know, and the next step—not just the list of requirements.
+- **Make hierarchy and consistency deliberate.** Use one clear primary action per area, cards for independent items rather than decoration, and shared design tokens for color, type, spacing, and shape.
+- **Reveal complexity progressively.** Prioritize frequent controls, keep less-used options easy to find, and make important actions discoverable without relying on hover.
+- **Fit the layout to the task and device.** Group form fields with useful examples; give complex work room; adapt schedules and dense data for their purpose instead of simply shrinking desktop layouts.
+- **Design beyond the happy path.** Provide clear loading, success, conflict, and error feedback, and tell users what happened and what they can do next.
+- **Use AI as a collaborator.** Give it the user, goal, requirements, and constraints; compare alternatives and trade-offs; justify the choice; reuse the design system; and verify real scenarios. The designer owns the decision.
 
 ---
 
