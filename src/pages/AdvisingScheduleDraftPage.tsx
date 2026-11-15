@@ -272,9 +272,8 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                 )}
                 {data.canEdit && courseOptions.length === 0 && (
                   <p className="mt-2 text-caption text-on-surface-variant">
-                    No courses match this term&apos;s published offerings and semester progression. Completed or
-                    in-progress courses, courses with unmet prerequisites, and courses not offered this season are
-                    excluded.
+                    Completed or in-progress courses, courses with unmet prerequisites, and courses not offered this
+                    season are excluded.
                   </p>
                 )}
                 <p className="mt-4 flex items-center gap-2 text-caption text-success">
