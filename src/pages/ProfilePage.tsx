@@ -96,7 +96,7 @@ const ProfilePage: React.FC = () => {
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
       />
 
-      <div className="max-w-4xl space-y-6">
+      <div className="w-full max-w-6xl space-y-6">
         <Card tone="raised" className="p-6">
           <div className="flex flex-wrap items-center gap-5">
             <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-h2 font-bold text-on-primary shadow-elevation-1">

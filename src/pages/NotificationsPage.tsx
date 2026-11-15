@@ -27,6 +27,8 @@ import {
 import { formatRelative } from '../lib/studentsService';
 import type { NotificationSummary, NotificationType } from '../lib/types';
 
+type NotificationFilter = 'all' | 'unread' | 'read';
+
 /** Icon and colour per notification type, so the list scans at a glance. */
 const TYPE_META: Record<NotificationType, { icon: typeof Info; wrap: string }> = {
   info: { icon: Info, wrap: 'bg-primary-container text-on-primary-container' },
@@ -44,6 +46,7 @@ const NotificationsPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<NotificationFilter>('all');
   /** The row currently being marked, so only that button shows a spinner. */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
@@ -90,6 +93,20 @@ const NotificationsPage: React.FC = () => {
     () => notifications.filter((item) => !item.isRead).map((item) => item.id),
     [notifications]
   );
+  const filteredNotifications = useMemo(
+    () =>
+      notifications.filter((item) => {
+        if (filter === 'unread') return !item.isRead;
+        if (filter === 'read') return item.isRead;
+        return true;
+      }),
+    [filter, notifications]
+  );
+  const filterOptions: { value: NotificationFilter; label: string; count: number }[] = [
+    { value: 'all', label: 'All', count: notifications.length },
+    { value: 'unread', label: 'Unread', count: unreadIds.length },
+    { value: 'read', label: 'Read', count: notifications.length - unreadIds.length },
+  ];
 
   /** FR 5.0 — mark a single notification as read. */
   const handleMarkRead = async (id: string) => {
@@ -178,12 +195,47 @@ const NotificationsPage: React.FC = () => {
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
       />
 
-      <div className="max-w-4xl space-y-4">
+      <div className="w-full max-w-6xl space-y-4">
         {error && <AlertBanner tone="error">Could not load your notifications: {error}</AlertBanner>}
         {actionError && (
           <AlertBanner tone="error" onDismiss={() => setActionError(null)}>
             {actionError}
           </AlertBanner>
+        )}
+
+        {notifications.length > 0 && (
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-body text-on-surface-variant" aria-live="polite" aria-atomic="true">
+              <span className="font-semibold text-on-surface">{notifications.length}</span> total
+              <span className="mx-2 text-outline">·</span>
+              <span className="font-semibold text-on-surface">{unreadIds.length}</span> unread
+            </p>
+            <div
+              className="inline-flex w-fit rounded-lg border border-outline-variant bg-surface-container-lowest p-1"
+              role="group"
+              aria-label="Filter notifications"
+            >
+              {filterOptions.map((option) => {
+                const isSelected = filter === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => setFilter(option.value)}
+                    className={`min-h-11 rounded-md px-3 py-2 text-caption font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${
+                      isSelected
+                        ? 'bg-primary text-on-primary'
+                        : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
+                    }`}
+                  >
+                    {option.label}
+                    <span className="ml-1.5 tabular-nums">{option.count}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         )}
 
         {notifications.length === 0 ? (
@@ -192,10 +244,17 @@ const NotificationsPage: React.FC = () => {
             title="No notifications yet"
             description="Updates about schedules, requests and approvals will show up here."
           />
+        ) : filteredNotifications.length === 0 ? (
+          <p
+            role="status"
+            className="rounded-xl border border-outline-variant bg-surface-container-low px-4 py-3 text-body text-on-surface-variant"
+          >
+            No {filter} notifications.
+          </p>
         ) : (
           <Card>
             <ul className="divide-y divide-outline-variant">
-              {notifications.map((notification) => {
+              {filteredNotifications.map((notification) => {
                 const meta = TYPE_META[notification.type] ?? TYPE_META.info;
                 const Icon = meta.icon;
 
@@ -260,7 +319,7 @@ const NotificationsPage: React.FC = () => {
           </Card>
         )}
 
-        {notifications.length > 0 && unreadIds.length === 0 && (
+        {notifications.length > 0 && unreadIds.length === 0 && filter !== 'unread' && (
           <p className="text-center text-caption text-on-surface-variant">
             You are all caught up — {notifications.length} notification
             {notifications.length === 1 ? '' : 's'} read.

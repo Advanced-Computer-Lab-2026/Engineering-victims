@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, Contact, UserX, Users } from 'lucide-react';
+import { ArrowRightLeft, Bell, BookOpen, Contact, UserX, Users } from 'lucide-react';
 import { ApiError, apiFetch } from '../lib/api';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import { navLabel, visibleNavItems } from '../lib/navigation';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
+import type { CourseSummary, EligibleSwapGroupsResponse } from '../lib/types';
 
 interface StatsResponse {
   total: number;
@@ -17,14 +18,34 @@ interface StatsResponse {
   waitingOnStudent: number;
 }
 
+interface MyCoursesResponse {
+  courses: CourseSummary[];
+  totalCreditHours: number;
+}
+
+interface StudentOverview {
+  registeredCourses: number | null;
+  totalCreditHours: number | null;
+  eligibleSwapGroups: number | null;
+}
+
 const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useSession();
-  const { unreadCount } = useUnreadCount();
+  const {
+    unreadCount,
+    isLoading: isUnreadCountLoading,
+    error: unreadCountError,
+  } = useUnreadCount();
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [studentOverview, setStudentOverview] = useState<StudentOverview | null>(null);
+  const [isStudentOverviewLoading, setIsStudentOverviewLoading] = useState(false);
+  const [studentOverviewErrors, setStudentOverviewErrors] = useState<string[]>([]);
 
   const canManageStudents = user?.role === 'Coordinator' || user?.role === 'Administrator';
+  const isStudent = user?.role === 'Student';
+  const isNormalStudent = isStudent && user.studentType === 'Normal Student';
 
   useEffect(() => {
     if (!canManageStudents) return;
@@ -43,6 +64,70 @@ const DashboardPage: React.FC = () => {
     };
   }, [canManageStudents]);
 
+  useEffect(() => {
+    if (!isStudent) {
+      setStudentOverview(null);
+      setStudentOverviewErrors([]);
+      setIsStudentOverviewLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setStudentOverview(null);
+    setStudentOverviewErrors([]);
+    setIsStudentOverviewLoading(true);
+
+    const coursesRequest = apiFetch<MyCoursesResponse>('/api/students/my-courses');
+    const swapGroupsRequest: Promise<EligibleSwapGroupsResponse | null> = isNormalStudent
+      ? apiFetch<EligibleSwapGroupsResponse>('/api/students/eligible-swap-groups')
+      : Promise.resolve(null);
+
+    Promise.allSettled([coursesRequest, swapGroupsRequest])
+      .then(([coursesResult, swapGroupsResult]) => {
+        if (cancelled) return;
+
+        const nextOverview: StudentOverview = {
+          registeredCourses: null,
+          totalCreditHours: null,
+          eligibleSwapGroups: null,
+        };
+        const errors: string[] = [];
+
+        if (coursesResult.status === 'fulfilled') {
+          nextOverview.registeredCourses = coursesResult.value.courses.length;
+          nextOverview.totalCreditHours = coursesResult.value.totalCreditHours;
+        } else {
+          const message =
+            coursesResult.reason instanceof ApiError
+              ? coursesResult.reason.message
+              : 'An unexpected error occurred.';
+          errors.push(`Could not load registered courses: ${message}`);
+        }
+
+        if (isNormalStudent) {
+          if (swapGroupsResult.status === 'fulfilled' && swapGroupsResult.value) {
+            nextOverview.eligibleSwapGroups = swapGroupsResult.value.eligibleGroups.length;
+          } else if (swapGroupsResult.status === 'rejected') {
+            const message =
+              swapGroupsResult.reason instanceof ApiError
+                ? swapGroupsResult.reason.message
+                : 'An unexpected error occurred.';
+            errors.push(`Could not load eligible swap groups: ${message}`);
+          }
+        }
+
+        setStudentOverview(nextOverview);
+        setStudentOverviewErrors(errors);
+      })
+      .finally(() => {
+        if (!cancelled) setIsStudentOverviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isNormalStudent, isStudent]);
+
   const firstName = user?.fullName?.split(' ')[0] ?? 'there';
 
   return (
@@ -56,6 +141,18 @@ const DashboardPage: React.FC = () => {
       {error && (
         <Card className="p-4 text-body text-error">
           Could not load dashboard data: {error}
+        </Card>
+      )}
+
+      {studentOverviewErrors.length > 0 && (
+        <Card role="alert" className="mb-4 p-4 text-body text-error">
+          {studentOverviewErrors.join(' ')}
+        </Card>
+      )}
+
+      {isStudent && unreadCountError && (
+        <Card role="alert" className="mb-4 p-4 text-body text-error">
+          Could not load unread notifications: {unreadCountError}
         </Card>
       )}
 
@@ -91,6 +188,69 @@ const DashboardPage: React.FC = () => {
             tone="rose"
           />
         </div>
+      )}
+
+      {isStudent && (
+        <section className="mb-6" aria-labelledby="student-overview-heading">
+          <h2
+            id="student-overview-heading"
+            className="mb-3 text-h3 font-bold text-on-surface"
+          >
+            Your semester at a glance
+          </h2>
+          <div className={`grid gap-4 sm:grid-cols-2 ${isNormalStudent ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+            <StatCard
+              label="Registered courses"
+              value={studentOverview?.registeredCourses ?? '—'}
+              detail={
+                studentOverview?.registeredCourses !== null &&
+                studentOverview?.registeredCourses !== undefined
+                  ? `${studentOverview.totalCreditHours ?? 0} credit hours this term`
+                  : isStudentOverviewLoading
+                    ? 'Loading current registration...'
+                    : 'Registration unavailable'
+              }
+              icon={<BookOpen className="h-5 w-5" aria-hidden />}
+              tone="indigo"
+              onClick={() => navigate('/my-courses')}
+            />
+            {isNormalStudent && (
+              <StatCard
+                label="Eligible swap groups"
+                value={studentOverview?.eligibleSwapGroups ?? '—'}
+                detail={
+                  studentOverview?.eligibleSwapGroups !== null &&
+                  studentOverview?.eligibleSwapGroups !== undefined
+                    ? studentOverview.eligibleSwapGroups === 0
+                      ? 'No matching groups right now'
+                      : 'Groups with matching course sets'
+                    : isStudentOverviewLoading
+                      ? 'Loading eligible groups...'
+                      : 'Count unavailable'
+                }
+                icon={<ArrowRightLeft className="h-5 w-5" aria-hidden />}
+                tone="sky"
+                onClick={() => navigate('/eligible-swap-groups')}
+              />
+            )}
+            <StatCard
+              label="Unread notifications"
+              value={unreadCount ?? '—'}
+              detail={
+                unreadCount !== null
+                  ? unreadCount === 0
+                    ? 'You are all caught up'
+                    : 'Waiting for your attention'
+                  : isUnreadCountLoading
+                    ? 'Loading notification count...'
+                    : 'Count unavailable'
+              }
+              icon={<Bell className="h-5 w-5" aria-hidden />}
+              tone="amber"
+              onClick={() => navigate('/notifications')}
+            />
+          </div>
+        </section>
       )}
 
       <Card tone="raised" className="mt-6 p-6">
@@ -160,7 +320,7 @@ const DashboardPage: React.FC = () => {
 
 interface StatCardProps {
   label: string;
-  value: number;
+  value: number | string;
   detail: string;
   icon: React.ReactNode;
   tone: 'indigo' | 'sky' | 'amber' | 'rose';
