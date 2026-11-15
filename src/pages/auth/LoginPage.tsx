@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { LogIn, ShieldCheck } from 'lucide-react';
 import { ApiError, apiFetch } from '../../lib/api';
 import type { SessionUser } from '../../lib/types';
+import gucLogo from '../../../White GUC Logo with Colorful Emblem.png';
 import AlertBanner from '../../components/ui/AlertBanner';
 import Card from '../../components/ui/Card';
 import CustomButton from '../../components/ui/CustomButton';
@@ -66,12 +67,14 @@ const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="bg-surface flex min-h-dvh items-center justify-center px-4 py-10">
+    <div className="bg-surface relative flex min-h-dvh items-center justify-center px-4 py-10">
+      <img
+        src={gucLogo}
+        alt="German University in Cairo"
+        className="absolute right-4 top-4 h-auto w-32 sm:right-8 sm:top-8 sm:w-40"
+      />
       <div className="w-full max-w-md">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-h2 font-bold text-on-primary shadow-elevation-1">
-            U
-          </div>
           <h1 className="text-h2 font-bold tracking-tight text-on-surface">Welcome back</h1>
           <p className="mt-1 text-body text-on-surface-variant">Sign in with your GUC credentials</p>
         </div>

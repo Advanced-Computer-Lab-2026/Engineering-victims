@@ -99,5 +99,6 @@ Every screen must answer: where am I, what can I do here, what happens next.
 - The official GUC institutional palette is not recorded in the repo; indigo
   `#4F46E5` is the agreed source color for this release (see
   `decisions/002-indigo-dark-only.md`). Revisit if a brand guide is supplied.
-- A product mark or logo asset does not exist; the favicon is a simple
-  typographic "U" mark until a licensed asset is provided.
+- The supplied white GUC logo with colorful emblem is used on the sign-in
+  page; the favicon remains a simple typographic "U" mark until a dedicated
+  favicon is provided.
