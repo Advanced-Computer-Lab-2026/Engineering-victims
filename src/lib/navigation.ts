@@ -103,6 +103,13 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['Advisor'],
     description: 'Every advising student in the school, not only the ones assigned to you.',
   },
+  {
+    to: '/course-availability',
+    label: 'Course Slot Availability',
+    icon: BookOpen,
+    roles: ['Advisor', 'Coordinator'],
+    description: 'Select a course to review its lecture, tutorial and lab slots and remaining capacity.',
+  },
   // Req 103-113: Advisors build plans; Coordinators review submitted plans.
   {
     to: '/graduation-plans',

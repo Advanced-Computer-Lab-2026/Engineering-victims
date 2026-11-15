@@ -6,6 +6,7 @@ import {
   CalendarDays,
   ChevronLeft,
   CircleAlert,
+  FilePen,
   GraduationCap,
   Hash,
   Hourglass,
@@ -232,6 +233,16 @@ const StudentDetailPage: React.FC = () => {
                   icon={<ScrollText className="h-4 w-4" aria-hidden />}
                 >
                   Academic history
+                </CustomButton>
+              )}
+              {canViewHistory && (
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(`/advising-schedules/${student.id}/draft`)}
+                  icon={<FilePen className="h-4 w-4" aria-hidden />}
+                >
+                  Draft schedule
                 </CustomButton>
               )}
               {isAdvisingStudent && role === 'Advisor' && (

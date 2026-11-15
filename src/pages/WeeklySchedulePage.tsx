@@ -495,6 +495,18 @@ const WeeklySchedulePage: React.FC = () => {
                 Back to students
               </CustomButton>
             )}
+            {!isOwn &&
+              student?.studentType === 'Advising Student' &&
+              (user?.role === 'Advisor' || user?.role === 'Coordinator') && (
+                <CustomButton
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => navigate(`/advising-schedules/${student.id}/draft`)}
+                  icon={<CalendarDays className="h-4 w-4" aria-hidden />}
+                >
+                  Create or edit draft
+                </CustomButton>
+              )}
             {/* Req 49: Download and print buttons for processed schedules */}
             {data?.visible && data.sessions.length > 0 && (
               <>
