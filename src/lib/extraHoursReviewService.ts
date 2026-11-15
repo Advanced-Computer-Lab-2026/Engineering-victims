@@ -1,4 +1,13 @@
 import { apiFetch } from './api';
+import { apiUrl, authHeaders } from './api';
+export interface ExtraHoursDocument { kind: 'Paid' | 'Deferred'; title: string; reference: string; requestReference: string; date: string; totalCost: number; paymentMethod?: string; transactionReference?: string; notice: string; amountDue?: number; chargeStatus?: string; installment?: { reference: string; label: string; dueDate: string } }
+export const fetchExtraHoursDocument = (id: string) => apiFetch<{ document: ExtraHoursDocument }>(`/api/extra-hours/mine/${id}/document`);
+export const downloadExtraHoursDocument = async (id: string) => {
+  const response = await fetch(apiUrl(`/api/extra-hours/mine/${id}/document?format=pdf`), { headers: authHeaders() });
+  if (!response.ok) { const data = await response.json(); throw new Error(data.message || 'Could not download document.'); }
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a'); link.href = url; link.download = `extra-hours-${id}.pdf`; document.body.appendChild(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
 
 export interface ExtraHoursSummary {
   id: string; reference: string;
@@ -29,7 +38,9 @@ export interface DeferredCharge { reference: string; amount: number; currency: s
 export interface DeferralPreview { version: number; amount: number; currency: string; installment: InstallmentSummary }
 export const previewExtraHoursDeferral = (id: string) => apiFetch<DeferralPreview>(`/api/extra-hours/mine/${id}/next-installment`);
 export const confirmExtraHoursDeferral = (id: string, installmentId: string, version: number) => apiFetch<{ message: string; charge: DeferredCharge }>(`/api/extra-hours/mine/${id}/defer`, { method: 'POST', body: JSON.stringify({ installmentId, version }) });
-export type StudentExtraHoursRequest = Pick<ExtraHoursDetail, 'id' | 'reference' | 'decision' | 'decidedAt' | 'settlementStatus' | 'requestedHours' | 'totalCost' | 'currency' | 'items'> & { term: string; version: number; settlementPreference: SettlementPreference | null; gatewayAttempt: string | null; paymentReference: string | null; activatedAt: string | null; activatedHours: number; deferredCharge: DeferredCharge | null };
+export type StudentExtraHoursRequest = Pick<ExtraHoursDetail, 'id' | 'reference' | 'decision' | 'decidedAt' | 'settlementStatus' | 'requestedHours' | 'totalCost' | 'currency' | 'items'> & { term: string; version: number; settlementPreference: SettlementPreference | null; gatewayAttempt: string | null; gatewayStatus: string | null; gatewayGeneration: number; paymentReference: string | null; activatedAt: string | null; activatedHours: number; deferredCharge: DeferredCharge | null };
+export const retryExtraHoursCheckout = (id: string) => apiFetch<{ url: string | null; paymentId: string }>(`/api/extra-hours/mine/${id}/retry-stripe`, { method: 'POST', body: '{}' });
+export const cancelExtraHoursCheckout = (id: string, generation: number) => apiFetch<{ message: string }>(`/api/extra-hours/mine/payments/${id}/cancel`, { method: 'POST', body: JSON.stringify({ generation }) });
 export const payExtraHoursWallet = (id: string) => apiFetch<{ message: string }>(`/api/extra-hours/mine/${id}/pay-wallet`, { method: 'POST', body: '{}' });
 export const openExtraHoursCheckout = (id: string) => apiFetch<{ url: string | null; paymentId: string }>(`/api/extra-hours/mine/${id}/stripe-checkout`, { method: 'POST', body: '{}' });
 export const confirmExtraHoursCheckout = (id: string) => apiFetch<{ message: string }>(`/api/extra-hours/mine/payments/${id}/confirm`, { method: 'POST', body: '{}' });

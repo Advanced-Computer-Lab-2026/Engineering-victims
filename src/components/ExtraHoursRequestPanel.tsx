@@ -4,6 +4,7 @@ import Card from './ui/Card';
 import Select from './ui/Select';
 import CustomButton from './ui/CustomButton';
 import AlertBanner from './ui/AlertBanner';
+import ConfirmDialog from './ui/ConfirmDialog';
 
 interface Context {
   student: { name: string; studentId: string };
@@ -41,6 +42,7 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [withdrawal, setWithdrawal] = useState<Context['requests'][number] | null>(null);
   const submissionKey = useRef('');
   const loadVersion = useRef(0);
   const load = async (termId?: string) => {
@@ -74,6 +76,16 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
       setSuccess(`${result.request.reference}: ${result.message}`);
       await load(context.termId);
     } catch (err) { setError(errorText(err)); }
+    finally { setBusy(false); }
+  };
+  const withdraw = async () => {
+    if (!withdrawal || busy) return;
+    setBusy(true); setError(null); setSuccess(null);
+    try {
+      const result = await apiFetch<{ request: { id: string; decision: string }; message: string }>(`/api/extra-hours/${withdrawal.id}/withdraw`, { method: 'POST', body: '{}' });
+      setContext((current) => current && ({ ...current, requests: current.requests.map((request) => request.id === result.request.id ? { ...request, decision: result.request.decision } : request) }));
+      setSuccess(result.message); setWithdrawal(null);
+    } catch (err) { setError(errorText(err)); setWithdrawal(null); }
     finally { setBusy(false); }
   };
   return (
@@ -115,9 +127,14 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
               <CustomButton size="sm" disabled={busy || !quote.eligible} onClick={() => void submit()}>Submit extra-hours request</CustomButton>
             </div>}
           </>}
-          {context.requests.length > 0 && <section className="space-y-2"><h4 className="text-sm font-semibold text-slate-200">Your recent requests for this term</h4>{context.requests.map((request) => <p key={request.id} className="break-all text-xs text-slate-400">{request.reference} · {request.requestedHours} hours · EGP {request.totalCost} · {request.decision}</p>)}</section>}
+          {context.requests.length > 0 && <section className="space-y-2"><h4 className="text-sm font-semibold text-slate-200">Your recent requests for this term</h4>{context.requests.map((request) => <div key={request.id} className="space-y-2 rounded-lg border border-slate-700 p-3">
+            <p className="break-all text-xs text-slate-400">{request.reference} · {request.requestedHours} hours · EGP {request.totalCost} · {request.decision}</p>
+            {request.decision === 'Pending' && <CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => setWithdrawal(request)} aria-label={`Withdraw request ${request.reference}`}>Withdraw request</CustomButton>}
+          </div>)}</section>}
         </>}
       </div>}
+      <ConfirmDialog open={Boolean(withdrawal)} title="Withdraw extra-hours request?" message={`Withdraw ${withdrawal?.reference ?? 'this request'} before Coordinator approval? You can submit a new request later, subject to eligibility and the advising deadline.`}
+        confirmLabel="Withdraw request" cancelLabel="Keep request" isLoading={busy} onConfirm={() => void withdraw()} onCancel={() => setWithdrawal(null)} />
     </Card>
   );
 };

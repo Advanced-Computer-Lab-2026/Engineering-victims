@@ -46,6 +46,12 @@ async function seedExtraHoursPaymentFixture() {
     request.settlementStatus = 'Awaiting Payment Choice';
     request.history.push({ action: 'Approved', actor: coordinator._id, note: request.responseNote });
     await request.save();
+    if (name === 'insufficient') {
+      const pending = prepareExtraHoursRequest({ student, termId: term._id, requestingAdvisorId: advisor._id, selectedCourses: courses.slice(0, 3), courseRequests: [{ course: courses[3], requestedHours: 3 }], records: [] });
+      pending.reference = 'EHR-DEV-WITHDRAW';
+      pending.history.push({ action: 'Submitted', actor: advisor._id });
+      await pending.save();
+    }
     await recordTransaction(student._id, { type: 'Refund', amount: balance, description: 'Disposable development wallet funding' }, { notifications: false });
     await assignPlan(String(student._id), String(plan._id), coordinator._id);
     accounts.push({ email, balance, requestReference: request.reference });

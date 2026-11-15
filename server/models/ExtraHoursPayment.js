@@ -6,7 +6,10 @@ const schema = new mongoose.Schema({
   reference: { type: String, default: () => `PAY-${randomUUID()}`, unique: true },
   method: { type: String, enum: ['Wallet', 'Gateway'], required: true },
   amount: { type: Number, required: true, min: 1 }, currency: { type: String, enum: ['EGP'], default: 'EGP' },
-  status: { type: String, enum: ['Pending', 'Succeeded', 'RefundRequired', 'Refunded'], default: 'Pending' },
+  status: { type: String, enum: ['Pending', 'Failed', 'Cancelled', 'Succeeded', 'RefundRequired', 'Refunded'], default: 'Pending' },
+  checkoutGeneration: { type: Number, default: 0, min: 0 },
+  retiredSessions: [{ sessionId: String, generation: Number, status: String, closedAt: Date, _id: false }],
+  closedAt: Date,
   stripeSessionId: { type: String, default: null }, stripePaymentIntent: { type: String, default: null },
   paidAt: Date, refundReference: String,
 }, { timestamps: true });

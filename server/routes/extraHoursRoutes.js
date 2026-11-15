@@ -5,6 +5,7 @@ const { authenticate, requireRole } = require('../middleware/authMiddleware');
 const User = require('../models/User');
 const Request = require('../models/ExtraHoursRequest');
 const { loadContext, evaluateSelection, submitRequest } = require('../services/extraHoursSubmissionService');
+const { withdrawRequest } = require('../services/extraHoursWithdrawalService');
 const objectId = z.string().refine((value) => mongoose.isValidObjectId(value));
 const selection = z.object({ studentId: objectId, termId: objectId,
   items: z.array(z.object({ courseId: objectId, requestedHours: z.number().int().min(1).max(12) }).strict()).min(1).max(34),
@@ -45,6 +46,13 @@ router.post('/quote', handle(async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: 'Select valid courses and whole requested hours.' });
   const context = await loadContext(parsed.data.studentId, parsed.data.termId);
   res.json(evaluateSelection(context, parsed.data.items).quote);
+}));
+router.post('/:id/withdraw', handle(async (req, res) => {
+  if (!objectId.safeParse(req.params.id).success || !z.object({}).strict().safeParse(req.body).success) {
+    return res.status(400).json({ message: 'A valid request identifier and an empty body are required.' });
+  }
+  const request = await withdrawRequest(req.params.id, req.user.userId);
+  res.json({ request: { id: request._id, decision: request.decision }, message: 'Request withdrawn. No hours were activated and no payment was taken.' });
 }));
 router.post('/', handle(async (req, res) => {
   const parsed = submission.safeParse(req.body);

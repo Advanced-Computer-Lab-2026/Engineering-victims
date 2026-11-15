@@ -7,12 +7,25 @@ import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { fetchMyWallet } from '../lib/walletService';
-import { fetchMyExtraHoursRequests, saveExtraHoursPreference, payExtraHoursWallet, openExtraHoursCheckout, confirmExtraHoursCheckout, previewExtraHoursDeferral, confirmExtraHoursDeferral, type DeferralPreview, type SettlementPreference, type StudentExtraHoursRequest } from '../lib/extraHoursReviewService';
+import { fetchExtraHoursDocument, downloadExtraHoursDocument, type ExtraHoursDocument } from '../lib/extraHoursReviewService';
+import { fetchMyExtraHoursRequests, saveExtraHoursPreference, payExtraHoursWallet, openExtraHoursCheckout, confirmExtraHoursCheckout, cancelExtraHoursCheckout, retryExtraHoursCheckout, previewExtraHoursDeferral, confirmExtraHoursDeferral, type DeferralPreview, type SettlementPreference, type StudentExtraHoursRequest } from '../lib/extraHoursReviewService';
 
 const money = (value: number) => `EGP ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const DocumentActions: React.FC<{ request: StudentExtraHoursRequest }> = ({ request }) => {
+  const [preview, setPreview] = useState<ExtraHoursDocument | null>(null), [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
+  const download = async () => { setBusy(true); setError(null); try { await downloadExtraHoursDocument(request.id); } catch (err) { setError(err instanceof Error ? err.message : 'Download failed.'); } finally { setBusy(false); } };
+  return <div className="space-y-3">
+    {error && <AlertBanner tone="error">{error}</AlertBanner>}
+    <div className="flex gap-3"><CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => { setBusy(true); setError(null); void fetchExtraHoursDocument(request.id).then((result) => setPreview(result.document)).catch((err) => setError(err instanceof Error ? err.message : 'Could not load document.')).finally(() => setBusy(false)); }}>View {request.settlementStatus === 'Paid' ? 'payment receipt' : 'deferred confirmation'}</CustomButton><CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => void download()}>Download PDF</CustomButton></div>
+    <ConfirmDialog open={Boolean(preview)} title={preview?.title || 'Document'} tone="warning" confirmLabel="Download PDF" cancelLabel="Close" isLoading={busy} onCancel={() => { if (!busy) setPreview(null); }} onConfirm={() => void download()}
+      message={<>{preview?.reference}<br />Request: {preview?.requestReference}<br />Date: {preview && new Date(preview.date).toLocaleString()}<br />Total: {money(preview?.totalCost || 0)}<br />
+        {preview?.kind === 'Paid' ? <>Method: {preview.paymentMethod}<br />Transaction: {preview.transactionReference}<br /></> : <>Installment: {preview?.installment?.label}<br />Reference: {preview?.installment?.reference}<br />Due date: {preview?.installment && new Date(preview.installment.dueDate).toLocaleDateString()}<br />Extra-hours amount due: {money(preview?.amountDue || 0)}<br /></>}{preview?.notice}</>} />
+  </div>;
+};
 const PayNow: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void }> = ({ request, onSaved }) => {
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null);
   const [walletConfirmation, setWalletConfirmation] = useState<{ balance: number } | null>(null);
+  const retryable = ['Failed', 'Cancelled'].includes(request.gatewayStatus || '') && !request.activatedAt;
   const reviewWalletPayment = async () => {
     if (busy || walletConfirmation) return;
     setBusy(true); setError(null);
@@ -34,7 +47,7 @@ const PayNow: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void 
       else if (method === 'Check' && request.gatewayAttempt) {
         const result = await confirmExtraHoursCheckout(request.gatewayAttempt); setError(result.message);
       } else {
-        const result = await openExtraHoursCheckout(request.id);
+        const result = retryable ? await retryExtraHoursCheckout(request.id) : await openExtraHoursCheckout(request.id);
         if (result.url) { window.location.assign(result.url); return; }
         await confirmExtraHoursCheckout(result.paymentId);
       }
@@ -46,8 +59,8 @@ const PayNow: React.FC<{ request: StudentExtraHoursRequest; onSaved: () => void 
     <p className="text-sm text-slate-300">Pay the full approved amount of {money(request.totalCost)}. Wallet payments require enough balance. Stripe Checkout uses test payments only.</p>
     {error && <AlertBanner tone="info">{error}</AlertBanner>}
     <div className="flex flex-wrap gap-3">
-      <CustomButton type="button" size="sm" disabled={busy || Boolean(request.gatewayAttempt)} onClick={() => void reviewWalletPayment()}>Pay {money(request.totalCost)} from wallet</CustomButton>
-      <CustomButton type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void pay('Gateway')}>{request.gatewayAttempt ? 'Continue Stripe checkout' : 'Pay with Stripe (test)'}</CustomButton>
+      {!retryable && <CustomButton type="button" size="sm" disabled={busy || Boolean(request.gatewayAttempt)} onClick={() => void reviewWalletPayment()}>Pay {money(request.totalCost)} from wallet</CustomButton>}
+      <CustomButton type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void pay('Gateway')}>{retryable ? 'Retry Stripe payment' : request.gatewayAttempt ? 'Continue Stripe checkout' : 'Pay with Stripe (test)'}</CustomButton>
       {request.gatewayAttempt && <CustomButton type="button" size="sm" variant="secondary" disabled={busy} onClick={() => void pay('Check')}>Check Stripe payment</CustomButton>}
     </div>
     <ConfirmDialog open={walletConfirmation !== null} title="Confirm wallet payment" tone="warning"
@@ -79,6 +92,7 @@ const SettlementChoice: React.FC<{ request: StudentExtraHoursRequest; onSaved: (
   const [saving, setSaving] = useState(false), [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   useEffect(() => { setChoice(request.settlementPreference ?? ''); }, [request.settlementPreference]);
+  if (['Failed', 'Cancelled'].includes(request.settlementStatus) && ['Failed', 'Cancelled'].includes(request.gatewayStatus || '') && !request.activatedAt) return <div className="space-y-3 border-t border-slate-800 pt-4"><AlertBanner tone="info">{request.settlementStatus === 'Cancelled' ? 'The previous Stripe payment was cancelled.' : 'The previous Stripe payment failed.'} Retry opens a verified checkout for the same approved amount. Extra hours remain inactive until payment succeeds.</AlertBanner><PayNow request={request} onSaved={onSaved} /></div>;
   if (request.settlementStatus !== 'Awaiting Payment Choice') return null;
   return <form className="space-y-3 border-t border-slate-800 pt-4" onSubmit={async (event) => {
     event.preventDefault(); if (!choice || saving) return;
@@ -112,7 +126,8 @@ const MyExtraHoursRequestsPage: React.FC = () => {
     if (!id) return;
     let active = true;
     setPaymentMessage('Checking payment with Stripe…');
-    confirmExtraHoursCheckout(id).then((result) => { if (active) { setPaymentMessage(result.message); retry(); } })
+    const action = params.get('cancelled') === '1' ? cancelExtraHoursCheckout(id, Number(params.get('attempt') || 0)) : confirmExtraHoursCheckout(id);
+    action.then((result) => { if (active) { setPaymentMessage(result.message); retry(); } })
       .catch((err: unknown) => { if (active) setPaymentMessage(err instanceof Error ? err.message : 'Could not check payment.'); });
     return () => { active = false; };
   }, [retry]);
@@ -148,6 +163,7 @@ const MyExtraHoursRequestsPage: React.FC = () => {
           </table></div>
           <p className="font-semibold text-white">{row.requestedHours} requested extra hours · Total: {money(row.totalCost)}</p>
           <SettlementChoice request={row} onSaved={retry} />
+          {['Paid', 'Deferred to Next Installment'].includes(row.settlementStatus) && <DocumentActions request={row} />}
         </Card>)}
         <p className="text-sm text-slate-400">Page {page} of {pages}</p>
         <div className="flex gap-3"><CustomButton variant="secondary" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Previous</CustomButton><CustomButton variant="secondary" disabled={page >= pages} onClick={() => setPage((value) => value + 1)}>Next</CustomButton></div>
