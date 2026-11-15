@@ -35,6 +35,15 @@ export class ApiError extends Error {
 }
 
 /**
+ * The endpoints that legitimately answer 401 for a wrong email or password.
+ * Their 401 belongs to the form, not to an expired session.
+ */
+const isCredentialRequest = (path: string): boolean =>
+  ['/api/auth/login', '/api/auth/forgot-password', '/api/auth/reset-password'].some((prefix) =>
+    path.startsWith(prefix)
+  );
+
+/**
  * Small fetch wrapper that always resolves or throws an ApiError with the
  * server's own message, so components never inspect response shapes.
  */
@@ -67,6 +76,12 @@ export const apiFetch = async <T>(path: string, options: RequestInit = {}): Prom
 
   const data = payload as { message?: string };
   if (!response.ok) {
+    // A 401 on any endpoint except the credential endpoints means the stored
+    // token is no longer accepted. Announce it once so the shell can sign the
+    // user out and explain why, instead of leaving a page stuck on its error.
+    if (response.status === 401 && !isCredentialRequest(path) && localStorage.getItem('token')) {
+      window.dispatchEvent(new CustomEvent('session-expired'));
+    }
     throw new ApiError(data.message || `Request failed with status ${response.status}`, response.status, payload);
   }
 

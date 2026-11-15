@@ -34,6 +34,21 @@ export const setAccountStatus = async (id: string, isActive: boolean) => {
   });
 };
 
+/**
+ * Req 52: the request a student is waiting on, derived from their workflow
+ * status. Mirrors `pendingRequestService` on the server so the detail page can
+ * label the same thing the advising list filters by.
+ */
+const PENDING_REQUEST_TYPES = [
+  { label: 'Slot-change request', statuses: ['Change Request Pending'] },
+  { label: 'Extra-hours approval', statuses: ['Pending Approval'] },
+  { label: 'Extra-hours payment', statuses: ['Awaiting Payment Choice'] },
+  { label: 'Deferred installment charge', statuses: ['Deferred to Next Installment'] },
+];
+
+export const pendingRequestFor = (workflowStatus: string): string =>
+  PENDING_REQUEST_TYPES.find((entry) => entry.statuses.includes(workflowStatus))?.label ?? 'None';
+
 export const formatDate = (value: string | Date): string => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Unknown';

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Eye, Loader2, RotateCcw, ScrollText, Search } from 'lucide-react';
-import { useSession } from '../hooks/useSession';
 import { ApiError } from '../lib/api';
 import {
   getGlobalScheduleHistory,
@@ -8,7 +8,6 @@ import {
   type ScheduleActivityEntry,
 } from '../lib/scheduleActivityService';
 import PageHeader from '../components/PageHeader';
-import StudentDetailDrawer from '../components/StudentDetailDrawer';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
@@ -29,14 +28,13 @@ import Select from '../components/ui/Select';
  *            member's name or GUC email.
  */
 const ScheduleActivityHistoryPage: React.FC = () => {
-  const { user } = useSession();
+  const navigate = useNavigate();
   const [logs, setLogs] = useState<ScheduleActivityEntry[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [actionFilter, setActionFilter] = useState<ScheduleActivityAction | ''>('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [search, setSearch] = useState('');
-  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +101,7 @@ const ScheduleActivityHistoryPage: React.FC = () => {
 
       {/* Req 124 & Req 125: Search & Filter Controls */}
       <Card tone="default" className="mb-6 p-4 space-y-4">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <CustomInput
             label="Search (Student ID, Staff Name or Email)"
             placeholder="e.g. 64-40078 or advisor@guc.edu.eg"
@@ -138,10 +136,10 @@ const ScheduleActivityHistoryPage: React.FC = () => {
           />
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-800/80 pt-3 text-xs text-slate-400">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-outline-variant pt-3 text-caption text-on-surface-variant">
           <span>
-            Showing <strong className="text-white">{logs.length}</strong> of{' '}
-            <strong className="text-white">{totalCount}</strong> recorded actions
+            Showing <strong className="text-on-surface">{logs.length}</strong> of{' '}
+            <strong className="text-on-surface">{totalCount}</strong> recorded actions
           </span>
           {hasFilters && (
             <CustomButton variant="ghost" size="sm" onClick={clearFilters}>
@@ -160,7 +158,7 @@ const ScheduleActivityHistoryPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading schedule activity history...
         </Card>
@@ -178,8 +176,8 @@ const ScheduleActivityHistoryPage: React.FC = () => {
       ) : (
         <Card tone="raised" className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[54rem] text-left text-sm">
-              <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+            <table className="w-full min-w-[54rem] text-left text-body">
+              <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Student ID</th>
                   <th className="px-4 py-3 font-semibold">Action</th>
@@ -191,13 +189,13 @@ const ScheduleActivityHistoryPage: React.FC = () => {
                   <th className="px-4 py-3 text-right font-semibold">Student Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-outline-variant">
                 {logs.map((entry) => (
-                  <tr key={entry.id} className="transition-colors hover:bg-slate-800/40">
+                  <tr key={entry.id} className="transition-colors hover:bg-surface-container">
                     <td className="px-4 py-3">
-                      <div className="font-mono font-semibold text-white">{entry.studentId}</div>
+                      <div className="font-mono font-semibold text-on-surface">{entry.studentId}</div>
                       {entry.studentName && (
-                        <div className="text-xs text-slate-400">{entry.studentName}</div>
+                        <div className="text-caption text-on-surface-variant">{entry.studentName}</div>
                       )}
                     </td>
                     <td className="px-4 py-3">
@@ -205,24 +203,24 @@ const ScheduleActivityHistoryPage: React.FC = () => {
                         {entry.action}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-slate-200">
+                    <td className="px-4 py-3 font-mono text-caption text-on-surface">
                       v{entry.scheduleVersion}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="font-medium text-slate-100">{entry.staffName}</div>
-                      <div className="text-xs text-slate-400">{entry.staffEmail}</div>
+                      <div className="font-medium text-on-surface">{entry.staffName}</div>
+                      <div className="text-caption text-on-surface-variant">{entry.staffEmail}</div>
                     </td>
                     <td className="px-4 py-3">
                       <Badge tone="neutral">{entry.staffRole}</Badge>
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-300">
+                    <td className="px-4 py-3 text-caption text-on-surface">
                       {new Date(entry.occurredAt).toLocaleString()}
                     </td>
-                    <td className="px-4 py-3 text-xs text-slate-300 max-w-xs">
+                    <td className="px-4 py-3 text-caption text-on-surface max-w-xs">
                       {entry.reason ? (
-                        <span className="text-amber-200">{entry.reason}</span>
+                        <span className="text-warning">{entry.reason}</span>
                       ) : (
-                        <span className="text-slate-500">—</span>
+                        <span className="text-on-surface-variant">—</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right">
@@ -230,7 +228,7 @@ const ScheduleActivityHistoryPage: React.FC = () => {
                         <CustomButton
                           variant="ghost"
                           size="sm"
-                          onClick={() => setSelectedStudentId(entry.studentObjectId)}
+                          onClick={() => navigate(`/students/${entry.studentObjectId}`)}
                           icon={<Eye className="h-4 w-4" aria-hidden />}
                         >
                           Advising Details
@@ -244,13 +242,6 @@ const ScheduleActivityHistoryPage: React.FC = () => {
           </div>
         </Card>
       )}
-
-      <StudentDetailDrawer
-        studentId={selectedStudentId}
-        role={user?.role ?? null}
-        onClose={() => setSelectedStudentId(null)}
-        onStatusChange={() => loadHistory(true)}
-      />
     </>
   );
 };

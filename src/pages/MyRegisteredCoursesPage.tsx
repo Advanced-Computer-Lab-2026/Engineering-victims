@@ -106,7 +106,7 @@ const MyRegisteredCoursesPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading your courses...
         </Card>
@@ -119,21 +119,21 @@ const MyRegisteredCoursesPage: React.FC = () => {
       ) : (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <Card tone="raised" className="flex items-center gap-4 p-4 bg-indigo-500/10 border-indigo-500/30">
-              <div className="rounded-lg bg-indigo-500 p-2 text-white">
+            <Card tone="raised" className="flex items-center gap-4 p-4 bg-primary-container border-primary">
+              <div className="rounded-lg bg-primary p-2 text-on-primary">
                 <CreditCard className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Total Registered Credits</p>
-                <p className="text-2xl font-bold text-white">{totalCredits}</p>
+                <p className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Total Registered Credits</p>
+                <p className="text-h2 font-bold text-on-surface">{totalCredits}</p>
               </div>
             </Card>
           </div>
 
           <Card tone="raised" className="overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+              <table className="w-full text-left text-body">
+                <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                   <tr>
                     <th scope="col" className="px-4 py-3 font-semibold">Course Code</th>
                     <th scope="col" className="px-4 py-3 font-semibold">Course Name</th>
@@ -141,12 +141,12 @@ const MyRegisteredCoursesPage: React.FC = () => {
                     <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-outline-variant">
                   {courses.map((course) => (
-                    <tr key={course.id} className="transition-colors hover:bg-slate-800/40">
-                      <td className="px-4 py-3 font-mono font-semibold text-indigo-300">{course.code}</td>
-                      <td className="px-4 py-3 text-slate-200">{course.name}</td>
-                      <td className="px-4 py-3 text-right text-slate-300">{course.creditHours}</td>
+                    <tr key={course.id} className="transition-colors hover:bg-surface-container">
+                      <td className="px-4 py-3 font-mono font-semibold text-primary">{course.code}</td>
+                      <td className="px-4 py-3 text-on-surface">{course.name}</td>
+                      <td className="px-4 py-3 text-right text-on-surface">{course.creditHours}</td>
                       <td className="px-4 py-3 text-right">
                         <CustomButton
                           variant="ghost"

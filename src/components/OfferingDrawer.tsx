@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import {
   Eye,
   EyeOff,
@@ -120,9 +121,20 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   const [slotsDraft, setSlotsDraft] = useState<CourseSlot[]>([]);
   const [advisors, setAdvisors] = useState<Advisor[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const trapRef = useFocusTrap<HTMLElement>(!!mode);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+
+  // Escape closes the drawer unless a save or delete confirmation is running.
+  useEffect(() => {
+    if (!mode) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !isSaving && !confirmRequest) onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mode, isSaving, confirmRequest, onClose]);
 
   // Instructors are advisors; the slot form picks one instead of asking for a
   // User ObjectId nobody can look up.
@@ -364,15 +376,21 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-      <aside className="relative flex h-full w-full max-w-2xl flex-col border-l border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-6">
+    <div className="fixed inset-0 z-toast flex justify-end">
+      <div className="absolute inset-0 scrim backdrop-blur-sm" onClick={onClose} aria-hidden />
+      <aside
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Offering details"
+        className="relative flex h-full w-full max-w-2xl flex-col border-l border-outline-variant bg-surface-container-lowest shadow-elevation-3"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-outline-variant p-6">
           <div className="min-w-0">
-            <h2 className="truncate text-lg font-bold text-white">
+            <h2 className="truncate text-h3 font-bold text-on-surface">
               {mode === 'create' ? 'New Offering' : mode === 'edit' ? 'Edit Offering' : 'Offering Details'}
             </h2>
-            <p className="mt-0.5 truncate text-sm text-slate-400">
+            <p className="mt-0.5 truncate text-body text-on-surface-variant">
               {offering
                 ? offering.courseId && typeof offering.courseId === 'object'
                   ? offering.courseId.code
@@ -380,7 +398,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                 : 'Configure a new course offering'}
             </p>
           </div>
-          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-white">
+          <button onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container hover:text-on-surface">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -390,32 +408,32 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
             {error && <AlertBanner tone="error" onDismiss={() => setError(null)}>{error}</AlertBanner>}
             {notice && <AlertBanner tone="success" onDismiss={() => setNotice(null)}>{notice}</AlertBanner>}
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">General Info</h3>
-              <div className="grid grid-cols-2 gap-4 text-sm">
+            <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+              <h3 className="mb-3 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">General Info</h3>
+              <div className="grid grid-cols-2 gap-4 text-body">
                 <div className="flex flex-col">
-                  <dt className="text-slate-500">Status</dt>
+                  <dt className="text-on-surface-variant">Status</dt>
                   <dd><Badge tone={offering.publicationStatus === 'Published' ? 'emerald' : 'amber'}>{offering.publicationStatus}</Badge></dd>
                 </div>
                 <div className="flex flex-col">
-                  <dt className="text-slate-500">Eligible Majors</dt>
-                  <dd className="text-slate-200">{offering.eligibleMajors?.join(', ') || 'All'}</dd>
+                  <dt className="text-on-surface-variant">Eligible Majors</dt>
+                  <dd className="text-on-surface">{offering.eligibleMajors?.join(', ') || 'All'}</dd>
                 </div>
               </div>
             </section>
 
-            <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-              <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Slots</h3>
+            <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+              <h3 className="mb-3 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Slots</h3>
               <div className="space-y-3">
                 {slots.map((slot) => (
-                  <div key={slot.id} className="flex items-center justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950 p-3 text-sm">
+                  <div key={slot.id} className="flex items-center justify-between gap-3 rounded-lg border border-outline-variant bg-surface-container-lowest p-3 text-body">
                     <div className="min-w-0 space-y-1">
                       <div className="flex flex-wrap items-center gap-3">
                         <Badge tone="indigo">{slot.slotType} {slot.groupNumber}</Badge>
-                        <span className="text-slate-200 font-mono">{slot.dayOfWeek} {slot.startTime}-{slot.endTime}</span>
-                        <span className="text-slate-400">{slot.roomId}</span>
+                        <span className="text-on-surface font-mono">{slot.dayOfWeek} {slot.startTime}-{slot.endTime}</span>
+                        <span className="text-on-surface-variant">{slot.roomId}</span>
                       </div>
-                      <p className="text-xs text-slate-500">{slot.assignedCount} assigned · {slot.maxCapacity} capacity</p>
+                      <p className="text-caption text-on-surface-variant">{slot.assignedCount} assigned · {slot.maxCapacity} capacity</p>
                     </div>
                     <CustomButton
                       variant="danger"
@@ -429,11 +447,11 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                     </CustomButton>
                   </div>
                 ))}
-                {slots.length === 0 && <p className="text-sm text-slate-500">No slots defined.</p>}
+                {slots.length === 0 && <p className="text-body text-on-surface-variant">No slots defined.</p>}
               </div>
             </section>
 
-            <div className="flex flex-wrap justify-end gap-2 border-t border-slate-800 pt-4">
+            <div className="flex flex-wrap justify-end gap-2 border-t border-outline-variant pt-4">
               <CustomButton
                 variant="danger"
                 disabled={isSaving}
@@ -465,7 +483,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
             <div className="flex-1 space-y-6 overflow-y-auto p-6">
               {error && <AlertBanner tone="error" onDismiss={() => setError(null)}>{error}</AlertBanner>}
 
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2">
                 <Select
                   label="Course"
                   value={offeringDraft.courseId}
@@ -499,7 +517,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
 
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-300">Course Slots</h3>
+                  <h3 className="text-body font-semibold text-on-surface">Course Slots</h3>
                   {mode === 'create' && (
                     <CustomButton size="sm" onClick={addSlot} icon={<Plus className="h-3 w-3" />}>Add Slot</CustomButton>
                   )}
@@ -507,18 +525,18 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
 
                 <div className="space-y-4">
                   {slotsDraft.map((slot, index) => (
-                    <div key={slot.id} className="grid gap-3 rounded-xl border border-slate-800 bg-slate-900/50 p-4">
-                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                        <span className="text-xs font-bold uppercase text-slate-500">Slot #{index + 1}</span>
+                    <div key={slot.id} className="grid gap-3 rounded-xl border border-outline-variant bg-surface-container-low p-4">
+                      <div className="flex items-center justify-between border-b border-outline-variant pb-2">
+                        <span className="text-caption font-bold uppercase text-on-surface-variant">Slot #{index + 1}</span>
                         {slot.id === 'new' ? (
-                          <button type="button" onClick={() => removeSlot(slot.id)} className="text-rose-400 hover:text-rose-300" aria-label="Remove new slot">
+                          <button type="button" onClick={() => removeSlot(slot.id)} className="text-error hover:text-error" aria-label="Remove new slot">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         ) : (
-                          <span className="text-xs text-slate-500">Delete saved slots from offering details</span>
+                          <span className="text-caption text-on-surface-variant">Delete saved slots from offering details</span>
                         )}
                       </div>
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                         <Select
                           label="Type"
                           value={slot.slotType}
@@ -572,7 +590,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
                     </div>
                   ))}
                   {slotsDraft.length === 0 && (
-                    <div className="text-center py-8 border-2 border-dashed border-slate-800 rounded-xl text-slate-500 text-sm">
+                    <div className="text-center py-8 border-2 border-dashed border-outline-variant rounded-xl text-on-surface-variant text-body">
                       {mode === 'create'
                         ? 'No slots added yet. Click "Add Slot" to begin.'
                         : 'This offering has no slots yet.'}
@@ -582,7 +600,7 @@ const OfferingDrawer: React.FC<OfferingDrawerProps> = ({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-800 p-4">
+            <div className="flex justify-end gap-2 border-t border-outline-variant p-4">
               <CustomButton variant="ghost" onClick={() => (mode === 'edit' ? onModeChange('view') : onClose())} type="button">
                 Cancel
               </CustomButton>

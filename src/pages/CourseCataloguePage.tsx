@@ -7,6 +7,7 @@ import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 import { ApiError } from '../lib/api';
@@ -45,6 +46,8 @@ const CourseCataloguePage: React.FC = () => {
   const [drawerMode, setDrawerMode] = useState<CourseDrawerMode | null>(null);
   const [importOpen, setImportOpen] = useState(false);
   const [importNotice, setImportNotice] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Course | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadCourses = useCallback(async () => {
     setIsLoading(true);
@@ -122,20 +125,23 @@ const CourseCataloguePage: React.FC = () => {
   };
 
   // Req 21: delete a course from the catalogue (the server flags it inactive).
-  const handleDelete = async (course: Course, event: React.MouseEvent) => {
+  const handleDelete = (course: Course, event: React.MouseEvent) => {
     event.stopPropagation();
-    if (
-      !window.confirm(
-        `Are you sure you want to delete course ${course.code}? This action will mark the course as inactive.`
-      )
-    ) {
-      return;
-    }
+    setDeleteTarget(course);
+  };
+
+  const performDelete = async () => {
+    if (!deleteTarget) return;
     try {
-      await deleteCourse(course.id);
+      setIsDeleting(true);
+      await deleteCourse(deleteTarget.id);
+      setDeleteTarget(null);
       await loadCourses();
     } catch (err) {
       setError((err as ApiError).message);
+      setDeleteTarget(null);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -199,10 +205,10 @@ const CourseCataloguePage: React.FC = () => {
       )}
 
       <Card className="mb-4 p-4">
-        <div className="flex flex-col gap-3 sm:flex-row">
+        <div className="flex flex-col gap-3 md:flex-row">
           <div className="relative flex-1">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
               aria-hidden
             />
             <input
@@ -211,7 +217,7 @@ const CourseCataloguePage: React.FC = () => {
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search by course code or name"
               aria-label="Search courses"
-              className="w-full rounded-lg border border-slate-700 bg-slate-900/70 py-2.5 pl-9 pr-3 text-sm text-slate-100 placeholder:text-slate-500 transition-colors hover:border-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60"
+              className="w-full rounded-lg border border-outline-variant bg-surface-container-low py-2.5 pl-9 pr-3 text-body text-on-surface placeholder:text-on-surface-variant transition-colors hover:border-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
 
@@ -224,7 +230,7 @@ const CourseCataloguePage: React.FC = () => {
             >
               Filters
               {Object.values(filters).some(Boolean) && (
-                <span className="ml-1 rounded-full bg-white/20 px-1.5 text-[10px] font-semibold">
+                <span className="ml-1 rounded-full bg-primary-container px-1.5 text-caption font-semibold text-on-primary-container">
                   {Object.values(filters).filter(Boolean).length}
                 </span>
               )}
@@ -238,7 +244,7 @@ const CourseCataloguePage: React.FC = () => {
         </div>
 
         {showFilters && (
-          <div className="mt-4 grid gap-3 border-t border-slate-800/70 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-4 grid gap-3 border-t border-outline-variant pt-4 md:grid-cols-2 lg:grid-cols-4">
             <Select
               label="Course type"
               placeholder="All types"
@@ -272,7 +278,7 @@ const CourseCataloguePage: React.FC = () => {
       </Card>
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading courses...
         </Card>
@@ -293,15 +299,15 @@ const CourseCataloguePage: React.FC = () => {
         />
       ) : (
         <>
-          <p className="mb-2 text-xs text-slate-500">
+          <p className="mb-2 text-caption text-on-surface-variant">
             {visibleCourses.length === courses.length
               ? `${courses.length} courses`
               : `${visibleCourses.length} of ${courses.length} courses`}
           </p>
           <Card tone="raised" className="overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[56rem] text-left text-sm">
-                <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+              <table className="w-full min-w-[56rem] text-left text-body">
+                <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                   <tr>
                     <th scope="col" className="px-4 py-3 font-semibold">Course</th>
                     <th scope="col" className="px-4 py-3 font-semibold">Type</th>
@@ -315,27 +321,27 @@ const CourseCataloguePage: React.FC = () => {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/60">
+                <tbody className="divide-y divide-outline-variant">
                   {visibleCourses.map((course) => (
                     <tr
                       key={course.id}
                       onClick={() => openCourse(course)}
-                      className="cursor-pointer transition-colors hover:bg-slate-800/40"
+                      className="cursor-pointer transition-colors hover:bg-surface-container"
                     >
                       <td className="px-4 py-3">
-                        <div className="font-mono text-sm font-semibold text-indigo-300">{course.code}</div>
-                        <div className="text-xs text-slate-400">{course.name}</div>
+                        <div className="font-mono text-body font-semibold text-primary">{course.code}</div>
+                        <div className="text-caption text-on-surface-variant">{course.name}</div>
                       </td>
                       <td className="px-4 py-3">
                         <Badge tone={COURSE_TYPE_TONE[course.courseType]}>{course.courseType}</Badge>
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{course.creditHours}</td>
-                      <td className="px-4 py-3 text-slate-300">
+                      <td className="px-4 py-3 text-on-surface">{course.creditHours}</td>
+                      <td className="px-4 py-3 text-on-surface">
                         {course.majors.length === COURSE_MAJORS.length ? 'Both' : course.majors.join(', ')}
                       </td>
-                      <td className="px-4 py-3 text-slate-300">{course.recommendedSemester}</td>
-                      <td className="px-4 py-3 text-slate-300">{course.offeringSeasons.join(', ')}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-400">
+                      <td className="px-4 py-3 text-on-surface">{course.recommendedSemester}</td>
+                      <td className="px-4 py-3 text-on-surface">{course.offeringSeasons.join(', ')}</td>
+                      <td className="px-4 py-3 font-mono text-caption text-on-surface-variant">
                         {course.prerequisites.length === 0
                           ? '—'
                           : course.prerequisites.map((prerequisite) => prerequisite.code).join(', ')}
@@ -346,7 +352,7 @@ const CourseCataloguePage: React.FC = () => {
                             type="button"
                             onClick={(event) => handleDelete(course, event)}
                             aria-label={`Delete ${course.code}`}
-                            className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-rose-500/10 hover:text-rose-400"
+                            className="flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-error-container hover:text-error"
                           >
                             <Trash2 className="h-4 w-4" aria-hidden />
                           </button>
@@ -357,7 +363,7 @@ const CourseCataloguePage: React.FC = () => {
                               openCourse(course);
                             }}
                             aria-label={`View ${course.code}`}
-                            className="rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-800 hover:text-white"
+                            className="flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface"
                           >
                             <ChevronRight className="h-4 w-4" aria-hidden />
                           </button>
@@ -382,6 +388,22 @@ const CourseCataloguePage: React.FC = () => {
       />
 
       <CourseImportDialog open={importOpen} onClose={closeImport} onImported={handleImported} />
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        title="Delete this course?"
+        message={
+          <>
+            <span className="font-medium text-on-surface">{deleteTarget?.code}</span> will be marked
+            inactive and removed from the catalogue. Existing offerings keep their records.
+          </>
+        }
+        confirmLabel="Delete course"
+        tone="danger"
+        isLoading={isDeleting}
+        onConfirm={performDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
     </>
   );
 };

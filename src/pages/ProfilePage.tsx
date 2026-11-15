@@ -34,9 +34,9 @@ interface ProfileUser {
 }
 
 const DetailField: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-  <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-4">
-    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-    <p className="mt-1 text-sm font-medium text-white">{value}</p>
+  <div className="rounded-xl border border-outline-variant bg-surface-container-lowest p-4">
+    <p className="text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">{label}</p>
+    <p className="mt-1 text-body font-medium text-on-surface">{value}</p>
   </div>
 );
 
@@ -75,7 +75,7 @@ const ProfilePage: React.FC = () => {
 
   if (!profile) {
     return (
-      <div className="flex min-h-[50vh] items-center justify-center gap-2 text-sm text-slate-400">
+      <div role="status" className="flex min-h-[50vh] items-center justify-center gap-2 text-body text-on-surface-variant">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         Loading your profile...
       </div>
@@ -97,15 +97,15 @@ const ProfilePage: React.FC = () => {
       />
 
       <div className="max-w-4xl space-y-6">
-        <Card tone="raised" className="p-6" sheen>
+        <Card tone="raised" className="p-6">
           <div className="flex flex-wrap items-center gap-5">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-2xl font-bold text-white shadow-lg shadow-indigo-950/50">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-primary text-h2 font-bold text-on-primary shadow-elevation-1">
               {profile.fullName.charAt(0)}
             </div>
             <div className="min-w-0">
-              <h2 className="truncate text-xl font-bold text-white">{profile.fullName}</h2>
-              <p className="text-sm font-medium text-indigo-400">{profile.role}</p>
-              <p className="flex items-center gap-1.5 truncate text-sm text-slate-400">
+              <h2 className="truncate text-h2 font-bold text-on-surface">{profile.fullName}</h2>
+              <p className="text-body font-medium text-primary">{profile.role}</p>
+              <p className="flex items-center gap-1.5 truncate text-body text-on-surface-variant">
                 <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden />
                 {profile.email}
               </p>
@@ -123,17 +123,17 @@ const ProfilePage: React.FC = () => {
 
         {/* FR 4.0: every account sees their own profile details. */}
         <Card className="p-6">
-          <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
-            <ShieldCheck className="h-4 w-4 text-indigo-400" aria-hidden />
+          <h3 className="mb-4 flex items-center gap-2 text-body font-semibold uppercase tracking-eyebrow text-on-surface-variant">
+            <ShieldCheck className="h-4 w-4 text-primary" aria-hidden />
             Account Information
           </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <DetailField label="Full Name" value={profile.fullName} />
             <DetailField
               label="GUC Email"
               value={
                 <span className="flex items-center gap-1.5">
-                  <Mail className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                  <Mail className="h-4 w-4 shrink-0 text-on-surface-variant" aria-hidden />
                   <span className="truncate">{profile.email}</span>
                 </span>
               }
@@ -150,16 +150,16 @@ const ProfilePage: React.FC = () => {
         {/* FR 4.0: only student profiles carry the academic fields. */}
         {isStudent && (
           <Card className="p-6">
-            <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-slate-400">
-              <GraduationCap className="h-4 w-4 text-indigo-400" aria-hidden />
+            <h3 className="mb-4 flex items-center gap-2 text-body font-semibold uppercase tracking-eyebrow text-on-surface-variant">
+              <GraduationCap className="h-4 w-4 text-primary" aria-hidden />
               Academic Information
             </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               <DetailField
                 label="Student ID"
                 value={
                   <span className="flex items-center gap-1.5">
-                    <CreditCard className="h-4 w-4 text-slate-500" aria-hidden />
+                    <CreditCard className="h-4 w-4 text-on-surface-variant" aria-hidden />
                     {profile.studentId || 'Not set'}
                   </span>
                 }
@@ -174,10 +174,10 @@ const ProfilePage: React.FC = () => {
                   profile.assignedAdvisor ? (
                     <span className="flex flex-col">
                       <span className="flex items-center gap-1.5">
-                        <UserRound className="h-4 w-4 text-slate-500" aria-hidden />
+                        <UserRound className="h-4 w-4 text-on-surface-variant" aria-hidden />
                         {profile.assignedAdvisor.fullName}
                       </span>
-                      <span className="truncate text-xs font-normal text-slate-500">
+                      <span className="truncate text-caption font-normal text-on-surface-variant">
                         {profile.assignedAdvisor.email}
                       </span>
                     </span>

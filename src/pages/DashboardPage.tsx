@@ -54,13 +54,13 @@ const DashboardPage: React.FC = () => {
       />
 
       {error && (
-        <Card className="p-4 text-sm text-rose-300">
+        <Card className="p-4 text-body text-error">
           Could not load dashboard data: {error}
         </Card>
       )}
 
       {canManageStudents && stats && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           <StatCard
             label="Total students"
             value={stats.total}
@@ -93,15 +93,15 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      <Card tone="raised" className="mt-6 p-6" sheen>
-        <h2 className="text-lg font-bold text-white">Getting started</h2>
-        <p className="mt-1 text-sm text-slate-400">
+      <Card tone="raised" className="mt-6 p-6">
+        <h2 className="text-h3 font-bold text-on-surface">Getting started</h2>
+        <p className="mt-1 text-body text-on-surface-variant">
           Every page in the sidebar is listed here too. Your access depends on your role.
         </p>
         {/* Same source as the sidebar, filtered by the same rules, so the two can
             never disagree about which pages a role may open. The dashboard itself
             is dropped — you are already standing on it. */}
-        <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+        <ul className="mt-4 grid gap-3 md:grid-cols-2">
           {visibleNavItems(user?.role ?? null, user?.studentType ?? null)
             .filter((item) => item.to !== '/dashboard')
             .map((item, index) => {
@@ -113,13 +113,13 @@ const DashboardPage: React.FC = () => {
                   <li key={item.to}>
                     <div
                       aria-disabled="true"
-                      className="w-full cursor-not-allowed rounded-xl border border-slate-800/80 bg-slate-900/30 p-4"
+                      className="w-full cursor-not-allowed rounded-xl border border-outline-variant bg-surface-container-low p-4"
                     >
-                      <span className="flex items-center gap-2 text-sm font-semibold text-slate-500">
+                      <span className="flex items-center gap-2 text-body font-semibold text-on-surface-variant">
                         <Icon className="h-4 w-4" aria-hidden />
                         {navLabel(item, user?.role ?? null)}
                       </span>
-                      <span className="mt-1 block text-xs text-slate-600">
+                      <span className="mt-1 block text-caption text-on-surface-variant">
                         Not built yet. It stays listed so the navigation does not lie about what exists.
                       </span>
                     </div>
@@ -132,18 +132,18 @@ const DashboardPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => navigate(item.to)}
-                    className={`w-full rounded-xl border border-slate-700 bg-slate-900/60 p-4 text-left transition-colors hover:bg-slate-800/60 focus:outline-none focus-visible:ring-2 ${tone.ring}`}
+                    className={`w-full rounded-xl border border-outline-variant bg-surface-container-low p-4 text-left transition-colors hover:bg-surface-container focus:outline-none focus-visible:ring-2 ${tone.ring}`}
                   >
-                    <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <span className="flex items-center gap-2 text-body font-semibold text-on-surface">
                       <Icon className={`h-4 w-4 ${tone.icon}`} aria-hidden />
                       {navLabel(item, user?.role ?? null)}
                       {item.to === '/notifications' && !!unreadCount && (
-                        <span className="ml-auto rounded-full bg-indigo-500 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                        <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 text-caption font-semibold leading-none text-on-primary">
                           {unreadCount > 99 ? '99+' : unreadCount}
                         </span>
                       )}
                     </span>
-                    <span className="mt-1 block text-xs text-slate-400">
+                    <span className="mt-1 block text-caption text-on-surface-variant">
                       {item.to === '/notifications' && unreadCount
                         ? `${unreadCount} unread — open it to mark them as read.`
                         : item.description}
@@ -173,29 +173,49 @@ interface StatCardProps {
  * colour of its own.
  */
 const TONES = [
-  { icon: 'text-indigo-400', ring: 'hover:border-indigo-500 focus-visible:ring-indigo-400' },
-  { icon: 'text-sky-400', ring: 'hover:border-sky-500 focus-visible:ring-sky-400' },
-  { icon: 'text-emerald-400', ring: 'hover:border-emerald-500 focus-visible:ring-emerald-400' },
-  { icon: 'text-amber-400', ring: 'hover:border-amber-500 focus-visible:ring-amber-400' },
+  { icon: 'text-primary', ring: 'hover:border-primary focus-visible:ring-primary' },
+  { icon: 'text-info', ring: 'hover:border-info focus-visible:ring-info' },
+  { icon: 'text-success', ring: 'hover:border-success focus-visible:ring-success' },
+  { icon: 'text-warning', ring: 'hover:border-warning focus-visible:ring-warning' },
 ];
 
 const TONE_CLASSES: Record<StatCardProps['tone'], string> = {
-  indigo: 'bg-indigo-500/15 text-indigo-400',
-  sky: 'bg-sky-500/15 text-sky-400',
-  amber: 'bg-amber-500/15 text-amber-400',
-  rose: 'bg-rose-500/15 text-rose-400',
+  indigo: 'bg-primary-container text-on-primary-container',
+  sky: 'bg-info-container text-info',
+  amber: 'bg-warning-container text-warning',
+  rose: 'bg-error-container text-error',
 };
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, detail, icon, tone, onClick }) => {
   const isClickable = !!onClick;
 
+  // A whole-card link is a button for keyboard and screen-reader users, not
+  // just a mouse target.
+  const activate = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (!onClick) return;
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onClick();
+    }
+  };
+
   return (
-    <Card className={`p-5 transition-all ${isClickable ? 'cursor-pointer hover:border-indigo-500/50 hover:bg-indigo-500/5' : ''}`} onClick={onClick}>
+    <Card
+      role={isClickable ? 'button' : undefined}
+      tabIndex={isClickable ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={isClickable ? activate : undefined}
+      className={`p-5 transition-all ${
+        isClickable
+          ? 'cursor-pointer hover:border-primary hover:bg-surface-container-low focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary'
+          : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</p>
-          <p className="mt-1 text-3xl font-bold tracking-tight text-white">{value}</p>
-          <p className="mt-1 truncate text-xs text-slate-500">{detail}</p>
+          <p className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">{label}</p>
+          <p className="mt-1 text-h1 font-bold tracking-tight text-on-surface">{value}</p>
+          <p className="mt-1 truncate text-caption text-on-surface-variant">{detail}</p>
         </div>
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONE_CLASSES[tone]}`}>
           {icon}

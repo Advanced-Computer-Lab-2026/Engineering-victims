@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { ArrowRightLeft, Calendar, Clock, MapPin } from 'lucide-react';
 import type { ApiError } from '../lib/api';
 import type { CourseSlotDetail, SlotChangeRequestSummary } from '../lib/types';
@@ -15,7 +16,7 @@ interface SlotChangeRequestDialogProps {
 }
 
 const fieldClass =
-  'rounded-lg border border-slate-700 bg-slate-900/70 px-3 py-2 text-sm text-slate-100 transition-colors hover:border-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 disabled:cursor-not-allowed disabled:opacity-60';
+  'rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2 text-body text-on-surface transition-colors hover:border-outline focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 /**
  * Req 40: ask for a change to one assigned lecture, tutorial or lab slot.
@@ -28,6 +29,7 @@ const SlotChangeRequestDialog: React.FC<SlotChangeRequestDialogProps> = ({ cours
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const trapRef = useFocusTrap<HTMLFormElement>(true);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -57,61 +59,62 @@ const SlotChangeRequestDialog: React.FC<SlotChangeRequestDialogProps> = ({ cours
   };
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-toast flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 scrim backdrop-blur-sm"
         onClick={isSubmitting ? undefined : onCancel}
         aria-hidden
       />
       <form
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="slot-change-title"
         onSubmit={handleSubmit}
-        className="relative w-full max-w-md rounded-2xl border border-slate-800 bg-slate-950 p-6 shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl border border-outline-variant bg-surface-container-lowest p-6 shadow-2xl"
       >
         <div className="flex items-start gap-4">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-indigo-800/60 bg-indigo-950/60 text-indigo-300">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary bg-primary-container text-on-primary-container">
             <ArrowRightLeft className="h-5 w-5" aria-hidden />
           </span>
           <div className="min-w-0">
-            <h2 id="slot-change-title" className="text-base font-bold text-white">
+            <h2 id="slot-change-title" className="text-body-lg font-bold text-on-surface">
               Request a slot change
             </h2>
-            <p className="mt-1 text-sm leading-relaxed text-slate-400">
+            <p className="mt-1 text-body leading-relaxed text-on-surface-variant">
               Your advisor reviews the request. Your current slot stays assigned until then.
             </p>
           </div>
         </div>
 
-        <dl className="mt-5 grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 rounded-xl border border-slate-800 bg-slate-900/50 p-4 text-sm">
-          <dt className="text-slate-500">Course</dt>
-          <dd className="text-slate-200">
-            <span className="font-mono font-semibold text-indigo-300">{course.code}</span> · {course.name}
+        <dl className="mt-5 grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 rounded-xl border border-outline-variant bg-surface-container-low p-4 text-body">
+          <dt className="text-on-surface-variant">Course</dt>
+          <dd className="text-on-surface">
+            <span className="font-mono font-semibold text-primary">{course.code}</span> · {course.name}
           </dd>
-          <dt className="text-slate-500">Component</dt>
-          <dd className="text-slate-200">
+          <dt className="text-on-surface-variant">Component</dt>
+          <dd className="text-on-surface">
             {slot.slotType} · Group {slot.groupNumber}
           </dd>
-          <dt className="text-slate-500">Current slot</dt>
-          <dd className="space-y-1 text-slate-300">
+          <dt className="text-on-surface-variant">Current slot</dt>
+          <dd className="space-y-1 text-on-surface">
             <span className="flex items-center gap-2">
-              <Calendar className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+              <Calendar className="h-3.5 w-3.5 text-on-surface-variant" aria-hidden />
               {slot.dayOfWeek}
             </span>
             <span className="flex items-center gap-2 font-mono">
-              <Clock className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+              <Clock className="h-3.5 w-3.5 text-on-surface-variant" aria-hidden />
               {slot.startTime} – {slot.endTime}
             </span>
             <span className="flex items-center gap-2">
-              <MapPin className="h-3.5 w-3.5 text-slate-500" aria-hidden />
+              <MapPin className="h-3.5 w-3.5 text-on-surface-variant" aria-hidden />
               {slot.room}
             </span>
           </dd>
         </dl>
 
         <label className="mt-5 block">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-400">Preference note (optional)</span>
+          <span className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Preference note (optional)</span>
           <textarea
             value={note}
             maxLength={SLOT_CHANGE_NOTE_LIMIT}
@@ -121,7 +124,7 @@ const SlotChangeRequestDialog: React.FC<SlotChangeRequestDialogProps> = ({ cours
             placeholder="e.g. Group 2 would suit me, or any slot on Sunday."
             className={`${fieldClass} mt-1.5 w-full resize-y`}
           />
-          <span className="mt-1 block text-right text-[11px] text-slate-500">
+          <span className="mt-1 block text-right text-caption text-on-surface-variant">
             {note.length}/{SLOT_CHANGE_NOTE_LIMIT}
           </span>
         </label>

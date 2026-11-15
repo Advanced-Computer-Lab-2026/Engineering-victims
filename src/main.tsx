@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import AppLayout from './components/AppLayout';
 import ErrorBoundary from './components/ErrorBoundary';
 import ProtectedRoute from './components/RouteGuards';
@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import NotificationsPage from './pages/NotificationsPage';
 import StudentsPage from './pages/StudentsPage';
+import StudentDetailPage from './pages/StudentDetailPage';
 import AcademicTermsPage from './pages/AcademicTermsPage';
 import AdvisorsPage from './pages/AdvisorsPage';
 import CourseCataloguePage from './pages/CourseCataloguePage';
@@ -35,6 +36,10 @@ import GraduationPlanBuilderPage from './pages/GraduationPlanBuilderPage';
 import MyGraduationPlanPage from './pages/MyGraduationPlanPage';
 import ExitExamRequestsPage from './pages/ExitExamRequestsPage';
 import SemesterStandingsPage from './pages/SemesterStandingsPage';
+import NotFoundPage from './pages/NotFoundPage';
+// Brand first, then system tokens, then the project's Tailwind entry point.
+import '../brand.css';
+import '../ui-system/tokens.css';
 import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -56,6 +61,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/students" element={<StudentsPage />} />
+          {/* Req 9, 53: one student's full record. A route rather than a side
+              drawer so the academic history and advising tables fit. */}
+          <Route path="/students/:studentId" element={<StudentDetailPage />} />
         </Route>
 
         {/* Req 50: every advising student, for Advisors only. */}
@@ -193,7 +201,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/notifications" element={<NotificationsPage />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </BrowserRouter>
     </ErrorBoundary>

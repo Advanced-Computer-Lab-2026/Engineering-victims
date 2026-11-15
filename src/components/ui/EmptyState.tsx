@@ -16,13 +16,13 @@ interface EmptyStateProps {
  * "design for errors" non-functional requirement.
  */
 const EmptyState: React.FC<EmptyStateProps> = ({ title, description, icon, action }) => (
-  <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-slate-700/70 bg-slate-900/30 px-6 py-14 text-center">
-    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-800/80 text-slate-400" aria-hidden>
+  <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-outline-variant bg-surface-container-low px-6 py-14 text-center">
+    <span className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-container text-on-surface-variant" aria-hidden>
       {icon ?? <Inbox className="h-5 w-5" />}
     </span>
     <div className="space-y-1">
-      <p className="text-sm font-semibold text-slate-200">{title}</p>
-      {description && <p className="max-w-sm text-xs leading-relaxed text-slate-400">{description}</p>}
+      <p className="text-body font-semibold text-on-surface">{title}</p>
+      {description && <p className="max-w-sm text-caption leading-relaxed text-on-surface-variant">{description}</p>}
     </div>
     {action && (
       <CustomButton variant="secondary" size="sm" onClick={action.onClick} className="mt-1">

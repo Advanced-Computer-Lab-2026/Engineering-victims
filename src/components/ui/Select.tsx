@@ -20,7 +20,7 @@ const Select: React.FC<SelectProps> = ({ label, options, placeholder, className 
 
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label htmlFor={selectId} className="text-xs font-medium uppercase tracking-wide text-slate-400">
+      <label htmlFor={selectId} className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
         {label}
       </label>
       <div className="relative">
@@ -28,19 +28,19 @@ const Select: React.FC<SelectProps> = ({ label, options, placeholder, className 
           id={selectId}
           value={value}
           {...props}
-          className={`w-full appearance-none rounded-lg border bg-slate-900/70 py-2.5 pl-3 pr-9 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:border-indigo-500/60 ${
-            isFiltered ? 'border-indigo-500/60 text-slate-100' : 'border-slate-700 text-slate-300 hover:border-slate-600'
+          className={`w-full appearance-none rounded-lg border bg-surface-container-lowest py-3 pl-3 pr-9 text-body text-on-surface transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary ${
+            isFiltered ? 'border-primary' : 'border-outline hover:border-outline'
           }`}
         >
           {placeholder !== undefined && <option value="">{placeholder}</option>}
           {options.map((option) => (
-            <option key={option.value} value={option.value} className="bg-slate-900">
+            <option key={option.value} value={option.value} className="bg-surface-container">
               {option.label}
             </option>
           ))}
         </select>
         <ChevronDown
-          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+          className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
           aria-hidden
         />
       </div>

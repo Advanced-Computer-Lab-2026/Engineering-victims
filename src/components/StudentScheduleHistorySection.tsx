@@ -114,17 +114,17 @@ const StudentScheduleHistorySection: React.FC<StudentScheduleHistorySectionProps
   };
 
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4 space-y-3">
+    <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <h3 className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          <ScrollText className="h-3.5 w-3.5 text-indigo-400" aria-hidden />
+        <h3 className="flex items-center gap-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
+          <ScrollText className="h-3.5 w-3.5 text-primary" aria-hidden />
           Schedule Processing & Reopening History
         </h3>
         {canOpenGlobalHistory && (
           <button
             type="button"
             onClick={() => navigate('/schedule-history')}
-            className="inline-flex items-center gap-1 text-xs font-medium text-indigo-400 hover:text-indigo-300"
+            className="inline-flex items-center gap-1 text-caption font-medium text-primary hover:text-primary"
           >
             Global history
             <ExternalLink className="h-3 w-3" aria-hidden />
@@ -158,7 +158,7 @@ const StudentScheduleHistorySection: React.FC<StudentScheduleHistorySectionProps
                 Reopen Processed Schedule
               </CustomButton>
             ) : (
-              <form onSubmit={handleReopen} className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/60 p-3">
+              <form onSubmit={handleReopen} className="space-y-2 rounded-xl border border-outline-variant bg-surface-container-lowest p-3">
                 <CustomInput
                   label="Reopening reason (required)"
                   placeholder="Explain why this schedule is being reopened..."
@@ -197,12 +197,12 @@ const StudentScheduleHistorySection: React.FC<StudentScheduleHistorySectionProps
       )}
 
       {isLoading ? (
-        <div className="flex items-center gap-2 py-4 text-xs text-slate-400">
+        <div className="flex items-center gap-2 py-4 text-caption text-on-surface-variant">
           <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
           Loading schedule activity history...
         </div>
       ) : logs.length === 0 ? (
-        <p className="text-xs text-slate-500">
+        <p className="text-caption text-on-surface-variant">
           No schedule processing or reopening actions have been recorded for this student yet.
         </p>
       ) : (
@@ -210,34 +210,34 @@ const StudentScheduleHistorySection: React.FC<StudentScheduleHistorySectionProps
           {logs.map((entry) => (
             <li
               key={entry.id}
-              className="rounded-xl border border-slate-800/80 bg-slate-950/50 p-3 text-xs space-y-1.5"
+              className="rounded-xl border border-outline-variant bg-surface-container-lowest p-3 text-caption space-y-1.5"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Badge tone={entry.action === 'Processed' ? 'emerald' : 'amber'} dot>
                     {entry.action}
                   </Badge>
-                  <span className="font-mono font-semibold text-slate-200">
+                  <span className="font-mono font-semibold text-on-surface">
                     v{entry.scheduleVersion}
                   </span>
-                  <span className="font-mono text-slate-500">({entry.studentId})</span>
+                  <span className="font-mono text-on-surface-variant">({entry.studentId})</span>
                 </div>
-                <span className="flex items-center gap-1 text-slate-400">
+                <span className="flex items-center gap-1 text-on-surface-variant">
                   <Clock className="h-3 w-3" aria-hidden />
                   {new Date(entry.occurredAt).toLocaleString()}
                 </span>
               </div>
 
-              <div className="text-slate-300">
-                <span className="font-medium text-white">{entry.staffName}</span>{' '}
-                <span className="text-slate-400">({entry.staffEmail})</span> ·{' '}
-                <Badge tone="neutral" className="text-[10px]">
+              <div className="text-on-surface">
+                <span className="font-medium text-on-surface">{entry.staffName}</span>{' '}
+                <span className="text-on-surface-variant">({entry.staffEmail})</span> ·{' '}
+                <Badge tone="neutral" className="text-caption">
                   {entry.staffRole}
                 </Badge>
               </div>
 
               {entry.reason && (
-                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-2.5 py-1.5 text-amber-200">
+                <div className="rounded-lg border border-warning bg-warning-container px-2.5 py-1.5 text-warning">
                   <span className="font-semibold">Reopening reason:</span> {entry.reason}
                 </div>
               )}

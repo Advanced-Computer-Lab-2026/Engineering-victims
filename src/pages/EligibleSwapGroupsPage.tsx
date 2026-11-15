@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, RefreshCcw, Calendar, BookOpen, Users, ArrowRightLeft, Eye, Clock, MapPin, UserRound, Coffee } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
@@ -13,9 +14,9 @@ import EmptyState from '../components/ui/EmptyState';
 
 /** Lecture, tutorial and lab read apart at a glance, matching Req 31's grid. */
 const TYPE_STYLE: Record<ScheduleSession['slotType'], { tone: BadgeTone; card: string }> = {
-  Lecture: { tone: 'indigo', card: 'border-indigo-500/40 bg-indigo-500/10' },
-  Tutorial: { tone: 'sky', card: 'border-sky-500/40 bg-sky-500/10' },
-  Lab: { tone: 'emerald', card: 'border-emerald-500/40 bg-emerald-500/10' },
+  Lecture: { tone: 'indigo', card: 'border-primary bg-primary-container' },
+  Tutorial: { tone: 'sky', card: 'border-info bg-info-container' },
+  Lab: { tone: 'emerald', card: 'border-success bg-success-container' },
 };
 
 /**
@@ -30,6 +31,17 @@ const EligibleSwapGroupsPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
+  const trapRef = useFocusTrap<HTMLDivElement>(!!selectedGroup);
+
+  // Escape closes the schedule viewer and clears the loaded group.
+  useEffect(() => {
+    if (!selectedGroup) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSelectedGroup(null);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [selectedGroup]);
   const [groupSchedule, setGroupSchedule] = useState<SwapGroupScheduleResponse | null>(null);
   const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<ApiError | null>(null);
@@ -122,32 +134,32 @@ const EligibleSwapGroupsPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading eligible swap groups...
         </Card>
       ) : data ? (
         <div className="space-y-6">
           {/* My Current Group Info */}
-          <Card tone="raised" className="p-5 bg-indigo-500/10 border-indigo-500/30" sheen>
+          <Card tone="raised" className="p-5 bg-primary-container border-primary">
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex-1">
-                <h3 className="flex items-center gap-2 text-lg font-bold text-white">
-                  <Users className="h-5 w-5 text-indigo-400" />
+                <h3 className="flex items-center gap-2 text-h3 font-bold text-on-surface">
+                  <Users className="h-5 w-5 text-primary" />
                   My Current Group
                 </h3>
-                <p className="mt-1 text-sm text-slate-300">
-                  You are currently in <span className="font-mono font-bold text-indigo-300">Group {data.myGroup}</span>
+                <p className="mt-1 text-body text-on-surface">
+                  You are currently in <span className="font-mono font-bold text-primary">Group {data.myGroup}</span>
                   {data.term && (
-                    <span className="text-slate-400">
+                    <span className="text-on-surface-variant">
                       {' '}· {data.term.academicYear} {data.term.season}
                     </span>
                   )}
                 </p>
               </div>
-              <div className="rounded-lg bg-indigo-500/20 px-4 py-2">
-                <p className="text-xs font-medium uppercase tracking-wide text-slate-400">Courses</p>
-                <p className="text-2xl font-bold text-indigo-300">{data.myCourses.length}</p>
+              <div className="rounded-lg bg-surface-container-lowest px-4 py-2">
+                <p className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">Courses</p>
+                <p className="text-h2 font-bold text-primary">{data.myCourses.length}</p>
               </div>
             </div>
 
@@ -176,7 +188,7 @@ const EligibleSwapGroupsPage: React.FC = () => {
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-300">
+                <h2 className="text-body font-semibold uppercase tracking-eyebrow text-on-surface">
                   Eligible Groups ({data.eligibleGroups.length})
                 </h2>
               </div>
@@ -186,19 +198,19 @@ const EligibleSwapGroupsPage: React.FC = () => {
                   <Card
                     key={group.studyGroup}
                     tone="raised"
-                    className="p-4 transition-all hover:border-indigo-500/50"
+                    className="p-4 transition-all hover:border-primary"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <h3 className="font-mono text-xl font-bold text-white">Group {group.studyGroup}</h3>
+                          <h3 className="font-mono text-h2 font-bold text-on-surface">Group {group.studyGroup}</h3>
                           <Badge tone="neutral" icon={<Users className="h-3 w-3" />}>
                             {group.major}
                           </Badge>
                         </div>
-                        <p className="mt-1 text-xs text-slate-400">Semester {group.semester}</p>
+                        <p className="mt-1 text-caption text-on-surface-variant">Semester {group.semester}</p>
 
-                        <div className="mt-3 flex items-center gap-4 text-xs text-slate-400">
+                        <div className="mt-3 flex items-center gap-4 text-caption text-on-surface-variant">
                           <span className="flex items-center gap-1">
                             <BookOpen className="h-3.5 w-3.5" />
                             {group.courseCodes.length} courses
@@ -211,7 +223,7 @@ const EligibleSwapGroupsPage: React.FC = () => {
 
                         <div className="mt-3 flex flex-wrap gap-1">
                           {group.courseCodes.map((code) => (
-                            <Badge key={code} tone="sky" className="text-[10px]">
+                            <Badge key={code} tone="sky" className="text-caption">
                               {code}
                             </Badge>
                           ))}
@@ -219,7 +231,7 @@ const EligibleSwapGroupsPage: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="mt-4 pt-4 border-t border-slate-800">
+                    <div className="mt-4 pt-4 border-t border-outline-variant">
                       <CustomButton
                         variant="secondary"
                         size="sm"
@@ -245,14 +257,14 @@ const EligibleSwapGroupsPage: React.FC = () => {
 
           {/* Schedule viewer: the destination group's complete week */}
           {selectedGroup && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center">
-              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={closeSchedule} />
-              <Card tone="raised" className="relative z-10 m-4 max-h-[90vh] w-full max-w-4xl overflow-y-auto p-6">
+            <div className="fixed inset-0 z-toast flex items-center justify-center">
+              <div className="absolute inset-0 scrim backdrop-blur-sm" onClick={closeSchedule} aria-hidden />
+              <Card ref={trapRef} tone="raised" role="dialog" aria-modal="true" aria-label="Group schedule" className="relative z-sticky m-4 max-h-[90vh] w-full max-w-4xl overflow-y-auto p-6">
                 <div className="mb-4 flex items-center justify-between">
                   <div>
-                    <h3 className="text-lg font-bold text-white">Group {selectedGroup} Schedule</h3>
+                    <h3 className="text-h3 font-bold text-on-surface">Group {selectedGroup} Schedule</h3>
                     {groupSchedule && (
-                      <p className="mt-0.5 text-xs text-slate-400">
+                      <p className="mt-0.5 text-caption text-on-surface-variant">
                         {groupSchedule.major} · Semester {groupSchedule.semester}
                         {groupSchedule.term && ` · ${groupSchedule.term.academicYear} ${groupSchedule.term.season}`}
                         {' · '}
@@ -274,7 +286,7 @@ const EligibleSwapGroupsPage: React.FC = () => {
                 )}
 
                 {isLoadingSchedule ? (
-                  <div className="flex items-center justify-center gap-2 p-12 text-sm text-slate-400">
+                  <div role="status" className="flex items-center justify-center gap-2 p-12 text-body text-on-surface-variant">
                     <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
                     Loading Group {selectedGroup}'s schedule...
                   </div>
@@ -289,7 +301,7 @@ const EligibleSwapGroupsPage: React.FC = () => {
                     <>
                       <div className="mb-4 flex flex-wrap gap-1">
                         {groupSchedule.courseCodes.map((code) => (
-                          <Badge key={code} tone="sky" className="text-[10px]">
+                          <Badge key={code} tone="sky" className="text-caption">
                             {code}
                           </Badge>
                         ))}
@@ -310,9 +322,9 @@ const EligibleSwapGroupsPage: React.FC = () => {
                           return (
                             <div key={day}>
                               <div className="mb-2 flex items-center gap-2">
-                                <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-300">{day}</h4>
+                                <h4 className="text-caption font-semibold uppercase tracking-eyebrow text-on-surface">{day}</h4>
                                 {isDayOff && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-300">
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-warning-container px-2 py-0.5 text-caption text-warning">
                                     <Coffee className="h-3 w-3" aria-hidden />
                                     Day off
                                   </span>
@@ -320,26 +332,26 @@ const EligibleSwapGroupsPage: React.FC = () => {
                               </div>
 
                               {daySessions.length === 0 ? (
-                                <p className="text-xs text-slate-500">No classes</p>
+                                <p className="text-caption text-on-surface-variant">No classes</p>
                               ) : (
-                                <div className="grid gap-2 sm:grid-cols-2">
+                                <div className="grid gap-2 md:grid-cols-2">
                                   {daySessions.map((session) => (
                                     <div
                                       key={session.id}
                                       className={`rounded-lg border p-3 ${TYPE_STYLE[session.slotType].card}`}
                                     >
                                       <div className="flex items-center justify-between gap-2">
-                                        <span className="font-mono text-sm font-semibold text-white">
+                                        <span className="font-mono text-body font-semibold text-on-surface">
                                           {session.courseCode}
                                         </span>
                                         <Badge tone={TYPE_STYLE[session.slotType].tone}>
                                           {session.slotType} · G{session.groupNumber}
                                         </Badge>
                                       </div>
-                                      <p className="mt-0.5 truncate text-xs text-slate-300" title={session.courseName}>
+                                      <p className="mt-0.5 truncate text-caption text-on-surface" title={session.courseName}>
                                         {session.courseName}
                                       </p>
-                                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-400">
+                                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-on-surface">
                                         <span className="flex items-center gap-1">
                                           <Clock className="h-3 w-3" aria-hidden />
                                           {session.startTime}–{session.endTime}

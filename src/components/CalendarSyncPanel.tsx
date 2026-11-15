@@ -88,13 +88,13 @@ const CalendarSyncPanel: React.FC<{ processed: boolean }> = ({ processed }) => {
     <Card className="mb-5 p-5 print:hidden">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
-          <h2 className="flex items-center gap-2 font-semibold text-white"><CalendarDays className="h-4 w-4" aria-hidden />Calendar sync</h2>
-          <p className="text-sm text-slate-400">Copy your processed schedule to Google Calendar for the teaching period.</p>
-          {status?.connected && <p className="text-sm text-slate-300">Connected{status.email ? ` as ${status.email}` : ''} · {status.timezone}</p>}
-          {status?.lastSyncedAt && <p className="text-xs text-slate-400">Last synchronized: {new Date(status.lastSyncedAt).toLocaleString()}</p>}
-          {status && !status.configured && <p className="text-sm text-amber-300">Calendar integration setup is pending. Contact your administrator.</p>}
-          {status?.needsReconnect && <p className="text-sm text-amber-300">Calendar access expired or was revoked. Disconnect, then connect again.</p>}
-          {!processed && <p className="text-xs text-slate-400">Synchronization becomes available when your schedule is processed.</p>}
+          <h2 className="flex items-center gap-2 font-semibold text-on-surface"><CalendarDays className="h-4 w-4" aria-hidden />Calendar sync</h2>
+          <p className="text-body text-on-surface-variant">Copy your processed schedule to Google Calendar for the teaching period.</p>
+          {status?.connected && <p className="text-body text-on-surface">Connected{status.email ? ` as ${status.email}` : ''} · {status.timezone}</p>}
+          {status?.lastSyncedAt && <p className="text-caption text-on-surface-variant">Last synchronized: {new Date(status.lastSyncedAt).toLocaleString()}</p>}
+          {status && !status.configured && <p className="text-body text-warning">Calendar integration setup is pending. Contact your administrator.</p>}
+          {status?.needsReconnect && <p className="text-body text-warning">Calendar access expired or was revoked. Disconnect, then connect again.</p>}
+          {!processed && <p className="text-caption text-on-surface-variant">Synchronization becomes available when your schedule is processed.</p>}
         </div>
         <div className="flex flex-wrap gap-2">
           {status?.connected ? <>
@@ -106,8 +106,8 @@ const CalendarSyncPanel: React.FC<{ processed: boolean }> = ({ processed }) => {
           {!status && !busy && <CustomButton size="sm" variant="secondary" onClick={() => void act('reload')}>Retry</CustomButton>}
         </div>
       </div>
-      <p className="mt-3 text-xs text-slate-400">Use Sync after a processed schedule changes. Disconnecting leaves previously exported events in your calendar.</p>
-      {busy && <p className="mt-3 text-sm text-slate-400" role="status">Updating calendar connection…</p>}
+      <p className="mt-3 text-caption text-on-surface-variant">Use Sync after a processed schedule changes. Disconnecting leaves previously exported events in your calendar.</p>
+      {busy && <p className="mt-3 text-body text-on-surface-variant" role="status">Updating calendar connection…</p>}
       {notice && <div className="mt-3"><AlertBanner tone={notice.error ? 'error' : 'success'} onDismiss={() => setNotice(null)}>{notice.message}</AlertBanner></div>}
     </Card>
   );

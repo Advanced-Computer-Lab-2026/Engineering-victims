@@ -18,9 +18,9 @@ import type { ScheduleSession, ScheduleStage, WeeklyScheduleResponse } from '../
 
 /** Lecture, tutorial and lab read apart at a glance, in the grid and the list. */
 const TYPE_STYLE: Record<ScheduleSession['slotType'], { tone: BadgeTone; card: string }> = {
-  Lecture: { tone: 'indigo', card: 'border-indigo-500/40 bg-indigo-500/10' },
-  Tutorial: { tone: 'sky', card: 'border-sky-500/40 bg-sky-500/10' },
-  Lab: { tone: 'emerald', card: 'border-emerald-500/40 bg-emerald-500/10' },
+  Lecture: { tone: 'indigo', card: 'border-primary bg-primary-container' },
+  Tutorial: { tone: 'sky', card: 'border-info bg-info-container' },
+  Lab: { tone: 'emerald', card: 'border-success bg-success-container' },
 };
 
 const STAGE_INFO: Record<ScheduleStage, { tone: BadgeTone; label: string; staffNote: string }> = {
@@ -554,17 +554,17 @@ const WeeklySchedulePage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading schedule...
         </Card>
       ) : data && student ? (
         <div className="space-y-6">
-          <Card tone="raised" className="p-5" sheen>
+          <Card tone="raised" className="p-5">
             <div className="flex flex-wrap items-center gap-3">
               <div className="min-w-0">
-                <h2 className="truncate text-lg font-bold text-white">{student.fullName}</h2>
-                <p className="font-mono text-xs text-slate-500">
+                <h2 className="truncate text-h3 font-bold text-on-surface">{student.fullName}</h2>
+                <p className="font-mono text-caption text-on-surface-variant">
                   {student.studentId} · {student.major} · Semester {student.currentSemester}
                   {student.studyGroup ? ` · Group ${student.studyGroup}` : ''}
                 </p>
@@ -580,7 +580,7 @@ const WeeklySchedulePage: React.FC = () => {
               </div>
             </div>
             {!isOwn && stage && (
-              <p className="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+              <p className="mt-3 flex items-center gap-1.5 text-caption text-on-surface-variant">
                 <Eye className="h-3.5 w-3.5" aria-hidden />
                 {stage.staffNote} Read-only view.
               </p>
@@ -606,9 +606,9 @@ const WeeklySchedulePage: React.FC = () => {
             <>
               <Card tone="raised" className="overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[56rem] table-fixed border-collapse text-left text-sm">
+                  <table className="w-full min-w-[56rem] table-fixed border-collapse text-left text-body">
                     <caption className="sr-only">Weekly calendar for {data.term?.label}</caption>
-                    <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+                    <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                       <tr>
                         <th scope="col" className="w-28 px-3 py-3 font-semibold">
                           Time
@@ -619,7 +619,7 @@ const WeeklySchedulePage: React.FC = () => {
                             <th key={day} scope="col" className="px-2 py-3 font-semibold">
                               <span className="block">{day}</span>
                               {isOff && (
-                                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] normal-case text-amber-300">
+                                <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-warning-container px-2 py-0.5 text-caption normal-case text-warning">
                                   <Coffee className="h-3 w-3" aria-hidden />
                                   Day off
                                 </span>
@@ -629,12 +629,12 @@ const WeeklySchedulePage: React.FC = () => {
                         })}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-800/60">
+                    <tbody className="divide-y divide-outline-variant">
                       {timeBlocks.map((block) => (
                         <tr key={block.start + block.end} className="align-top">
-                          <th scope="row" className="whitespace-nowrap px-3 py-3 font-mono text-xs font-medium text-slate-400">
+                          <th scope="row" className="whitespace-nowrap px-3 py-3 font-mono text-caption font-medium text-on-surface-variant">
                             {block.start}
-                            <span className="block text-slate-600">{block.end}</span>
+                            <span className="block text-on-surface-variant">{block.end}</span>
                           </th>
                           {data.days.map((day) => {
                             const here = data.sessions.filter(
@@ -646,7 +646,7 @@ const WeeklySchedulePage: React.FC = () => {
                             return (
                               <td
                                 key={day}
-                                className={`px-1.5 py-1.5 ${data.daysOff.includes(day) ? 'bg-slate-950/40' : ''}`}
+                                className={`px-1.5 py-1.5 ${data.daysOff.includes(day) ? 'bg-surface-container-lowest' : ''}`}
                               >
                                 {here.map((session) => (
                                   <SessionCard key={session.id} session={session} />
@@ -662,19 +662,19 @@ const WeeklySchedulePage: React.FC = () => {
               </Card>
 
               {data.daysOff.length > 0 && (
-                <p className="flex items-center gap-1.5 text-sm text-slate-400">
-                  <Coffee className="h-4 w-4 text-amber-400" aria-hidden />
-                  Days off: <span className="font-medium text-slate-200">{data.daysOff.join(', ')}</span>
+                <p className="flex items-center gap-1.5 text-body text-on-surface-variant">
+                  <Coffee className="h-4 w-4 text-warning" aria-hidden />
+                  Days off: <span className="font-medium text-on-surface">{data.daysOff.join(', ')}</span>
                 </p>
               )}
 
               <section>
-                <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-300">All sessions</h2>
+                <h2 className="mb-3 text-body font-semibold uppercase tracking-eyebrow text-on-surface">All sessions</h2>
                 <Card tone="raised" className="overflow-hidden">
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[48rem] text-left text-sm">
+                    <table className="w-full min-w-[48rem] text-left text-body">
                       <caption className="sr-only">Every session in this schedule</caption>
-                      <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+                      <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                         <tr>
                           <th scope="col" className="px-4 py-3 font-semibold">Course</th>
                           <th scope="col" className="px-4 py-3 font-semibold">Type</th>
@@ -684,24 +684,24 @@ const WeeklySchedulePage: React.FC = () => {
                           <th scope="col" className="px-4 py-3 font-semibold">Instructor</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-800/60">
+                      <tbody className="divide-y divide-outline-variant">
                         {data.sessions.map((session) => (
-                          <tr key={session.id} className="hover:bg-slate-800/40">
+                          <tr key={session.id} className="hover:bg-surface-container">
                             <td className="px-4 py-3">
-                              <span className="font-mono text-xs text-slate-300">{session.courseCode}</span>
-                              <span className="block text-slate-200">{session.courseName}</span>
+                              <span className="font-mono text-caption text-on-surface">{session.courseCode}</span>
+                              <span className="block text-on-surface">{session.courseName}</span>
                             </td>
                             <td className="px-4 py-3">
                               <Badge tone={TYPE_STYLE[session.slotType].tone}>
                                 {session.slotType} · G{session.groupNumber}
                               </Badge>
                             </td>
-                            <td className="px-4 py-3 text-slate-300">{session.dayOfWeek}</td>
-                            <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-300">
+                            <td className="px-4 py-3 text-on-surface">{session.dayOfWeek}</td>
+                            <td className="whitespace-nowrap px-4 py-3 font-mono text-caption text-on-surface">
                               {session.startTime}–{session.endTime}
                             </td>
-                            <td className="px-4 py-3 text-slate-300">{session.room}</td>
-                            <td className="px-4 py-3 text-slate-400">{session.instructor ?? '—'}</td>
+                            <td className="px-4 py-3 text-on-surface">{session.room}</td>
+                            <td className="px-4 py-3 text-on-surface-variant">{session.instructor ?? '—'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -720,22 +720,22 @@ const WeeklySchedulePage: React.FC = () => {
 const SessionCard: React.FC<{ session: ScheduleSession }> = ({ session }) => (
   <div className={`mb-1 rounded-lg border p-2 last:mb-0 ${TYPE_STYLE[session.slotType].card}`}>
     <p className="flex items-center justify-between gap-1">
-      <span className="whitespace-nowrap font-mono text-xs font-semibold text-white">{session.courseCode}</span>
-      <span className="truncate text-[10px] uppercase tracking-wide text-slate-400">{session.slotType}</span>
+      <span className="whitespace-nowrap font-mono text-caption font-semibold text-on-surface">{session.courseCode}</span>
+      <span className="truncate text-caption uppercase tracking-eyebrow text-on-surface">{session.slotType}</span>
     </p>
-    <p className="mt-0.5 truncate text-xs text-slate-300" title={session.courseName}>
+    <p className="mt-0.5 truncate text-caption text-on-surface" title={session.courseName}>
       {session.courseName}
     </p>
-    <p className="mt-1 flex items-center gap-1 text-[11px] text-slate-400">
+    <p className="mt-1 flex items-center gap-1 text-caption text-on-surface">
       <MapPin className="h-3 w-3 shrink-0" aria-hidden />
       {session.room} · G{session.groupNumber}
     </p>
-    <p className="flex items-center gap-1 text-[11px] text-slate-400">
+    <p className="flex items-center gap-1 text-caption text-on-surface">
       <Clock className="h-3 w-3 shrink-0" aria-hidden />
       {session.startTime}–{session.endTime}
     </p>
     {session.instructor && (
-      <p className="flex items-center gap-1 truncate text-[11px] text-slate-500">
+      <p className="flex items-center gap-1 truncate text-caption text-on-surface-variant">
         <UserRound className="h-3 w-3 shrink-0" aria-hidden />
         {session.instructor}
       </p>

@@ -24,19 +24,19 @@ const LIST_LIMIT = 6;
 const OutstandingList: React.FC<{ title: string; courses: OutstandingCourse[] }> = ({ title, courses }) =>
   courses.length === 0 ? null : (
     <div className="mt-3">
-      <h4 className="text-xs font-medium uppercase tracking-wide text-slate-500">{title}</h4>
+      <h4 className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">{title}</h4>
       <ul className="mt-1.5 space-y-1.5">
         {courses.slice(0, LIST_LIMIT).map((entry) => (
-          <li key={entry.course.id} className="flex items-center justify-between gap-3 text-sm">
-            <span className="min-w-0 truncate text-slate-200">
-              <span className="font-mono text-xs text-slate-400">{entry.course.code}</span> {entry.course.name}
+          <li key={entry.course.id} className="flex items-center justify-between gap-3 text-body">
+            <span className="min-w-0 truncate text-on-surface">
+              <span className="font-mono text-caption text-on-surface-variant">{entry.course.code}</span> {entry.course.name}
             </span>
             <Badge tone={STATE_TONE[entry.state]}>{entry.state}</Badge>
           </li>
         ))}
       </ul>
       {courses.length > LIST_LIMIT && (
-        <p className="mt-1.5 text-xs text-slate-500">
+        <p className="mt-1.5 text-caption text-on-surface-variant">
           and {courses.length - LIST_LIMIT} more — see the academic history for the full list.
         </p>
       )}
@@ -83,7 +83,7 @@ const AdvisingOverviewPanel: React.FC<AdvisingOverviewPanelProps> = ({ studentId
 
   if (!overview) {
     return (
-      <section className="flex items-center justify-center gap-2 rounded-2xl border border-slate-800 bg-slate-900/50 p-6 text-sm text-slate-400">
+      <section role="status" className="flex items-center justify-center gap-2 rounded-2xl border border-outline-variant bg-surface-container-low p-6 text-body text-on-surface-variant">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         Calculating allowance and eligibility...
       </section>
@@ -94,47 +94,47 @@ const AdvisingOverviewPanel: React.FC<AdvisingOverviewPanelProps> = ({ studentId
 
   return (
     <>
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Credit-hour allowance</h3>
+      <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+        <h3 className="text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Credit-hour allowance</h3>
         <div className="mt-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <span className="text-2xl font-bold text-white">{allowance.allowedHours}</span>
-          <span className="text-sm text-slate-400">hours allowed</span>
+          <span className="text-h2 font-bold text-on-surface">{allowance.allowedHours}</span>
+          <span className="text-body text-on-surface-variant">hours allowed</span>
           {allowance.isProbation && <Badge tone="amber">Probation, {allowance.reductionPercent}% less</Badge>}
         </div>
-        <p className="mt-2 text-xs leading-relaxed text-slate-400">
+        <p className="mt-2 text-caption leading-relaxed text-on-surface-variant">
           {allowance.band}: the standard allowance is {allowance.standardHours} hours.{' '}
           {allowance.isProbation
             ? `Reduced by ${allowance.reductionPercent}% and rounded up for probation; no increase can be granted.`
             : 'An increase needs approved extra hours.'}
         </p>
-        <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+        <dl className="mt-3 grid grid-cols-2 gap-3 text-body">
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">GPA</dt>
-            <dd className="mt-0.5 text-slate-200">{allowance.gpa === null ? 'Not graded yet' : allowance.gpa.toFixed(2)}</dd>
+            <dt className="text-caption uppercase tracking-eyebrow text-on-surface-variant">GPA</dt>
+            <dd className="mt-0.5 text-on-surface">{allowance.gpa === null ? 'Not graded yet' : allowance.gpa.toFixed(2)}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-slate-500">Completed hours</dt>
-            <dd className="mt-0.5 text-slate-200">{overview.completedHours}</dd>
+            <dt className="text-caption uppercase tracking-eyebrow text-on-surface-variant">Completed hours</dt>
+            <dd className="mt-0.5 text-on-surface">{overview.completedHours}</dd>
           </div>
           {showReason && (
             <div className="col-span-2">
-              <dt className="text-xs uppercase tracking-wide text-slate-500">Advising reason</dt>
-              <dd className="mt-0.5 text-slate-200">
-                {overview.advisingReason ?? <span className="text-slate-500">Not recorded</span>}
+              <dt className="text-caption uppercase tracking-eyebrow text-on-surface-variant">Advising reason</dt>
+              <dd className="mt-0.5 text-on-surface">
+                {overview.advisingReason ?? <span className="text-on-surface-variant">Not recorded</span>}
               </dd>
             </div>
           )}
         </dl>
       </section>
 
-      <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
+      <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Bachelor project</h3>
+          <h3 className="text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Bachelor project</h3>
           <Badge tone={bachelorProject.eligible ? 'emerald' : 'rose'} dot>
             {bachelorProject.eligible ? 'Eligible' : 'Not eligible'}
           </Badge>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-slate-300">{bachelorProject.explanation}</p>
+        <p className="mt-2 text-body leading-relaxed text-on-surface">{bachelorProject.explanation}</p>
         <OutstandingList title="English courses still required" courses={bachelorProject.outstandingEnglish} />
         <OutstandingList title="Semester 1-6 courses not completed" courses={bachelorProject.outstandingCourses} />
       </section>

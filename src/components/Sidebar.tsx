@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LogOut, X } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import CustomButton from './ui/CustomButton';
 import { navLabel, visibleNavItems } from '../lib/navigation';
 import type { Role, StudentType } from '../lib/types';
@@ -19,6 +20,16 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
   const navigate = useNavigate();
   const { logout } = useSession();
   const { unreadCount } = useUnreadCount();
+  const trapRef = useFocusTrap<HTMLElement>(open);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, onClose]);
 
   const handleLogout = () => {
     // Clearing the shared session also collapses the role-gated nav items, so
@@ -32,30 +43,32 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
       {/* Scrim only exists on small screens, where the sidebar slides over content. */}
       {open && (
         <div
-          className="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"
+          className="fixed inset-0 z-overlay scrim backdrop-blur-sm lg:hidden"
           onClick={onClose}
           aria-hidden
         />
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-72 shrink-0 flex-col border-r border-slate-800/80 bg-slate-950/85 backdrop-blur-md transition-transform duration-200 lg:sticky lg:top-0 lg:translate-x-0 ${
+        ref={trapRef}
+        aria-label="Main navigation"
+        className={`fixed inset-y-0 left-0 z-modal flex h-dvh w-72 shrink-0 flex-col border-r border-outline-variant bg-surface-container-lowest transition-transform duration-200 lg:sticky lg:top-0 lg:translate-x-0 ${
           open ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex items-center gap-3 p-6">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-lg font-bold text-white shadow-lg shadow-indigo-950/50">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-h3 font-bold text-on-primary shadow-elevation-1">
             U
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-base font-bold tracking-tight text-white">USMS Portal</h1>
-            <p className="truncate text-xs text-slate-500">GUC Scheduling</p>
+            <span className="block truncate text-body-lg font-bold tracking-tight text-on-surface">USMS Portal</span>
+            <p className="truncate text-caption text-on-surface-variant">GUC Scheduling</p>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close navigation"
-            className="rounded-md p-1.5 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white lg:hidden"
+            className="flex h-11 w-11 items-center justify-center rounded-md text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface lg:hidden"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>
@@ -66,7 +79,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
             const Icon = item.icon;
             const label = navLabel(item, role);
             const baseClasses =
-              'flex w-full items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all';
+              'flex w-full min-h-11 items-center gap-3 rounded-xl px-4 py-2.5 text-body font-medium transition-colors';
 
             if (item.unavailable) {
               return (
@@ -74,11 +87,11 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
                   key={item.to}
                   aria-disabled="true"
                   title="Not built yet"
-                  className={`${baseClasses} cursor-not-allowed text-slate-600`}
+                  className={`${baseClasses} cursor-not-allowed text-on-surface-variant opacity-60`}
                 >
                   <Icon className="h-4 w-4 shrink-0" aria-hidden />
                   <span className="flex-1 truncate text-left">{label}</span>
-                  <span className="rounded-full bg-slate-800/80 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  <span className="rounded-full bg-surface-container px-1.5 py-0.5 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
                     Soon
                   </span>
                 </span>
@@ -93,8 +106,8 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
                 className={({ isActive }) =>
                   `${baseClasses} ${
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-950/40'
-                      : 'text-slate-400 hover:bg-slate-800/70 hover:text-white'
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface'
                   }`
                 }
               >
@@ -104,7 +117,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
                     <span className="flex-1 truncate text-left">{label}</span>
                     {/* Unread badge on the notifications item, for every role. */}
                     {item.to === '/notifications' && !!unreadCount && (
-                      <span className="min-w-[1.3rem] rounded-full bg-indigo-500 px-1.5 py-0.5 text-center text-[10px] font-semibold leading-none text-white">
+                      <span className="min-w-[1.3rem] rounded-full bg-primary-container text-center text-caption font-semibold leading-none text-on-primary-container px-1.5 py-0.5">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     )}
@@ -116,14 +129,14 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
           })}
         </nav>
 
-        <div className="border-t border-slate-800/80 p-4">
+        <div className="border-t border-outline-variant p-4">
           <CustomButton
-            variant="ghost"
+            variant="danger-ghost"
             size="sm"
             fullWidth
             onClick={handleLogout}
             icon={<LogOut className="h-4 w-4" aria-hidden />}
-            className="justify-start hover:bg-rose-950/40 hover:text-rose-300"
+            className="justify-start"
           >
             Sign Out
           </CustomButton>

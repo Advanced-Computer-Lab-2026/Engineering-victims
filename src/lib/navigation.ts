@@ -62,7 +62,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Pending-Work Dashboard',
     icon: Layers,
     roles: ['Coordinator', 'Administrator'],
-    description: 'Every student’s workflow status, blocking step and awaiting requests grouped by student type, request type and Advisor.',
+    description: "Every student's workflow status, blocking step and awaiting requests grouped by student type, request type and Advisor.",
   },
   {
     to: '/coordinator/queue',
@@ -131,7 +131,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Semester Standings',
     icon: Scale,
     roles: ['Coordinator', 'Administrator'],
-    description: 'Finalize advising students’ semester GPA and review probation history.',
+    description: "Finalize advising students' semester GPA and review probation history.",
   },
   // Matches the /advisors route guard, so the item is not hidden from a role
   // that is allowed to open the page.

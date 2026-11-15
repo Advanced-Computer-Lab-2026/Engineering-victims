@@ -70,7 +70,7 @@ const MyGraduationPlanPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+      <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
         Loading your graduation plan...
       </Card>
@@ -102,13 +102,13 @@ const MyGraduationPlanPage: React.FC = () => {
       )}
 
       <section className="mb-5">
-        <h2 className="mb-3 text-base font-semibold text-white">My exit-exam requests</h2>
+        <h2 className="mb-3 text-body-lg font-semibold text-on-surface">My exit-exam requests</h2>
         {exitExamError ? (
           <AlertBanner tone="error" title="Could not load exit-exam requests">
             {exitExamError}
           </AlertBanner>
         ) : exitExamRequests.length === 0 ? (
-          <Card className="p-4 text-sm text-slate-400">
+          <Card className="p-4 text-body text-on-surface-variant">
             You do not have any exit-exam requests.
           </Card>
         ) : (
@@ -117,10 +117,10 @@ const MyGraduationPlanPage: React.FC = () => {
               <Card key={request.id} tone="raised" className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
-                    <h3 className="font-semibold text-slate-100">
+                    <h3 className="font-semibold text-on-surface">
                       {request.course?.code ?? 'Failed course'} — {request.course?.name ?? 'Course'}
                     </h3>
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="mt-1 text-caption text-on-surface-variant">
                       Submitted {formatDate(request.submittedAt)}
                       {request.decidedAt ? ` · Decided ${formatDate(request.decidedAt)}` : ''}
                     </p>
@@ -138,19 +138,19 @@ const MyGraduationPlanPage: React.FC = () => {
                     {request.status === 'Pending' ? 'Awaiting Coordinator decision' : request.status}
                   </Badge>
                 </div>
-                <div className="mt-3 space-y-2 text-sm">
-                  <p className="text-slate-300">
-                    <span className="font-medium text-slate-200">Advisor's explanation: </span>
+                <div className="mt-3 space-y-2 text-body">
+                  <p className="text-on-surface">
+                    <span className="font-medium text-on-surface">Advisor's explanation: </span>
                     {request.reason}
                   </p>
                   {request.responseNote && (
-                    <p className="whitespace-pre-wrap text-slate-300">
-                      <span className="font-medium text-slate-200">Coordinator's response: </span>
+                    <p className="whitespace-pre-wrap text-on-surface">
+                      <span className="font-medium text-on-surface">Coordinator's response: </span>
                       {request.responseNote}
                     </p>
                   )}
                   {request.decidedBy && (
-                    <p className="text-xs text-slate-500">Reviewed by {request.decidedBy.fullName}</p>
+                    <p className="text-caption text-on-surface-variant">Reviewed by {request.decidedBy.fullName}</p>
                   )}
                 </div>
               </Card>
@@ -163,10 +163,10 @@ const MyGraduationPlanPage: React.FC = () => {
         <>
           <Card tone="raised" className="mb-5 p-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-slate-300">
-                <UserRound className="h-4 w-4 text-slate-500" aria-hidden />
-                <span className="text-sm">
-                  Prepared by <span className="font-medium text-slate-100">{plan.advisor?.fullName ?? 'your Advisor'}</span>
+              <div className="flex items-center gap-2 text-on-surface">
+                <UserRound className="h-4 w-4 text-on-surface-variant" aria-hidden />
+                <span className="text-body">
+                  Prepared by <span className="font-medium text-on-surface">{plan.advisor?.fullName ?? 'your Advisor'}</span>
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -174,14 +174,14 @@ const MyGraduationPlanPage: React.FC = () => {
                   Accepted
                 </Badge>
                 {plan.decidedAt && (
-                  <span className="text-xs text-slate-500">Accepted {formatDate(plan.decidedAt)}</span>
+                  <span className="text-caption text-on-surface-variant">Accepted {formatDate(plan.decidedAt)}</span>
                 )}
               </div>
             </div>
 
             {plan.responseNote && (
-              <div className="mt-3 flex items-start gap-2 rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-3 py-2.5 text-sm text-emerald-200">
-                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden />
+              <div className="mt-3 flex items-start gap-2 rounded-lg border border-success bg-success-container px-3 py-2.5 text-body text-success">
+                <MessageSquare className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
                 <p>
                   <span className="font-semibold">Coordinator's note: </span>
                   {plan.responseNote}
@@ -194,25 +194,25 @@ const MyGraduationPlanPage: React.FC = () => {
             {terms.map(({ term, courses, hours }) => (
               <Card key={term.label} tone="raised" className="flex flex-col p-4">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-slate-300">
-                    <CalendarRange className="h-4 w-4 text-slate-500" aria-hidden />
-                    <h2 className="text-sm font-semibold">{term.label}</h2>
+                  <div className="flex items-center gap-2 text-on-surface">
+                    <CalendarRange className="h-4 w-4 text-on-surface-variant" aria-hidden />
+                    <h2 className="text-body font-semibold">{term.label}</h2>
                   </div>
-                  <span className="text-xs text-slate-500">{hours} hrs</span>
+                  <span className="text-caption text-on-surface-variant">{hours} hrs</span>
                 </div>
 
                 {courses.length === 0 ? (
-                  <p className="mt-4 text-sm text-slate-500">No courses assigned to this term.</p>
+                  <p className="mt-4 text-body text-on-surface-variant">No courses assigned to this term.</p>
                 ) : (
                   <ul className="mt-3 space-y-2">
                     {courses.map((course) => (
                       <li
                         key={course.id}
-                        className="rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2"
+                        className="rounded-lg border border-outline-variant bg-surface-container-low px-3 py-2"
                       >
-                        <p className="font-mono text-xs font-semibold text-indigo-300">{course.code}</p>
-                        <p className="text-sm text-slate-200">{course.name}</p>
-                        <p className="mt-0.5 text-xs text-slate-500">{course.creditHours} credit hours</p>
+                        <p className="font-mono text-caption font-semibold text-primary">{course.code}</p>
+                        <p className="text-body text-on-surface">{course.name}</p>
+                        <p className="mt-0.5 text-caption text-on-surface-variant">{course.creditHours} credit hours</p>
                       </li>
                     ))}
                   </ul>

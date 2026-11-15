@@ -187,7 +187,7 @@ const CourseOfferingsPage: React.FC = () => {
       )}
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading offerings...
         </Card>
@@ -204,8 +204,8 @@ const CourseOfferingsPage: React.FC = () => {
       ) : (
         <Card tone="raised" className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[40rem] text-left text-sm">
-              <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+            <table className="w-full min-w-[40rem] text-left text-body">
+              <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">Course</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Status</th>
@@ -213,33 +213,33 @@ const CourseOfferingsPage: React.FC = () => {
                   <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-outline-variant">
                 {offerings.map((offering) => (
-                  <tr key={offering.id} className="group transition-colors hover:bg-slate-800/40">
+                  <tr key={offering.id} className="group transition-colors hover:bg-surface-container">
                     <td className="px-4 py-3">
                       {/* A deleted course leaves a null ref: `typeof null` is
                           'object', so the guard must check truthiness first. */}
-                      <div className="font-medium text-slate-100">
+                      <div className="font-medium text-on-surface">
                         {offering.courseId && typeof offering.courseId === 'object'
                           ? offering.courseId.name
                           : 'Unknown course'}
                       </div>
-                      <div className="text-xs text-slate-500 font-mono">
+                      <div className="text-caption text-on-surface-variant font-mono">
                         {offering.courseId && typeof offering.courseId === 'object'
                           ? offering.courseId.code
                           : 'N/A'}
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      <span className={`px-2 py-0.5 rounded-full text-caption font-semibold ${
                         offering.publicationStatus === 'Published'
-                          ? 'bg-green-500/20 text-green-400'
-                          : 'bg-amber-500/20 text-amber-400'
+                          ? 'bg-success-container text-success'
+                          : 'bg-warning-container text-warning'
                       }`}>
                         {offering.publicationStatus}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-slate-300 text-xs">
+                    <td className="px-4 py-3 text-on-surface text-caption">
                       {offering.eligibleMajors?.join(', ') || 'All'}
                     </td>
                     <td className="px-4 py-3 text-right">

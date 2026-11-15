@@ -107,7 +107,7 @@ const CoordinatorGraduationPlansPage: React.FC = () => {
   );
 
   const inputClass =
-    'w-full rounded-lg border border-slate-700 bg-slate-900/70 py-2.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60';
+    'w-full rounded-lg border border-outline-variant bg-surface-container-low py-2.5 text-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary';
 
   return (
     <>
@@ -141,19 +141,19 @@ const CoordinatorGraduationPlansPage: React.FC = () => {
       )}
 
       <Card tone="raised" className="mb-5 p-4">
-        <div className="mb-3 flex items-center gap-2 text-slate-300">
-          <ListFilter className="h-4 w-4 text-slate-500" aria-hidden />
-          <h2 className="text-sm font-semibold">Search and filter</h2>
+        <div className="mb-3 flex items-center gap-2 text-on-surface">
+          <ListFilter className="h-4 w-4 text-on-surface-variant" aria-hidden />
+          <h2 className="text-body font-semibold">Search and filter</h2>
         </div>
 
         <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-4">
           <div className="flex flex-col gap-1.5 xl:col-span-2">
-            <label htmlFor="plan-search" className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label htmlFor="plan-search" className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
               Search
             </label>
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500"
+                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-on-surface-variant"
                 aria-hidden
               />
               <input
@@ -182,7 +182,7 @@ const CoordinatorGraduationPlansPage: React.FC = () => {
           />
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="plan-from" className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label htmlFor="plan-from" className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
               Submitted from
             </label>
             <input
@@ -196,7 +196,7 @@ const CoordinatorGraduationPlansPage: React.FC = () => {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="plan-to" className="text-xs font-medium uppercase tracking-wide text-slate-400">
+            <label htmlFor="plan-to" className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
               Submitted to
             </label>
             <input
@@ -223,7 +223,7 @@ const CoordinatorGraduationPlansPage: React.FC = () => {
       </Card>
 
       {isLoading ? (
-        <Card className="flex items-center justify-center gap-2 p-16 text-sm text-slate-400">
+        <Card role="status" className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant">
           <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
           Loading submitted plans...
         </Card>
@@ -240,8 +240,8 @@ const CoordinatorGraduationPlansPage: React.FC = () => {
       ) : (
         <Card tone="raised" className="overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase tracking-wide text-slate-400">
+            <table className="w-full text-left text-body">
+              <thead className="border-b border-outline-variant bg-surface-container-low text-caption uppercase tracking-eyebrow text-on-surface-variant">
                 <tr>
                   <th scope="col" className="px-4 py-3 font-semibold">Student</th>
                   <th scope="col" className="px-4 py-3 font-semibold">Advisor</th>
@@ -251,35 +251,35 @@ const CoordinatorGraduationPlansPage: React.FC = () => {
                   <th scope="col" className="px-4 py-3 text-right font-semibold">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-outline-variant">
                 {plans.map((plan) => (
-                  <tr key={plan.id} className="transition-colors hover:bg-slate-800/40">
+                  <tr key={plan.id} className="transition-colors hover:bg-surface-container">
                     <td className="px-4 py-3">
                       {plan.student ? (
                         <>
-                          <p className="font-medium text-slate-100">{plan.student.fullName}</p>
-                          <p className="font-mono text-xs text-slate-500">
+                          <p className="font-medium text-on-surface">{plan.student.fullName}</p>
+                          <p className="font-mono text-caption text-on-surface-variant">
                             {plan.student.studentId} · {plan.student.major}
                           </p>
                         </>
                       ) : (
-                        <span className="text-slate-500">Student not found</span>
+                        <span className="text-on-surface-variant">Student not found</span>
                       )}
                     </td>
                     <td className="px-4 py-3">
                       {plan.advisor ? (
                         <>
-                          <p className="text-slate-200">{plan.advisor.fullName}</p>
-                          <p className="text-xs text-slate-500">{plan.advisor.email}</p>
+                          <p className="text-on-surface">{plan.advisor.fullName}</p>
+                          <p className="text-caption text-on-surface-variant">{plan.advisor.email}</p>
                         </>
                       ) : (
-                        <span className="text-slate-500">—</span>
+                        <span className="text-on-surface-variant">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-slate-400">
+                    <td className="px-4 py-3 text-on-surface-variant">
                       {plan.submittedAt ? formatDate(plan.submittedAt) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono text-slate-300">{plan.assignedCount}</td>
+                    <td className="px-4 py-3 text-right font-mono text-on-surface">{plan.assignedCount}</td>
                     <td className="px-4 py-3">
                       <Badge tone={STATUS_TONE[plan.status] ?? 'neutral'} dot>
                         {plan.status === 'Submitted' ? 'Awaiting decision' : plan.status}

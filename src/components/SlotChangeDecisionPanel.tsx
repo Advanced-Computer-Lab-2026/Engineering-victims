@@ -105,8 +105,8 @@ const SlotChangeDecisionPanel: React.FC<SlotChangeDecisionPanelProps> = ({
   };
 
   return (
-    <section className="rounded-2xl border border-indigo-500/30 bg-slate-900/60 p-4" aria-labelledby="slot-decision-title">
-      <h3 id="slot-decision-title" className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
+    <section className="rounded-2xl border border-primary bg-surface-container-low p-4" aria-labelledby="slot-decision-title">
+      <h3 id="slot-decision-title" className="mb-3 flex items-center gap-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
         <Gavel className="h-4 w-4" aria-hidden />
         Decide this request
       </h3>
@@ -126,8 +126,8 @@ const SlotChangeDecisionPanel: React.FC<SlotChangeDecisionPanelProps> = ({
         </div>
       )}
 
-      <label htmlFor={`decision-note-${request.id}`} className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-slate-400">
-        Response note <span className="normal-case text-slate-500">(optional, shown to the student)</span>
+      <label htmlFor={`decision-note-${request.id}`} className="mb-1.5 block text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">
+        Response note <span className="normal-case text-on-surface-variant">(optional, shown to the student)</span>
       </label>
       <textarea
         id={`decision-note-${request.id}`}
@@ -138,18 +138,18 @@ const SlotChangeDecisionPanel: React.FC<SlotChangeDecisionPanelProps> = ({
         disabled={submitting}
         placeholder="e.g. Moved you to the Sunday group, which has seats and fits your timetable."
         aria-describedby={`decision-note-count-${request.id}`}
-        className="w-full resize-y rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500 focus:border-indigo-500/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 disabled:opacity-60"
+        className="w-full resize-y rounded-lg border border-outline-variant bg-surface-container-lowest px-3 py-2 text-body text-on-surface placeholder:text-on-surface-variant focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-60"
       />
       <p
         id={`decision-note-count-${request.id}`}
-        className={`mt-1 text-right text-[11px] tabular-nums ${tooLong ? 'text-rose-300' : 'text-slate-500'}`}
+        className={`mt-1 text-right text-caption tabular-nums ${tooLong ? 'text-error' : 'text-on-surface-variant'}`}
       >
         {note.trim().length}/{SLOT_CHANGE_NOTE_LIMIT}
       </p>
 
       {confirming ? (
-        <div className="mt-3 rounded-xl border border-slate-700 bg-slate-950/60 p-3" role="group" aria-label="Confirm decision">
-          <p className="text-sm text-slate-200">
+        <div className="mt-3 rounded-xl border border-outline-variant bg-surface-container p-3" role="group" aria-label="Confirm decision">
+          <p className="text-body text-on-surface">
             {confirming.action === 'approve' ? (
               <>
                 Approve and move {studentName} to <b>{component} group {confirming.replacement.groupNumber}</b> (
@@ -160,7 +160,7 @@ const SlotChangeDecisionPanel: React.FC<SlotChangeDecisionPanelProps> = ({
               <>Reject this request? {studentName} keeps their current {component} group.</>
             )}
           </p>
-          <p className="mt-1 text-xs text-slate-500">The group choice is locked until you confirm or cancel.</p>
+          <p className="mt-1 text-caption text-on-surface-variant">The group choice is locked until you confirm or cancel.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <CustomButton
               size="sm"
@@ -196,8 +196,8 @@ const SlotChangeDecisionPanel: React.FC<SlotChangeDecisionPanelProps> = ({
           >
             Reject
           </CustomButton>
-          {!replacement && <span className="text-xs text-slate-500">Choose an available group above to approve.</span>}
-          {submitting && <Loader2 className="h-4 w-4 animate-spin text-slate-500" aria-label="Saving" />}
+          {!replacement && <span className="text-caption text-on-surface-variant">Choose an available group above to approve.</span>}
+          {submitting && <Loader2 className="h-4 w-4 animate-spin text-on-surface-variant" aria-label="Saving" />}
         </div>
       )}
     </section>

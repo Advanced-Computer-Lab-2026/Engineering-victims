@@ -13,6 +13,7 @@ import {
   X,
 } from 'lucide-react';
 import { ApiError } from '../lib/api';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 import { fetchStaffSlotChangeRequest } from '../lib/slotChangeRequestsService';
 import { SLOT_TONE, STATUS_TONE, slotLabel } from '../lib/slotChangeDisplay';
 import { formatDate, formatRelative } from '../lib/studentsService';
@@ -43,19 +44,19 @@ interface DetailRowProps {
 
 const DetailRow: React.FC<DetailRowProps> = ({ icon, label, children }) => (
   <div className="flex items-start gap-3 py-2.5">
-    <span className="mt-0.5 shrink-0 text-slate-500" aria-hidden>
+    <span className="mt-0.5 shrink-0 text-on-surface-variant" aria-hidden>
       {icon}
     </span>
     <div className="min-w-0 flex-1">
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 break-words text-sm text-slate-200">{children}</dd>
+      <dt className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">{label}</dt>
+      <dd className="mt-0.5 break-words text-body text-on-surface">{children}</dd>
     </div>
   </div>
 );
 
 const when = (value: string) => (
   <>
-    {formatDate(value)} <span className="text-xs text-slate-500">({formatRelative(value)})</span>
+    {formatDate(value)} <span className="text-caption text-on-surface-variant">({formatRelative(value)})</span>
   </>
 );
 
@@ -95,6 +96,7 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
   const [selectionLocked, setSelectionLocked] = useState(false);
   const closeButton = useRef<HTMLButtonElement>(null);
   const selectedId = selected?.id ?? null;
+  const trapRef = useFocusTrap<HTMLElement>(!!selectedId);
 
   /** Req 48: show the decided request and refresh the list and comparison. */
   const handleDecided = useCallback(
@@ -180,24 +182,25 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
   const responder = request?.response?.respondedBy;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} aria-hidden />
+    <div className="fixed inset-0 z-modal flex justify-end">
+      <div className="absolute inset-0 scrim backdrop-blur-sm" onClick={onClose} aria-hidden />
 
       <aside
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="slot-change-detail-title"
         aria-busy={isLoading}
-        className="relative flex h-full w-full max-w-lg flex-col border-l border-slate-800 bg-slate-950/95 shadow-2xl backdrop-blur-xl"
+        className="relative flex h-full w-full max-w-lg flex-col border-l border-outline-variant bg-surface-container-lowest shadow-2xl backdrop-blur-xl"
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-800 p-6">
+        <div className="flex items-start justify-between gap-4 border-b border-outline-variant p-6">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wider text-indigo-400">Slot-change request</p>
-            <h2 id="slot-change-detail-title" className="mt-1 truncate text-lg font-bold text-white">
+            <p className="text-caption font-semibold uppercase tracking-eyebrow text-primary">Slot-change request</p>
+            <h2 id="slot-change-detail-title" className="mt-1 truncate text-h3 font-bold text-on-surface">
               {request?.student?.fullName ?? (isGone ? 'Request unavailable' : 'Student record removed')}
             </h2>
             {request?.student && (
-              <p className="mt-0.5 truncate font-mono text-xs text-slate-500">{request.student.studentId}</p>
+              <p className="mt-0.5 truncate font-mono text-caption text-on-surface-variant">{request.student.studentId}</p>
             )}
           </div>
           <button
@@ -205,7 +208,7 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
             type="button"
             onClick={onClose}
             aria-label="Close request details"
-            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>
@@ -236,26 +239,26 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                 </Badge>
                 <Badge tone={SLOT_TONE[request.slotType]}>{request.slotType}</Badge>
                 {isLoading && (
-                  <span className="flex items-center gap-1.5 text-xs text-slate-500">
+                  <span className="flex items-center gap-1.5 text-caption text-on-surface-variant">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
                     Checking for updates...
                   </span>
                 )}
               </div>
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Requested change</h3>
-                <dl className="divide-y divide-slate-800/70">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Requested change</h3>
+                <dl className="divide-y divide-outline-variant">
                   <DetailRow icon={<BookOpen className="h-4 w-4" />} label="Course">
                     {request.course ? (
                       <>
-                        <span className="font-mono font-semibold text-indigo-300">{request.course.code}</span>{' '}
+                        <span className="font-mono font-semibold text-primary">{request.course.code}</span>{' '}
                         {request.course.name}
                       </>
                     ) : (
-                      <span className="text-slate-500">Course removed</span>
+                      <span className="text-on-surface-variant">Course removed</span>
                     )}
-                    {request.term && <span className="block text-xs text-slate-500">{request.term.label}</span>}
+                    {request.term && <span className="block text-caption text-on-surface-variant">{request.term.label}</span>}
                   </DetailRow>
                   <DetailRow icon={<Clock className="h-4 w-4" />} label={`Current ${request.slotType.toLowerCase()} slot`}>
                     {slotLabel(request.currentSlot)}
@@ -267,7 +270,7 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                     {request.preferenceNote ? (
                       <span className="whitespace-pre-wrap">{request.preferenceNote}</span>
                     ) : (
-                      <span className="text-slate-500">No note</span>
+                      <span className="text-on-surface-variant">No note</span>
                     )}
                   </DetailRow>
                   <DetailRow icon={<CalendarDays className="h-4 w-4" />} label="Submitted">
@@ -298,43 +301,43 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                 />
               )}
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</h3>
-                <dl className="divide-y divide-slate-800/70">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Student</h3>
+                <dl className="divide-y divide-outline-variant">
                   <DetailRow icon={<UserRound className="h-4 w-4" />} label="Name and ID">
                     {request.student ? (
                       <>
                         {request.student.fullName}{' '}
-                        <span className="font-mono text-xs text-slate-500">{request.student.studentId}</span>
+                        <span className="font-mono text-caption text-on-surface-variant">{request.student.studentId}</span>
                       </>
                     ) : (
-                      <span className="text-slate-500">Student record removed</span>
+                      <span className="text-on-surface-variant">Student record removed</span>
                     )}
                   </DetailRow>
                   <DetailRow icon={<UserRound className="h-4 w-4" />} label="Current Advisor">
                     {request.advisor ? (
                       <>
                         {request.advisor.fullName}
-                        {!showsAll && <span className="text-xs text-slate-500"> (you)</span>}
+                        {!showsAll && <span className="text-caption text-on-surface-variant"> (you)</span>}
                       </>
                     ) : (
-                      <span className="text-slate-500">Unassigned</span>
+                      <span className="text-on-surface-variant">Unassigned</span>
                     )}
                   </DetailRow>
                 </dl>
               </section>
 
-              <section className="rounded-2xl border border-slate-800 bg-slate-900/50 p-4">
-                <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Outcome</h3>
-                <dl className="divide-y divide-slate-800/70">
+              <section className="rounded-2xl border border-outline-variant bg-surface-container-low p-4">
+                <h3 className="mb-1 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">Outcome</h3>
+                <dl className="divide-y divide-outline-variant">
                   {request.status === 'Pending' && (
                     <DetailRow icon={<CircleAlert className="h-4 w-4" />} label="Decision">
-                      <span className="text-slate-300">Awaiting an Advisor or Coordinator decision</span>
+                      <span className="text-on-surface-variant">Awaiting an Advisor or Coordinator decision</span>
                     </DetailRow>
                   )}
                   {request.status === 'Withdrawn' && (
                     <DetailRow icon={<CircleAlert className="h-4 w-4" />} label="Withdrawn by the student">
-                      {request.withdrawnAt ? when(request.withdrawnAt) : <span className="text-slate-500">Date not recorded</span>}
+                      {request.withdrawnAt ? when(request.withdrawnAt) : <span className="text-on-surface-variant">Date not recorded</span>}
                     </DetailRow>
                   )}
                   {request.response && (
@@ -342,7 +345,7 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                       <DetailRow icon={<UserRound className="h-4 w-4" />} label="Decided by">
                         {responder ? `${responder.name} (${responder.role})` : 'Advisor or Coordinator'}
                         {request.response.respondedAt && (
-                          <span className="block text-xs text-slate-500">{formatDate(request.response.respondedAt)}</span>
+                          <span className="block text-caption text-on-surface-variant">{formatDate(request.response.respondedAt)}</span>
                         )}
                       </DetailRow>
                       {request.status === 'Approved' && (
@@ -350,10 +353,10 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                           {request.response.replacementSlot ? (
                             <>
                               {slotLabel(request.response.replacementSlot)}
-                              <span className="block text-xs text-slate-500">{request.response.replacementSlot.room}</span>
+                              <span className="block text-caption text-on-surface-variant">{request.response.replacementSlot.room}</span>
                             </>
                           ) : (
-                            <span className="text-slate-500">No longer available</span>
+                            <span className="text-on-surface-variant">No longer available</span>
                           )}
                         </DetailRow>
                       )}
@@ -361,7 +364,7 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                         {request.response.note ? (
                           <span className="whitespace-pre-wrap">{request.response.note}</span>
                         ) : (
-                          <span className="text-slate-500">No note</span>
+                          <span className="text-on-surface-variant">No note</span>
                         )}
                       </DetailRow>
                     </>
@@ -369,7 +372,7 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
                 </dl>
               </section>
 
-              <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <p className="flex items-center gap-1.5 text-caption text-on-surface-variant">
                 <Hash className="h-3.5 w-3.5" aria-hidden />
                 Request <span className="font-mono">{request.id}</span>
               </p>
@@ -377,7 +380,7 @@ const SlotChangeRequestDetailDrawer: React.FC<SlotChangeRequestDetailDrawerProps
           )}
         </div>
 
-        <div className="border-t border-slate-800 p-6">
+        <div className="border-t border-outline-variant p-6">
           <CustomButton variant="ghost" size="sm" fullWidth onClick={onClose}>
             Back to results
           </CustomButton>

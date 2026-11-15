@@ -7,6 +7,7 @@ import CustomButton from '../components/ui/CustomButton';
 import Badge from '../components/ui/Badge';
 import EmptyState from '../components/ui/EmptyState';
 import AlertBanner from '../components/ui/AlertBanner';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import { addAdvisor, removeAdvisor, listAdvisors, type Advisor } from '../lib/advisorService';
 
 export default function AdvisorsPage() {
@@ -18,6 +19,7 @@ export default function AdvisorsPage() {
   const [removeLoading, setRemoveLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [pendingRemoval, setPendingRemoval] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAdvisors();
@@ -27,7 +29,7 @@ export default function AdvisorsPage() {
     try {
       setLoading(true);
       const response = await listAdvisors();
-      console.log('Advisors fetched:', response);
+
       setAdvisors(response.advisors);
     } catch (error: any) {
       console.error('Error fetching advisors:', error);
@@ -60,7 +62,7 @@ export default function AdvisorsPage() {
     }
   };
 
-  const handleRemoveAdvisor = async (e: React.FormEvent) => {
+  const handleRemoveAdvisor = (e: React.FormEvent) => {
     e.preventDefault();
     setSuccessMessage('');
     setErrorMessage('');
@@ -70,19 +72,22 @@ export default function AdvisorsPage() {
       return;
     }
 
-    // Confirm before removing
-    if (!confirm(`Are you sure you want to remove the advisor with email: ${removeEmail}?`)) {
-      return;
-    }
+    // Ask first; the in-app dialog replaces the browser's confirm prompt.
+    setPendingRemoval(removeEmail.trim());
+  };
 
+  const performRemoveAdvisor = async () => {
+    if (!pendingRemoval) return;
     try {
       setRemoveLoading(true);
-      const response = await removeAdvisor(removeEmail.trim());
+      const response = await removeAdvisor(pendingRemoval);
       setSuccessMessage(`${response.message}`);
       setRemoveEmail('');
+      setPendingRemoval(null);
       fetchAdvisors(); // Refresh list
     } catch (error: any) {
       setErrorMessage(error.message || 'Failed to remove advisor');
+      setPendingRemoval(null);
     } finally {
       setRemoveLoading(false);
     }
@@ -95,7 +100,7 @@ export default function AdvisorsPage() {
         description="Add or remove advisors from the advising system"
       />
 
-      <div className="p-6 space-y-6">
+      <div className="space-y-6">
         {/* Alert Messages */}
         {successMessage && (
           <AlertBanner tone="success" onDismiss={() => setSuccessMessage('')}>
@@ -113,25 +118,20 @@ export default function AdvisorsPage() {
           {/* Add Advisor Form */}
           <Card>
             <div className="flex items-center gap-3 mb-4">
-              <UserPlus className="w-5 h-5 text-green-600" />
-              <h3 className="text-lg font-semibold">Add Advisor</h3>
+              <UserPlus className="w-5 h-5 text-success" />
+              <h3 className="text-h3 font-semibold">Add Advisor</h3>
             </div>
             <form onSubmit={handleAddAdvisor} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Advisor GUC Email</label>
-                <CustomInput
-                  label=""
-                  type="email"
-                  placeholder="name@guc.edu.eg"
-                  value={addEmail}
-                  onChange={(e) => setAddEmail(e.target.value)}
-                  disabled={addLoading}
-                  icon={<Mail className="w-4 h-4" />}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Enter a valid GUC email address (@guc.edu.eg)
-                </p>
-              </div>
+              <CustomInput
+                label="Advisor GUC email"
+                type="email"
+                placeholder="name@guc.edu.eg"
+                hint="Enter a valid GUC email address (@guc.edu.eg)"
+                value={addEmail}
+                onChange={(e) => setAddEmail(e.target.value)}
+                disabled={addLoading}
+                icon={<Mail className="w-4 h-4" />}
+              />
               <CustomButton
                 type="submit"
                 variant="primary"
@@ -146,25 +146,20 @@ export default function AdvisorsPage() {
           {/* Remove Advisor Form */}
           <Card>
             <div className="flex items-center gap-3 mb-4">
-              <UserMinus className="w-5 h-5 text-red-600" />
-              <h3 className="text-lg font-semibold">Remove Advisor</h3>
+              <UserMinus className="w-5 h-5 text-error" />
+              <h3 className="text-h3 font-semibold">Remove Advisor</h3>
             </div>
             <form onSubmit={handleRemoveAdvisor} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Advisor GUC Email</label>
-                <CustomInput
-                  label=""
-                  type="email"
-                  placeholder="name@guc.edu.eg"
-                  value={removeEmail}
-                  onChange={(e) => setRemoveEmail(e.target.value)}
-                  disabled={removeLoading}
-                  icon={<Mail className="w-4 h-4" />}
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Cannot remove advisors with assigned students
-                </p>
-              </div>
+              <CustomInput
+                label="Advisor GUC email"
+                type="email"
+                placeholder="name@guc.edu.eg"
+                hint="Cannot remove advisors with assigned students"
+                value={removeEmail}
+                onChange={(e) => setRemoveEmail(e.target.value)}
+                disabled={removeLoading}
+                icon={<Mail className="w-4 h-4" />}
+              />
               <CustomButton
                 type="submit"
                 variant="danger"
@@ -180,7 +175,7 @@ export default function AdvisorsPage() {
         {/* Advisors List */}
         <Card>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold">Current Advisors ({advisors.length})</h3>
+            <h3 className="text-h3 font-semibold">Current Advisors ({advisors.length})</h3>
             <CustomButton
               variant="secondary"
               onClick={fetchAdvisors}
@@ -191,9 +186,9 @@ export default function AdvisorsPage() {
           </div>
 
           {loading ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="text-gray-500 mt-2">Loading advisors...</p>
+            <div role="status" className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-info mx-auto"></div>
+              <p className="text-on-surface-variant mt-2">Loading advisors...</p>
             </div>
           ) : advisors.length === 0 ? (
             <EmptyState
@@ -204,30 +199,30 @@ export default function AdvisorsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-surface-container-low border-b">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-caption font-medium text-on-surface-variant uppercase">
                       Name
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-caption font-medium text-on-surface-variant uppercase">
                       Email
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-caption font-medium text-on-surface-variant uppercase">
                       Assigned Students
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-caption font-medium text-on-surface-variant uppercase">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    <th className="px-4 py-3 text-left text-caption font-medium text-on-surface-variant uppercase">
                       Added
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {advisors.map((advisor) => (
-                    <tr key={advisor._id} className="hover:bg-gray-50">
+                    <tr key={advisor._id} className="hover:bg-surface-container-low">
                       <td className="px-4 py-3 font-medium">{advisor.fullName}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{advisor.email}</td>
+                      <td className="px-4 py-3 text-body text-on-surface-variant">{advisor.email}</td>
                       <td className="px-4 py-3">
                         <Badge tone={advisor.assignedStudentsCount > 0 ? 'indigo' : 'neutral'}>
                           {advisor.assignedStudentsCount} student{advisor.assignedStudentsCount !== 1 ? 's' : ''}
@@ -238,7 +233,7 @@ export default function AdvisorsPage() {
                           {advisor.isActive ? 'Active' : 'Inactive'}
                         </Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">
+                      <td className="px-4 py-3 text-body text-on-surface-variant">
                         {new Date(advisor.createdAt).toLocaleDateString()}
                       </td>
                     </tr>
@@ -249,6 +244,22 @@ export default function AdvisorsPage() {
           )}
         </Card>
       </div>
+
+      <ConfirmDialog
+        open={!!pendingRemoval}
+        title="Remove advisor?"
+        message={
+          <>
+            The advisor with email <span className="font-medium text-on-surface">{pendingRemoval}</span> will
+            lose access to their advising roster. Advisors with assigned students cannot be removed.
+          </>
+        }
+        confirmLabel="Remove advisor"
+        tone="danger"
+        isLoading={removeLoading}
+        onConfirm={performRemoveAdvisor}
+        onCancel={() => setPendingRemoval(null)}
+      />
     </div>
   );
 }
