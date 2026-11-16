@@ -44,6 +44,9 @@ const GraduationPlanBuilderPage = React.lazy(() => import('./pages/GraduationPla
 const MyGraduationPlanPage = React.lazy(() => import('./pages/MyGraduationPlanPage'));
 const ExitExamRequestsPage = React.lazy(() => import('./pages/ExitExamRequestsPage'));
 const SemesterStandingsPage = React.lazy(() => import('./pages/SemesterStandingsPage'));
+const ExtraHoursRequestsPage = React.lazy(() => import('./pages/ExtraHoursRequestsPage'));
+const MyExtraHoursRequestsPage = React.lazy(() => import('./pages/MyExtraHoursRequestsPage'));
+const InstallmentBillingPage = React.lazy(() => import('./pages/InstallmentBillingPage'));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -51,6 +54,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <BrowserRouter>
       <Routes>
         <Route path="/" element={<LoginPage />} />
+        <Route element={<ProtectedRoute roles={['Student', 'Coordinator', 'Administrator']}><AppLayout /></ProtectedRoute>}>
+          <Route path="/billing" element={<InstallmentBillingPage />} />
+        </Route>
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
@@ -122,6 +128,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/exit-exam-requests" element={<ExitExamRequestsPage />} />
+          <Route path="/extra-hours-requests" element={<ExtraHoursRequestsPage />} />
         </Route>
 
         {/* Req 89: students only. A Normal Student who types the URL is told
@@ -134,6 +141,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/wallet" element={<WalletPage />} />
+          <Route path="/my-extra-hours-requests" element={<MyExtraHoursRequestsPage />} />
           {/* Req 114: the accepted graduation plan, when there is one. */}
           <Route path="/my-graduation-plan" element={<MyGraduationPlanPage />} />
           {/* Req 54: an Advising Student's own history. */}

@@ -56,6 +56,16 @@ export const NAV_ITEMS: NavItem[] = [
     icon: LayoutDashboard,
     description: 'Overview and shortcuts for everything your role can reach.',
   },
+  { to: '/billing', label: 'Installment Billing', labels: { Student: 'My Installments' }, icon: Wallet,
+    roles: ['Student', 'Coordinator', 'Administrator'], description: 'University installments, charges and recorded payments.' },
+  {
+    to: '/my-extra-hours-requests', label: 'My Extra-hours Requests', icon: ClipboardList,
+    roles: ['Student'], studentTypes: ['Advising Student'], description: 'View approved extra-hours requests and itemized costs.',
+  },
+  {
+    to: '/extra-hours-requests', label: 'Extra-hours Requests', icon: ClipboardList,
+    roles: ['Coordinator'], description: 'Review extra-hours requests, eligibility checks and itemized costs.',
+  },
   // Req 122: Coordinator pending-work dashboard
   {
     to: '/coordinator/pending-work',
