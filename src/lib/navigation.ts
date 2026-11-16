@@ -50,6 +50,12 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
+  {
+    to: '/dashboard',
+    label: 'Dashboard',
+    icon: LayoutDashboard,
+    description: 'Overview and shortcuts for everything your role can reach.',
+  },
   { to: '/billing', label: 'Installment Billing', labels: { Student: 'My Installments' }, icon: Wallet,
     roles: ['Student', 'Coordinator', 'Administrator'], description: 'University installments, charges and recorded payments.' },
   {
@@ -59,12 +65,6 @@ export const NAV_ITEMS: NavItem[] = [
   {
     to: '/extra-hours-requests', label: 'Extra-hours Requests', icon: ClipboardList,
     roles: ['Coordinator'], description: 'Review extra-hours requests, eligibility checks and itemized costs.',
-  },
-  {
-    to: '/dashboard',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-    description: 'Overview and shortcuts for everything your role can reach.',
   },
   // Req 122: Coordinator pending-work dashboard
   {

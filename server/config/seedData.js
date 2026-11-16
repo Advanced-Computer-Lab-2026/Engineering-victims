@@ -9,6 +9,9 @@ const ScheduleTemplate = require('../models/ScheduleTemplate');
 const StudentSchedule = require('../models/StudentSchedule');
 const GraduationPlan = require('../models/GraduationPlan');
 const ExitExamRequest = require('../models/ExitExamRequest');
+const ExtraHoursRequest = require('../models/ExtraHoursRequest');
+const ExtraHoursPayment = require('../models/ExtraHoursPayment');
+const DeferredExtraHoursCharge = require('../models/DeferredExtraHoursCharge');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const SwapRequest = require('../models/SwapRequest');
 const NotificationEvent = require('../models/NotificationEvent');
@@ -27,6 +30,7 @@ const { seedScheduleGroups } = require('./scheduleSeed');
 const { seedAdvisingSchedules } = require('./advisingScheduleSeed');
 const { seedSchedulingPreferences } = require('./schedulingPreferenceSeed');
 const { seedGraduationPlans } = require('./graduationPlanSeed');
+const { seedExtraHoursRequests } = require('./extraHoursDemoSeed');
 const {
   seedSlotChangeRequests,
   seedExitExamRequests,
@@ -646,6 +650,9 @@ const seedOfferings = async ({ terms, courses, instructors }) => {
  * the second run outright.
  */
 const seed = async () => {
+  await DeferredExtraHoursCharge.deleteMany({});
+  await ExtraHoursPayment.deleteMany({});
+  await ExtraHoursRequest.deleteMany({});
   await User.deleteMany({});
   await Student.deleteMany({});
   await AcademicTerm.deleteMany({});
@@ -743,6 +750,7 @@ const seed = async () => {
   const walletTransactions = await seedWallets(students);
   // Req 54: completed (graded) and current courses for the Advising Students.
   const courseRecords = await seedAcademicHistory({ students, courses, offerings });
+  const extraHoursRequests = await seedExtraHoursRequests({ students, users: created, terms, courses });
   const graduationPlans = await seedGraduationPlans({ students, users: created });
   const slotChangeRequests = await seedSlotChangeRequests({ students, terms, courses });
   const exitExamRequests = await seedExitExamRequests({ students, users: created });
@@ -816,6 +824,7 @@ const seed = async () => {
     schedulingPreferences,
     walletTransactions,
     courseRecords,
+    extraHoursRequests,
     graduationPlans: graduationPlans.length,
     slotChangeRequests,
     exitExamRequests,

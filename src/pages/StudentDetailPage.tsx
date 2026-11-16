@@ -22,6 +22,7 @@ import { useSession } from '../hooks/useSession';
 import { usePageTitle } from '../hooks/usePageTitle';
 import StudentScheduleHistorySection from '../components/StudentScheduleHistorySection';
 import AdvisingOverviewPanel from '../components/AdvisingOverviewPanel';
+import ExtraHoursRequestPanel from '../components/ExtraHoursRequestPanel';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
@@ -185,7 +186,9 @@ const StudentDetailPage: React.FC = () => {
 
   const student = data?.student;
   const isAdvisingStudent = student?.studentType === 'Advising Student';
-  const isMyStudent = role === 'Advisor' && student?.assignedAdvisor?.id === user?.id;
+  const isMyStudent = role === 'Advisor' &&
+    student?.assignedAdvisor?.email.toLowerCase() === user?.email.toLowerCase();
+  const canRequestExtraHours = Boolean(isMyStudent && isAdvisingStudent && student?.isActive);
   const pendingRequest = student ? pendingRequestFor(student.workflowStatus) : 'None';
 
   return (
@@ -426,6 +429,8 @@ const StudentDetailPage: React.FC = () => {
 
             {/* Req 59: advising reason, allowance and bachelor-project eligibility. */}
             {isAdvisingStudent && <AdvisingOverviewPanel studentId={student.id} />}
+
+            {canRequestExtraHours && <ExtraHoursRequestPanel studentId={student.id} />}
           </>
         )}
       </div>

@@ -90,45 +90,45 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
   };
   return (
     <Card className="p-4">
-      <h3 className="mb-2 font-semibold text-slate-100">Extra-hours request</h3>
+      <h3 className="mb-2 text-body-lg font-semibold text-on-surface">Extra-hours request</h3>
       {!open ? <CustomButton size="sm" variant="secondary" onClick={() => { setOpen(true); void load(); }}>Request extra credit hours</CustomButton> : <div className="space-y-4">
-        <p className="text-sm text-slate-400">Choose the courses and billable extra hours to request. Approval and settlement are required before hours can be activated.</p>
-        {busy && <p role="status" className="text-sm text-slate-400">Loading or validating request…</p>}
+        <p className="text-body text-on-surface-variant">Choose the courses and billable extra hours to request. Approval and settlement are required before hours can be activated.</p>
+        {busy && <p role="status" className="text-body text-on-surface-variant">Loading or validating request…</p>}
         {error && <AlertBanner tone="error">{error}</AlertBanner>}
         {success && <AlertBanner tone="success">{success}</AlertBanner>}
         {!context && !busy && <CustomButton size="sm" onClick={() => void load()}>Retry</CustomButton>}
         {context && <>
           <Select label="Draft term" value={context.termId} disabled={busy} options={context.terms.map((term) => ({ value: term.id, label: term.label }))} onChange={(event) => { setSuccess(null); void load(event.target.value); }} />
-          <p className="text-sm text-slate-300">Current draft: {context.selectedHours} credit hours.</p>
-          <p className="text-xs text-slate-400">{context.graduationVerified ? 'An accepted graduation plan currently verifies completion within one year.' : 'Graduation within one year is not verified. The normal maximum increase of three hours applies.'}</p>
+          <p className="text-body text-on-surface-variant">Current draft: {context.selectedHours} credit hours.</p>
+          <p className="text-caption text-on-surface-variant">{context.graduationVerified ? 'An accepted graduation plan currently verifies completion within one year.' : 'Graduation within one year is not verified. The normal maximum increase of three hours applies.'}</p>
           {context.deadlinePassed ? <AlertBanner tone="info">The advising deadline ({new Date(context.advisingDeadline).toLocaleDateString()}) has passed. Requests are closed for this term.</AlertBanner> : <>
             {context.courses.length === 0 && <AlertBanner tone="info">No eligible published courses are available for this term.</AlertBanner>}
             <fieldset disabled={busy} className="space-y-3">
-              <legend className="mb-2 text-sm font-medium text-slate-200">Courses and requested extra hours</legend>
-              {context.courses.map((course) => <div key={course.id} className="rounded-lg border border-slate-700 p-3">
-                <label className="flex items-start gap-2 text-sm text-slate-200">
+              <legend className="mb-2 text-body font-medium text-on-surface">Courses and requested extra hours</legend>
+              {context.courses.map((course) => <div key={course.id} className="rounded-lg border border-outline-variant p-3">
+                <label className="flex items-start gap-2 text-body text-on-surface">
                   <input type="checkbox" checked={Object.prototype.hasOwnProperty.call(hours, course.id)} onChange={(event) => {
                     const next = { ...hours }; if (event.target.checked) next[course.id] = course.creditHours; else delete next[course.id]; changeHours(next);
                   }} className="mt-1" />
-                  <span>{course.code} — {course.name}<span className="block text-xs text-slate-400">{course.creditHours} course credits{course.alreadySelected ? ' · already in draft' : ''}</span></span>
+                  <span>{course.code} — {course.name}<span className="block text-caption text-on-surface-variant">{course.creditHours} course credits{course.alreadySelected ? ' · already in draft' : ''}</span></span>
                 </label>
-                {Object.prototype.hasOwnProperty.call(hours, course.id) && <label className="mt-2 flex items-center gap-2 text-xs text-slate-300">Requested extra hours
-                  <input type="number" min={1} max={course.creditHours} step={1} value={hours[course.id]} onChange={(event) => changeHours({ ...hours, [course.id]: Number(event.target.value) })} className="w-20 rounded border border-slate-600 bg-slate-950 px-2 py-1 text-white" />
+                {Object.prototype.hasOwnProperty.call(hours, course.id) && <label className="mt-2 flex items-center gap-2 text-caption text-on-surface-variant">Requested extra hours
+                  <input type="number" min={1} max={course.creditHours} step={1} value={hours[course.id]} onChange={(event) => changeHours({ ...hours, [course.id]: Number(event.target.value) })} className="w-20 rounded border border-outline-variant bg-surface-container-lowest px-2 py-1 text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary" />
                 </label>}
               </div>)}
             </fieldset>
-            <p className="text-xs text-slate-400">The whole course counts towards the projected schedule. Pricing uses the extra hours you request: EGP 1,000/hour for repeats, EGP 800/hour for new courses.</p>
+            <p className="text-caption text-on-surface-variant">The whole course counts towards the projected schedule. Pricing uses the extra hours you request: EGP 1,000/hour for repeats, EGP 800/hour for new courses.</p>
             <CustomButton size="sm" disabled={busy || !Object.keys(hours).length} onClick={() => void preview()}>Check eligibility and price</CustomButton>
             {quote && <div className="space-y-3">
-              <p className="text-sm text-slate-200">Standard: {quote.standardHours} · Projected: {quote.selectedHours} · Maximum: {quote.maximumTotalHours} hours</p>
+              <p className="text-body text-on-surface">Standard: {quote.standardHours} · Projected: {quote.selectedHours} · Maximum: {quote.maximumTotalHours} hours</p>
               {quote.issues.length > 0 && <AlertBanner tone="error"><ul className="list-disc pl-4">{quote.issues.map((issue, index) => <li key={`${issue.code}-${index}`}>{issue.message}</li>)}</ul></AlertBanner>}
-              <div className="overflow-x-auto"><table className="w-full text-left text-xs text-slate-300"><caption className="sr-only">Extra-hours itemized price in EGP</caption><thead><tr><th>Course</th><th>Type</th><th>Hours</th><th>EGP/hour</th><th>Subtotal</th></tr></thead><tbody>{quote.items.map((item) => <tr key={item.course}><td className="py-2">{item.code}</td><td>{item.classification}</td><td>{item.requestedHours}</td><td>{item.ratePerHour}</td><td>{item.subtotal}</td></tr>)}</tbody></table></div>
-              <p className="font-semibold text-white">Total: EGP {quote.totalCost.toLocaleString()}</p>
+              <div className="overflow-x-auto"><table className="w-full text-left text-caption text-on-surface-variant"><caption className="sr-only">Extra-hours itemized price in EGP</caption><thead><tr><th>Course</th><th>Type</th><th>Hours</th><th>EGP/hour</th><th>Subtotal</th></tr></thead><tbody>{quote.items.map((item) => <tr key={item.course}><td className="py-2">{item.code}</td><td>{item.classification}</td><td>{item.requestedHours}</td><td>{item.ratePerHour}</td><td>{item.subtotal}</td></tr>)}</tbody></table></div>
+              <p className="font-semibold text-on-surface">Total: EGP {quote.totalCost.toLocaleString()}</p>
               <CustomButton size="sm" disabled={busy || !quote.eligible} onClick={() => void submit()}>Submit extra-hours request</CustomButton>
             </div>}
           </>}
-          {context.requests.length > 0 && <section className="space-y-2"><h4 className="text-sm font-semibold text-slate-200">Your recent requests for this term</h4>{context.requests.map((request) => <div key={request.id} className="space-y-2 rounded-lg border border-slate-700 p-3">
-            <p className="break-all text-xs text-slate-400">{request.reference} · {request.requestedHours} hours · EGP {request.totalCost} · {request.decision}</p>
+          {context.requests.length > 0 && <section className="space-y-2"><h4 className="text-body font-semibold text-on-surface">Your recent requests for this term</h4>{context.requests.map((request) => <div key={request.id} className="space-y-2 rounded-lg border border-outline-variant p-3">
+            <p className="break-all text-caption text-on-surface-variant">{request.reference} · {request.requestedHours} hours · EGP {request.totalCost} · {request.decision}</p>
             {request.decision === 'Pending' && <CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => setWithdrawal(request)} aria-label={`Withdraw request ${request.reference}`}>Withdraw request</CustomButton>}
           </div>)}</section>}
         </>}

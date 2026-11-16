@@ -66,6 +66,7 @@ Every screen must answer: where am I, what can I do here, what happens next.
 | `/forgot-password`, `/reset-password` | Recover access | Send / set password | Token, password | No | Button loading | n/a | Field + banner | Confirmation |
 | `/dashboard` | Orient | Open a permitted destination | Role-aware nav, stats | Yes | Cards | First-use list | Per-widget error | Data |
 | `/students`, `/advising-students` | Find and open a student | Open student | Student list + filters | Staff | List loading | Filtered / first-use | Banner + retry | List |
+| `/students/:studentId` | Review a student's record; an assigned Advisor can request extra hours for an active Advising Student | Request extra hours; open schedule or academic history | Student record, advising draft, eligibility and price | Staff; request action: assigned Advisor | Record / request context | Missing student or editable draft | Specific inline error | Request reference |
 | `/schedule`, `/schedule/:studentId` | Read a weekly schedule | Print / act on slot | Weekly schedule | Yes | Region loading | Empty week | Region error | Schedule |
 | `/my-courses`, `/preferences`, `/eligible-swap-groups`, `/swaps` | Manage registration and swaps | Submit / accept request | Courses, groups, requests | Student | List loading | Empty + next step | Banner | Confirmation |
 | `/academic-history`, `/transcript`, `/my-graduation-plan` | Review academic record | Export / open plan | History, transcript, plan | Yes | Region loading | Empty record | Region error | Content |
