@@ -15,7 +15,7 @@ const WalletTransaction = require('../models/WalletTransaction');
 const recordTransaction = async (
   studentId,
   { type, amount, requestReference = null, paymentReference = null, description = '', occurredAt = new Date() },
-  { notifications = true } = {}
+  { notifications = true, session = null } = {}
 ) => {
   if (!WalletTransaction.TYPES.includes(type)) {
     throw new Error(`Unknown wallet transaction type: ${type}`);
@@ -32,7 +32,7 @@ const recordTransaction = async (
     { $inc: { balance: isCredit ? amount : -amount } },
     // A first refund opens the wallet; a payment never does, because there is
     // nothing in a wallet that does not exist yet.
-    { new: true, upsert: isCredit, setDefaultsOnInsert: true }
+    { new: true, upsert: isCredit, setDefaultsOnInsert: true, ...(session ? { session } : {}) }
   );
 
   if (!wallet) {
@@ -41,7 +41,7 @@ const recordTransaction = async (
     throw error;
   }
 
-  const transaction = await WalletTransaction.create({
+  const entry = {
     wallet: wallet._id,
     student: studentId,
     type,
@@ -53,7 +53,8 @@ const recordTransaction = async (
     occurredAt,
     // Saved in the ledger write, so retries never repeat the balance mutation.
     notificationPending: notifications,
-  });
+  };
+  const transaction = session ? (await WalletTransaction.create([entry], { session }))[0] : await WalletTransaction.create(entry);
 
   return { wallet, transaction };
 };

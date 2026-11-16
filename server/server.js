@@ -40,8 +40,9 @@ const SwapRequest = require("./models/SwapRequest");
 const ScheduleActivityLog = require("./models/ScheduleActivityLog");
 const { startProbationWorker } = require("./services/probationService");
 const semesterStandingRoutes = require("./routes/semesterStandingRoutes");
+const extraHoursRoutes = require("./routes/extraHoursRoutes");
+const ExtraHoursRequest = require("./models/ExtraHoursRequest");
 
-// Create server/.env (and the MongoDB connection string) if it is missing.
 if (ensureEnvFile()) {
   console.log("Created server/.env with a default local MongoDB connection.");
 }
@@ -50,6 +51,11 @@ dotenv.config();
 
 const app = express();
 app.use(cors());
+app.post(
+  "/api/payments/stripe/webhook",
+  express.raw({ type: "application/json", limit: "256kb" }),
+  require("./routes/stripeWebhookRoutes"),
+);
 app.use(express.json());
 app.use(morgan("dev"));
 
@@ -73,6 +79,8 @@ app.use("/api/mandatory-removal-requests", mandatoryRemovalRoutes);
 app.use("/api/advising-schedules", advisingScheduleDraftRoutes);
 app.use("/api/calendar", calendarRoutes);
 app.use("/api/semester-standings", semesterStandingRoutes);
+app.use("/api/extra-hours", extraHoursRoutes);
+app.use("/api/billing", require("./routes/installmentBillingRoutes"));
 app.use("/api/swaps", swapRequestRoutes);
 app.use("/api/coordinator", coordinatorDashboardRoutes);
 app.use("/api/schedule-history", scheduleActivityRoutes);
@@ -95,8 +103,6 @@ async function startServer() {
     const result = await seedIfEmpty();
 
     if (result.skipped) {
-      // Restarting must never cost anyone their work, so an initialized
-      // database is left exactly as it is.
       console.log(
         `Database already initialized (${result.users} users, ${result.students} students, ${result.courses} courses) — seed skipped.`,
       );
@@ -124,7 +130,6 @@ async function startServer() {
       console.log(`Graduation plans: ${graduationPlans}`);
     }
 
-    // Duplicate prevention must be indexed before a worker can deliver events.
     await Promise.all([
       Notification.init(),
       NotificationEvent.init(),
@@ -133,14 +138,15 @@ async function startServer() {
       CalendarEvent.init(),
       SemesterStanding.init(),
       ProbationWarning.init(),
+      ExtraHoursRequest.init(),
       SwapRequest.init(),
       ScheduleActivityLog.init(),
     ]);
     const stopNotificationWorker = startNotificationWorker({ beforeBatch: flushStudentNotifications });
     const stopProbationWorker = startProbationWorker();
     const httpServer = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-    httpServer.on('close', stopNotificationWorker);
-    httpServer.on('close', stopProbationWorker);
+    httpServer.on("close", stopNotificationWorker);
+    httpServer.on("close", stopProbationWorker);
   } catch (err) {
     console.error("Startup error:", err.message);
     console.error(`\nCould not connect to MongoDB at: ${MONGODB_URI}`);
