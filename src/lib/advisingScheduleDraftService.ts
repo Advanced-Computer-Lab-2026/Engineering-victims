@@ -1,5 +1,5 @@
 import { apiFetch } from './api';
-import type { AdvisingScheduleDraftResponse } from './types';
+import type { AdvisingScheduleDraftResponse, AdvisingScheduleValidationResponse } from './types';
 
 const endpoint = (studentId: string) => `/api/advising-schedules/students/${encodeURIComponent(studentId)}`;
 const withTerm = (path: string, termId?: string) =>
@@ -35,3 +35,47 @@ export const removeAdvisingScheduleCourse = (studentId: string, courseId: string
     { method: 'DELETE' }
   );
 };
+
+export const fetchAdvisingScheduleValidation = (
+  studentId: string,
+  termId: string
+): Promise<AdvisingScheduleValidationResponse> =>
+  apiFetch<AdvisingScheduleValidationResponse>(withTerm(`${endpoint(studentId)}/validation`, termId));
+
+export const assignAdvisingScheduleSlot = (
+  studentId: string,
+  courseId: string,
+  termId: string,
+  slotType: 'Lecture' | 'Tutorial' | 'Lab',
+  slotId: string
+) =>
+  apiFetch<{ message: string }>(`${endpoint(studentId)}/courses/${encodeURIComponent(courseId)}/slots`, {
+    method: 'POST',
+    body: JSON.stringify({ termId, slotType, slotId }),
+  });
+
+export const changeAdvisingScheduleSlot = (
+  studentId: string,
+  scheduleId: string,
+  termId: string,
+  slotId: string
+) =>
+  apiFetch<{ message: string }>(`${endpoint(studentId)}/slots/${encodeURIComponent(scheduleId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ termId, slotId }),
+  });
+
+export const removeAdvisingScheduleSlot = (
+  studentId: string,
+  scheduleId: string,
+  termId: string
+) =>
+  apiFetch<{ message: string }>(withTerm(`${endpoint(studentId)}/slots/${encodeURIComponent(scheduleId)}`, termId), {
+    method: 'DELETE',
+  });
+
+export const markAdvisingScheduleReadyForReview = (studentId: string, termId: string) =>
+  apiFetch<{ message: string; workflowStatus: string }>(`${endpoint(studentId)}/ready`, {
+    method: 'POST',
+    body: JSON.stringify({ termId }),
+  });

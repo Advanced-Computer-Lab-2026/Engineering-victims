@@ -1,25 +1,33 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { BookOpen, Loader2, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
+import { BookOpen, CheckCircle2, Loader2, Plus, RotateCcw, Save, Trash2 } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 import PageHeader from '../components/PageHeader';
 import Select from '../components/ui/Select';
 import StudentPreferencesPanel from '../components/StudentPreferencesPanel';
 import { ApiError } from '../lib/api';
 import {
   addAdvisingScheduleCourse,
+  assignAdvisingScheduleSlot,
+  changeAdvisingScheduleSlot,
   createAdvisingScheduleDraft,
   fetchAdvisingScheduleDraft,
+  fetchAdvisingScheduleValidation,
+  markAdvisingScheduleReadyForReview,
   removeAdvisingScheduleCourse,
+  removeAdvisingScheduleSlot,
 } from '../lib/advisingScheduleDraftService';
 import type {
+  AdvisingScheduleSlotAssignments,
   AdvisingScheduleCourseOption,
   AdvisingScheduleDraftCourse,
   AdvisingScheduleDraftResponse,
+  AdvisingScheduleValidation,
 } from '../lib/types';
 import { formatDate, formatRelative } from '../lib/studentsService';
 
@@ -44,6 +52,18 @@ const AdvisingScheduleDraftPage: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [selectedTermId, setSelectedTermId] = useState('');
+  const [slotAssignments, setSlotAssignments] = useState<AdvisingScheduleSlotAssignments[]>([]);
+  const [validation, setValidation] = useState<AdvisingScheduleValidation | null>(null);
+  const [selectedSlotIds, setSelectedSlotIds] = useState<Record<string, string>>({});
+  const [slotAction, setSlotAction] = useState<string | null>(null);
+  const [isMarkingReady, setIsMarkingReady] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [slotRemoval, setSlotRemoval] = useState<{
+    assignmentId: string;
+    courseCode: string;
+    slotType: string;
+    groupNumber: number;
+  } | null>(null);
   // Edits are staged here and only written when "Save as draft" is pressed.
   const [stagedAdds, setStagedAdds] = useState<string[]>([]);
   const [stagedRemoves, setStagedRemoves] = useState<string[]>([]);
@@ -58,6 +78,15 @@ const AdvisingScheduleDraftPage: React.FC = () => {
       setSelectedTermId(response.term.id);
       setStagedAdds([]);
       setStagedRemoves([]);
+      setSelectedSlotIds({});
+      if (response.term.id) {
+        const check = await fetchAdvisingScheduleValidation(studentId, response.term.id);
+        setValidation(check.validation);
+        setSlotAssignments(check.slotAssignments);
+      } else {
+        setValidation(null);
+        setSlotAssignments([]);
+      }
     } catch (err) {
       setData(null);
       setError((err as ApiError).message);
@@ -89,6 +118,49 @@ const AdvisingScheduleDraftPage: React.FC = () => {
       setError((err as ApiError).message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const runSlotAction = async (key: string, action: () => Promise<unknown>): Promise<boolean> => {
+    if (!studentId || !selectedTermId) return false;
+    setSlotAction(key);
+    setError(null);
+    setNotice(null);
+    try {
+      await action();
+      await load(selectedTermId);
+      return true;
+    } catch (err) {
+      setError((err as ApiError).message);
+      return false;
+    } finally {
+      setSlotAction(null);
+    }
+  };
+
+  const confirmSlotRemoval = async () => {
+    if (!studentId || !slotRemoval) return;
+    const confirmedRemoval = slotRemoval;
+    const succeeded = await runSlotAction(
+      `${confirmedRemoval.assignmentId}-remove`,
+      () => removeAdvisingScheduleSlot(studentId, confirmedRemoval.assignmentId, selectedTermId)
+    );
+    if (succeeded) setSlotRemoval(null);
+  };
+
+  const markReadyForReview = async () => {
+    if (!studentId || !selectedTermId) return;
+    setIsMarkingReady(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await markAdvisingScheduleReadyForReview(studentId, selectedTermId);
+      setNotice(response.message);
+      await load(selectedTermId);
+    } catch (err) {
+      setError((err as ApiError).message);
+    } finally {
+      setIsMarkingReady(false);
     }
   };
 
@@ -165,6 +237,12 @@ const AdvisingScheduleDraftPage: React.FC = () => {
           <AlertBanner tone="error" title="Could not update the draft schedule" onDismiss={() => setError(null)}>
             {error}
           </AlertBanner>
+        </div>
+      )}
+
+      {notice && (
+        <div className="mb-4">
+          <AlertBanner tone="success" onDismiss={() => setNotice(null)}>{notice}</AlertBanner>
         </div>
       )}
 
@@ -260,6 +338,7 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                       {displayedCourses.map((course) => {
                         const isStagedAdd = stagedAddSet.has(course.id);
                         const isPendingRemoval = stagedRemoveSet.has(course.id);
+                        const courseSlots = slotAssignments.find((item) => item.courseId === course.id);
                         return (
                           <li
                             key={course.id}
@@ -304,6 +383,112 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                               >
                                 {isPendingRemoval ? 'Undo' : 'Remove'}
                               </CustomButton>
+                            )}
+                            {data.canEdit && !isStagedAdd && !isPendingRemoval && (
+                              <div className="w-full border-t border-outline-variant pt-3">
+                                <h4 className="mb-2 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
+                                  Lecture, tutorial and lab slots
+                                </h4>
+                                {courseSlots?.components.filter((component) => component.required > 0).length ? (
+                                  <div className="space-y-4">
+                                    {courseSlots.components.filter((component) => component.required > 0).map((component) => {
+                                      const addKey = `${course.id}-${component.slotType}-add`;
+                                      const addOptions = component.options.filter(
+                                        (option) => !option.assignedToStudent && option.remainingCapacity > 0 && option.clashes.length === 0
+                                      );
+                                      const assignedIds = new Set(component.assignments.map((assignment) => assignment.slot.id));
+                                      const remainingRequired = Math.max(0, component.required - component.assignments.length);
+
+                                      return (
+                                        <div key={component.slotType} className="space-y-2">
+                                          <p className="text-caption font-medium text-on-surface">
+                                            {component.slotType}: {component.assignments.length} of {component.required} assigned
+                                          </p>
+                                          {component.assignments.map((assignment) => {
+                                            const changeOptions = component.options.filter(
+                                              (option) => option.id === assignment.slot.id ||
+                                                (!option.assignedToStudent && option.remainingCapacity > 0 && option.clashes.length === 0)
+                                            );
+                                            const selectedId = selectedSlotIds[assignment.id] ?? assignment.slot.id;
+                                            const details = assignment.slot;
+                                            return (
+                                              <div key={assignment.id} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-end">
+                                                <Select
+                                                  label={`Assigned ${component.slotType.toLowerCase()} slot`}
+                                                  value={selectedId}
+                                                  onChange={(event) => setSelectedSlotIds((current) => ({ ...current, [assignment.id]: event.target.value }))}
+                                                  options={changeOptions.map((option) => ({
+                                                    value: option.id,
+                                                    label: option.id === details.id
+                                                      ? `Group ${option.groupNumber} · ${option.dayOfWeek} ${option.startTime}–${option.endTime} · Room ${option.roomId} · current`
+                                                      : `Group ${option.groupNumber} · ${option.dayOfWeek} ${option.startTime}–${option.endTime} · Room ${option.roomId} · ${option.remainingCapacity} seats left`,
+                                                  }))}
+                                                />
+                                                <CustomButton
+                                                  variant="secondary"
+                                                  size="sm"
+                                                  disabled={!selectedId || selectedId === details.id}
+                                                  isLoading={slotAction === assignment.id}
+                                                  onClick={() => runSlotAction(assignment.id, () => changeAdvisingScheduleSlot(studentId ?? '', assignment.id, selectedTermId, selectedId))}
+                                                >
+                                                  Change slot
+                                                </CustomButton>
+                                                <CustomButton
+                                                  variant="danger-ghost"
+                                                  size="sm"
+                                                  isLoading={slotAction === `${assignment.id}-remove`}
+                                                  onClick={() => setSlotRemoval({
+                                                    assignmentId: assignment.id,
+                                                    courseCode: course.code,
+                                                    slotType: component.slotType,
+                                                    groupNumber: details.groupNumber,
+                                                  })}
+                                                  icon={<Trash2 className="h-4 w-4" aria-hidden />}
+                                                >
+                                                  Remove slot
+                                                </CustomButton>
+                                              </div>
+                                            );
+                                          })}
+                                          {remainingRequired > 0 && (
+                                            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                                              <Select
+                                                label={`Available ${component.slotType.toLowerCase()} slots`}
+                                                value={selectedSlotIds[addKey] ?? ''}
+                                                onChange={(event) => setSelectedSlotIds((current) => ({ ...current, [addKey]: event.target.value }))}
+                                                placeholder="Select a slot with capacity and no clash"
+                                                options={addOptions.filter((option) => !assignedIds.has(option.id)).map((option) => ({
+                                                  value: option.id,
+                                                  label: `Group ${option.groupNumber} · ${option.dayOfWeek} ${option.startTime}–${option.endTime} · Room ${option.roomId} · ${option.remainingCapacity} seats left`,
+                                                }))}
+                                              />
+                                              <CustomButton
+                                                variant="secondary"
+                                                size="sm"
+                                                disabled={!selectedSlotIds[addKey]}
+                                                isLoading={slotAction === addKey}
+                                                onClick={() => runSlotAction(addKey, () => assignAdvisingScheduleSlot(studentId ?? '', course.id, selectedTermId, component.slotType, selectedSlotIds[addKey] ?? ''))}
+                                                icon={<Plus className="h-4 w-4" aria-hidden />}
+                                              >
+                                                Assign slot
+                                              </CustomButton>
+                                              {addOptions.length === 0 && (
+                                                <p className="text-caption text-on-surface-variant sm:col-span-2">
+                                                  No slots with remaining capacity and no timetable clash are available for this component.
+                                                </p>
+                                              )}
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <p className="text-caption text-on-surface-variant">
+                                    {courseSlots ? 'No lecture, tutorial or lab slots are required for this course.' : 'Save this course to load its available slots.'}
+                                  </p>
+                                )}
+                              </div>
                             )}
                           </li>
                         );
@@ -353,11 +538,55 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                     Changes are not stored until you press Save as draft.
                   </p>
                 )}
+                {validation && (
+                  <section className="mt-5 border-t border-outline-variant pt-4" aria-live="polite">
+                    <h3 className="mb-3 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">
+                      Draft validation
+                    </h3>
+                    {hasUnsavedChanges ? (
+                      <AlertBanner tone="info" title="Save changes to validate the latest draft">
+                        The findings below describe the last saved course and slot selections.
+                      </AlertBanner>
+                    ) : validation.valid ? (
+                      <AlertBanner tone="success" title="No blocking issues">
+                        {validation.selectedHours} credit hours selected; {validation.allowedHours} allowed or approved.
+                      </AlertBanner>
+                    ) : (
+                      <AlertBanner tone="error" title={`${validation.issues.length} issue${validation.issues.length === 1 ? '' : 's'} to resolve`}>
+                        <ul className="list-disc space-y-1 pl-5">
+                          {validation.issues.map((issue, index) => <li key={`${issue.code}-${issue.courseId ?? issue.slotId ?? index}`}>{issue.message}</li>)}
+                        </ul>
+                      </AlertBanner>
+                    )}
+                  </section>
+                )}
+                {data.canEdit && data.draft && validation?.valid && !hasUnsavedChanges && (
+                  <div className="mt-5 flex justify-end">
+                    <CustomButton
+                      onClick={markReadyForReview}
+                      isLoading={isMarkingReady}
+                      icon={<CheckCircle2 className="h-4 w-4" aria-hidden />}
+                    >
+                      Mark Ready for Student Review
+                    </CustomButton>
+                  </div>
+                )}
               </>
             )}
           </Card>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={Boolean(slotRemoval)}
+        title="Remove assigned slot?"
+        message={slotRemoval
+          ? `Remove ${slotRemoval.slotType.toLowerCase()} group ${slotRemoval.groupNumber} from ${slotRemoval.courseCode}? The schedule may be incomplete until another group is assigned.`
+          : ''}
+        confirmLabel="Remove slot"
+        isLoading={Boolean(slotRemoval && slotAction === `${slotRemoval.assignmentId}-remove`)}
+        onCancel={() => setSlotRemoval(null)}
+        onConfirm={() => void confirmSlotRemoval()}
+      />
     </>
   );
 };

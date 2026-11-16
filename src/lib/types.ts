@@ -557,6 +557,54 @@ export interface AdvisingScheduleCourseOption extends Omit<AdvisingScheduleDraft
   courseType: 'Core' | 'Elective' | 'Huma';
 }
 
+export interface AdvisingScheduleSlotChoice {
+  id: string;
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  groupNumber: number;
+  dayOfWeek: WeekDay;
+  startTime: string;
+  endTime: string;
+  roomId: string;
+  maxCapacity: number;
+  assignedCount: number;
+  remainingCapacity: number;
+  assignedToStudent: boolean;
+  clashes: string[];
+}
+
+export interface AdvisingScheduleSlotComponent {
+  slotType: 'Lecture' | 'Tutorial' | 'Lab';
+  required: number;
+  assignments: Array<{ id: string; slot: AdvisingScheduleSlotChoice }>;
+  options: AdvisingScheduleSlotChoice[];
+}
+
+export interface AdvisingScheduleSlotAssignments {
+  courseId: string;
+  components: AdvisingScheduleSlotComponent[];
+}
+
+export interface AdvisingScheduleValidationIssue {
+  code: string;
+  message: string;
+  courseId?: string;
+  slotType?: 'Lecture' | 'Tutorial' | 'Lab';
+  slotId?: string;
+  slotIds?: string[];
+}
+
+export interface AdvisingScheduleValidation {
+  valid: boolean;
+  selectedHours: number;
+  allowedHours: number;
+  issues: AdvisingScheduleValidationIssue[];
+}
+
+export interface AdvisingScheduleValidationResponse {
+  validation: AdvisingScheduleValidation;
+  slotAssignments: AdvisingScheduleSlotAssignments[];
+}
+
 export interface AdvisingScheduleDraftResponse {
   student: {
     id: string;

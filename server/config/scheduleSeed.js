@@ -25,9 +25,10 @@ const CourseSlot = require('../models/CourseSlot');
  * The labels a seeded cohort's groups get; the UI reads them verbatim.
  *
  * A cohort gets one published group per label, and every one of them carries
- * the *same* slot list: seedOfferings builds exactly one slot per course and
- * slot type for a term (and (courseId, termId) is unique), so there is no
- * second time at which the same course runs. Sharing the slots is what makes
+ * the *same* slot list: seedOfferings builds the groups a course actually
+ * needs — one per component at minimum, more when its hours require several
+ * sessions — each at a distinct time, and (courseId, termId) stays unique, so
+ * a course is never offered twice in a term. Sharing the slots is what makes
  * the groups' registered course-code sets identical, which is the condition
  * Req 34 matches on — a group that drifted to a different course set would
  * never be offered as a swap destination.

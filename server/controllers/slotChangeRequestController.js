@@ -21,6 +21,7 @@ const {
   isObjectIdString,
 } = require('../services/slotChangeRequestService');
 const { supportsTransactions, isTransactionUnsupportedError } = require('../services/transactionSupport');
+const { createPendingSlotChangeRequest } = require('../services/advisingScheduleWorkflowService');
 const { notify, notifyRole } = require('../services/notificationService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
 
@@ -595,22 +596,27 @@ exports.createMyRequest = async (req, res) => {
 
     let created;
     try {
-      created = await SlotChangeRequest.create({
-        student: student._id,
-        term: term._id,
-        scheduleEntry: entry._id,
-        course: course._id,
-        offering: slot.offeringId._id,
-        slotType: slot.slotType,
-        currentSlot: slot._id,
-        currentSlotSnapshot: snapshot,
-        preferenceNote: input.preferenceNote,
+      created = await createPendingSlotChangeRequest({
+        studentId: student._id,
+        termId: term._id,
+        request: {
+          student: student._id,
+          term: term._id,
+          scheduleEntry: entry._id,
+          course: course._id,
+          offering: slot.offeringId._id,
+          slotType: slot.slotType,
+          currentSlot: slot._id,
+          currentSlotSnapshot: snapshot,
+          preferenceNote: input.preferenceNote,
+        },
       });
     } catch (error) {
       // The partial unique index catches a simultaneous duplicate submission.
       if (error?.code === 11000) {
         return res.status(409).json({ message: 'You already have a pending change request for this slot.' });
       }
+      if (error.status) return res.status(error.status).json({ message: error.message });
       throw error;
     }
 
