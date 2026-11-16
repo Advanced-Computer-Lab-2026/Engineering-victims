@@ -7,6 +7,7 @@ const CourseOffering = require('../models/CourseOffering');
 const CourseSlot = require('../models/CourseSlot');
 const ScheduleTemplate = require('../models/ScheduleTemplate');
 const StudentSchedule = require('../models/StudentSchedule');
+const AdvisingScheduleDraft = require('../models/AdvisingScheduleDraft');
 const GraduationPlan = require('../models/GraduationPlan');
 const ExitExamRequest = require('../models/ExitExamRequest');
 const ExtraHoursRequest = require('../models/ExtraHoursRequest');
@@ -24,6 +25,10 @@ const CalendarOAuthState = require('../models/CalendarOAuthState');
 const CalendarEvent = require('../models/CalendarEvent');
 const { COURSES } = require('./courseCatalogue');
 const { recalculate } = require('../services/workflowService');
+// The single source of truth for how many lecture/tutorial/lab rows a course
+// needs. seedOfferings has to create at least that many groups, or the advising
+// draft editor can never satisfy the validation that enforces the same rule.
+const { requiredCount } = require('../services/advisingScheduleValidation');
 const { seedWallets } = require('./walletSeed');
 const { seedAcademicHistory } = require('./academicHistorySeed');
 const { seedScheduleGroups } = require('./scheduleSeed');
@@ -602,27 +607,39 @@ const seedOfferings = async ({ terms, courses, instructors }) => {
     const course = courseByCode.get(code);
     const offeringId = createdOfferings[offeringIndex]._id;
 
-    SLOT_TYPES.forEach(({ slotType, hoursField }) => {
-      if (!course[hoursField]) return;
+    SLOT_TYPES.forEach(({ slotType }) => {
+      // One slot per *session*, not one per component. requiredCount() is the
+      // rule the advising validation enforces — a 4-hour lecture needs two rows,
+      // and a Lecture component is required even when lectureHours is 0 — so an
+      // offering must publish that many groups or the draft editor shows
+      // "no slots available" with nothing left to pick.
+      //
+      // Consecutive indices give consecutive grid cells, so the groups of one
+      // offering never share a time: a student can hold all of them at once
+      // without slotsOverlap() calling it a timetable clash.
+      const groups = requiredCount(course, slotType);
+      if (!groups) return;
 
-      const index = slotDocs.length;
-      const cell = index % gridCells;
-      const position = Math.floor(index / gridCells) % ROOMS.length;
-      const [startTime, endTime] = BLOCKS[Math.floor(cell / DAYS.length) % BLOCKS.length];
-      const capacity = SLOT_CAPACITY[slotType];
+      for (let groupNumber = 1; groupNumber <= groups; groupNumber += 1) {
+        const index = slotDocs.length;
+        const cell = index % gridCells;
+        const position = Math.floor(index / gridCells) % ROOMS.length;
+        const [startTime, endTime] = BLOCKS[Math.floor(cell / DAYS.length) % BLOCKS.length];
+        const capacity = SLOT_CAPACITY[slotType];
 
-      slotDocs.push({
-        offeringId,
-        instructorId: instructors[position % instructors.length]._id,
-        slotType,
-        groupNumber: 1,
-        dayOfWeek: DAYS[cell % DAYS.length],
-        startTime,
-        endTime,
-        roomId: ROOMS[position],
-        maxCapacity: capacity.maxCapacity,
-        assignedCount: capacity.assignedCount,
-      });
+        slotDocs.push({
+          offeringId,
+          instructorId: instructors[position % instructors.length]._id,
+          slotType,
+          groupNumber,
+          dayOfWeek: DAYS[cell % DAYS.length],
+          startTime,
+          endTime,
+          roomId: ROOMS[position],
+          maxCapacity: capacity.maxCapacity,
+          assignedCount: capacity.assignedCount,
+        });
+      }
     });
   });
 
@@ -681,6 +698,12 @@ const seed = async () => {
   await CalendarConnection.deleteMany({});
   await CalendarOAuthState.deleteMany({});
   await CalendarEvent.deleteMany({});
+  // Drafts are runtime-only too (seed() never writes one), and they hold a
+  // student id directly rather than through a schedule row, so leaving them
+  // behind is exactly the orphan this block exists to prevent: the database
+  // keeps a draft whose student the reseed just deleted, and scripts/
+  // audit-demo-rules.cjs reports it as an orphan draft.
+  await AdvisingScheduleDraft.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
@@ -809,6 +832,31 @@ const seed = async () => {
     )
   );
 
+  // CourseSlot.assignedCount is denormalised, so it has to be reconciled from
+  // the rows the seed just wrote: the capacity constants seed slots with a
+  // plausible-looking 48/24/16, and scheduleSeed/advisingScheduleSeed then
+  // $inc their own cohorts on top. A counter that does not match the real
+  // StudentSchedule rows makes the seat math in slotChangeRequestService and
+  // extraHoursActivationService wrong (and scripts/audit-demo-rules.cjs flags
+  // every slot as drift), so derive it from the rows — the same source of
+  // truth controllers/offeringController.js reads.
+  const occupancy = await StudentSchedule.aggregate([
+    { $group: { _id: '$slotId', count: { $sum: 1 } } },
+  ]);
+  const countBySlot = new Map(occupancy.map(({ _id, count }) => [String(_id), count]));
+  const slotIds = (await CourseSlot.find({}).select('_id').lean()).map((slot) => slot._id);
+  if (slotIds.length) {
+    await CourseSlot.bulkWrite(
+      slotIds.map((slotId) => ({
+        updateOne: {
+          filter: { _id: slotId },
+          update: { $set: { assignedCount: countBySlot.get(String(slotId)) ?? 0 } },
+        },
+      })),
+      { ordered: false }
+    );
+  }
+
   return {
     users: created.length,
     students: students.length,
@@ -875,4 +923,18 @@ const seedIfEmpty = async () => {
   return { skipped: false, ...(await seed()) };
 };
 
-module.exports = { seed, seedIfEmpty, isSeeded, ADVISORS, STAFF, STUDENTS };
+module.exports = {
+  seed,
+  seedIfEmpty,
+  isSeeded,
+  ADVISORS,
+  STAFF,
+  STUDENTS,
+  // Grid constants, exported so scripts/backfill-slot-groups.cjs places new
+  // groups on exactly the same week grid the seed builds.
+  DAYS,
+  BLOCKS,
+  ROOMS,
+  SLOT_CAPACITY,
+  SLOT_TYPES,
+};
