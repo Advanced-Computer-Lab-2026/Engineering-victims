@@ -182,7 +182,7 @@ const StudentScheduleHistorySection: React.FC<StudentScheduleHistorySectionProps
                 </div>
               </form>
             )
-          ) : currentStatus === 'Ready to Process' ? (
+          ) : ['Ready for Student Review', 'Ready to Process'].includes(currentStatus ?? '') ? (
             <CustomButton
               variant="primary"
               size="sm"

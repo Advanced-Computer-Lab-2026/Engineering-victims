@@ -11,15 +11,19 @@ const {
 } = require('../services/advisingScheduleDraftService');
 const { buildAcademicHistory } = require('../services/academicHistoryService');
 const { deriveAllowance } = require('../services/advisingOverviewService');
+const workflow = require('../services/advisingScheduleWorkflowService');
 
 const EDITABLE_STATUSES = new Set(['Not Started', 'Draft', 'Reopened']);
 
-const findAdvisingStudent = async (studentId) => {
+const findAdvisingStudent = async (studentId, user) => {
   if (!mongoose.isValidObjectId(studentId)) return { status: 400, message: 'That student link is not valid.' };
   const student = await Student.findById(studentId);
   if (!student) return { status: 404, message: 'Student not found' };
   if (student.studentType !== 'Advising Student') {
     return { status: 404, message: 'That student is not an advising student.' };
+  }
+  if (!workflow.canManageStudent(user, student)) {
+    return { status: 403, message: 'You can only manage students assigned to you.' };
   }
   return { student };
 };
@@ -153,7 +157,7 @@ const respondWithDraft = async (res, student, term, terms, draft, statusCode = 2
 
 exports.getDraft = async (req, res) => {
   try {
-    const { student, status, message } = await findAdvisingStudent(req.params.studentId);
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
     if (!student) return res.status(status).json({ message });
 
     const [selected, terms] = await Promise.all([
@@ -176,7 +180,7 @@ exports.getDraft = async (req, res) => {
 
 exports.createDraft = async (req, res) => {
   try {
-    const { student, status, message } = await findAdvisingStudent(req.params.studentId);
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
     if (!student) return res.status(status).json({ message });
     if (!EDITABLE_STATUSES.has(student.workflowStatus)) {
       return res.status(409).json({ message: 'This advising schedule is no longer an editable draft.' });
@@ -216,7 +220,7 @@ exports.createDraft = async (req, res) => {
 
 exports.addCourse = async (req, res) => {
   try {
-    const { student, status, message } = await findAdvisingStudent(req.params.studentId);
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
     if (!student) return res.status(status).json({ message });
     if (!EDITABLE_STATUSES.has(student.workflowStatus)) {
       return res.status(409).json({ message: 'This advising schedule is no longer an editable draft.' });
@@ -261,7 +265,7 @@ exports.addCourse = async (req, res) => {
 
 exports.removeCourse = async (req, res) => {
   try {
-    const { student, status, message } = await findAdvisingStudent(req.params.studentId);
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
     if (!student) return res.status(status).json({ message });
     if (!EDITABLE_STATUSES.has(student.workflowStatus)) {
       return res.status(409).json({ message: 'This advising schedule is no longer an editable draft.' });
@@ -277,22 +281,114 @@ exports.removeCourse = async (req, res) => {
       });
     }
     const { term } = selected;
-    const draft = await AdvisingScheduleDraft.findOne({ student: student._id, term: term._id });
-    if (!draft) return res.status(404).json({ message: 'Draft schedule not found.' });
-
-    const result = await AdvisingScheduleDraft.updateOne(
-      { _id: draft._id, courses: { $elemMatch: { course: req.params.courseId, mandatory: false } } },
-      { $pull: { courses: { course: req.params.courseId, mandatory: false } }, $set: { updatedBy: req.user.userId } }
-    );
-    if (!result.modifiedCount) {
-      return res.status(404).json({ message: 'That non-mandatory course is not in this draft schedule.' });
-    }
-
-    student.lastUpdateAt = new Date();
-    await student.save();
+    await workflow.removeCourseFromDraft({
+      user: req.user,
+      studentId: student._id,
+      termId: term._id,
+      courseId: req.params.courseId,
+    });
     const updated = await loadDraft(student, term);
     return res.status(200).json({ draft: serializeDraft(updated) });
   } catch (error) {
     return res.status(500).json({ message: 'Could not remove the course from the draft schedule', error: error.message });
+  }
+};
+
+exports.getValidation = async (req, res) => {
+  try {
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
+    if (!student) return res.status(status).json({ message });
+    const selected = await resolveTerm(req.query.termId);
+    if (!selected.term) {
+      return res.status(selected.status ?? 404).json({ message: selected.message ?? 'Choose an academic term.' });
+    }
+    const result = await workflow.loadDraftValidation({ student, term: selected.term });
+    return res.status(200).json({
+      validation: result.validation,
+      slotAssignments: workflow.buildSlotAssignments({
+        courses: result.draft?.courses ?? [],
+        offerings: result.offerings ?? [],
+        rows: result.rows ?? [],
+        slots: result.slots ?? [],
+        slotOccupancy: result.slotOccupancy ?? new Map(),
+      }),
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || 'Could not validate this draft schedule.' });
+  }
+};
+
+exports.assignSlot = async (req, res) => {
+  try {
+    const { termId, slotType, slotId } = req.body ?? {};
+    if (![termId, req.params.courseId, slotId].every(mongoose.isValidObjectId)) {
+      return res.status(400).json({ message: 'Choose a valid term, course and slot.' });
+    }
+    const result = await workflow.assignCourseSlot({
+      user: req.user,
+      studentId: req.params.studentId,
+      termId,
+      courseId: req.params.courseId,
+      slotType,
+      slotId,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || 'Could not assign the slot.' });
+  }
+};
+
+exports.changeSlot = async (req, res) => {
+  try {
+    const { termId, slotId } = req.body ?? {};
+    if (![termId, req.params.scheduleId, slotId].every(mongoose.isValidObjectId)) {
+      return res.status(400).json({ message: 'Choose a valid term, assignment and replacement slot.' });
+    }
+    const result = await workflow.changeCourseSlot({
+      user: req.user,
+      studentId: req.params.studentId,
+      termId,
+      scheduleId: req.params.scheduleId,
+      slotId,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || 'Could not change the assigned slot.' });
+  }
+};
+
+exports.removeSlot = async (req, res) => {
+  try {
+    const { termId } = req.query;
+    if (![termId, req.params.scheduleId].every(mongoose.isValidObjectId)) {
+      return res.status(400).json({ message: 'Choose a valid term and slot assignment.' });
+    }
+    const result = await workflow.removeCourseSlot({
+      user: req.user,
+      studentId: req.params.studentId,
+      termId,
+      scheduleId: req.params.scheduleId,
+    });
+    return res.status(200).json(result);
+  } catch (error) {
+    return res.status(error.status || 500).json({ message: error.message || 'Could not remove the assigned slot.' });
+  }
+};
+
+exports.markReadyForReview = async (req, res) => {
+  try {
+    const { termId } = req.body ?? {};
+    if (!mongoose.isValidObjectId(termId)) return res.status(400).json({ message: 'Choose a valid academic term.' });
+    const result = await workflow.markReadyForReview({ user: req.user, studentId: req.params.studentId, termId });
+    return res.status(200).json({
+      message: 'The completed schedule is ready for student review.',
+      workflowStatus: result.workflowStatus,
+      validation: result.validation,
+    });
+  } catch (error) {
+    return res.status(error.status || 500).json({
+      message: error.message || 'Could not mark the schedule ready for review.',
+      validation: error.details,
+    });
   }
 };

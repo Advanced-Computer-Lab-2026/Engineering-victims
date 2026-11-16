@@ -5,6 +5,7 @@ const StudentSchedule = require('../models/StudentSchedule');
 const User = require('../models/User');
 const { recalculate } = require('../services/workflowService');
 const { queueStudentNotification } = require('../services/studentNotificationService');
+const advisingScheduleWorkflow = require('../services/advisingScheduleWorkflowService');
 
 /**
  * Req 123: Automatically records a schedule processing or reopening action.
@@ -309,32 +310,27 @@ exports.processAdvisingSchedule = async (req, res) => {
       return res.status(400).json({ message: 'Invalid student ID.' });
     }
 
-    const [student, staffUser] = await Promise.all([
-      Student.findById(studentId).populate('assignedAdvisor', 'fullName email'),
-      User.findById(req.user.userId).select('fullName email role').lean(),
-    ]);
+    const termId = req.body?.termId || req.query?.termId || (
+      await StudentSchedule.findOne({ studentId, status: 'Active' }).sort({ updatedAt: -1 }).select('termId').lean()
+    )?.termId;
+    if (!termId) return res.status(409).json({ message: 'There is no review-ready schedule to process.' });
 
-    if (!student) return res.status(404).json({ message: 'Student not found.' });
+    const staffUser = await User.findById(req.user.userId).select('fullName email role').lean();
     if (!staffUser) return res.status(404).json({ message: 'Staff user not found.' });
-    if (student.studentType !== 'Advising Student') {
-      return res.status(400).json({ message: 'Only advising student schedules are processed here.' });
-    }
-    if (student.workflowStatus === 'Processed') {
-      return res.status(409).json({ message: 'This schedule is already processed.' });
-    }
-
-    await StudentSchedule.updateMany(
-      { studentId: student._id, status: { $in: ['Draft', 'Active'] } },
-      { $set: { status: 'Processed' } }
-    );
+    const { student, term } = await advisingScheduleWorkflow.processSchedule({
+      user: req.user,
+      studentId,
+      termId,
+    });
+    await student.populate('assignedAdvisor', 'fullName email');
 
     const logEntry = await recordScheduleActivity({
       student,
+      termId: term._id,
       action: 'Processed',
       user: staffUser,
     });
 
-    student.workflowStatus = 'Processed';
     queueStudentNotification(student, 'schedule.processed', {
       entityId: logEntry._id,
       occurrence: 'processed',
@@ -347,10 +343,7 @@ exports.processAdvisingSchedule = async (req, res) => {
       workflowStatus: student.workflowStatus,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: 'Could not process schedule.',
-      error: error.message,
-    });
+    return res.status(error.status || 500).json({ message: error.message || 'Could not process schedule.', validation: error.details });
   }
 };
 
@@ -372,35 +365,25 @@ exports.reopenAdvisingSchedule = async (req, res) => {
       });
     }
 
-    const [student, staffUser] = await Promise.all([
-      Student.findById(studentId).populate('assignedAdvisor', 'fullName email'),
-      User.findById(req.user.userId).select('fullName email role').lean(),
-    ]);
+    const termId = req.body?.termId || (
+      await StudentSchedule.findOne({ studentId, status: 'Processed' }).sort({ updatedAt: -1 }).select('termId').lean()
+    )?.termId;
+    if (!termId) return res.status(409).json({ message: 'There is no processed schedule to reopen.' });
 
-    if (!student) return res.status(404).json({ message: 'Student not found.' });
+    const staffUser = await User.findById(req.user.userId).select('fullName email role').lean();
     if (!staffUser) return res.status(404).json({ message: 'Staff user not found.' });
-    if (student.studentType !== 'Advising Student') {
-      return res.status(400).json({ message: 'Only advising student schedules can be reopened.' });
-    }
-    if (student.workflowStatus !== 'Processed') {
-      return res.status(409).json({
-        message: 'Only a Processed schedule can be reopened.',
-      });
-    }
-
-    await StudentSchedule.updateMany(
-      { studentId: student._id, status: 'Processed' },
-      { $set: { status: 'Draft' } }
-    );
+    const reopened = await advisingScheduleWorkflow.reopenSchedule({ user: req.user, studentId, termId, reason });
+    const { student } = reopened;
+    await student.populate('assignedAdvisor', 'fullName email');
 
     const logEntry = await recordScheduleActivity({
       student,
+      termId: reopened.term._id,
       action: 'Reopened',
       user: staffUser,
-      reason,
+      reason: reopened.reason,
     });
 
-    student.workflowStatus = 'Reopened';
     queueStudentNotification(student, 'schedule.reopened', {
       entityId: logEntry._id,
       occurrence: 'reopened',
@@ -413,9 +396,6 @@ exports.reopenAdvisingSchedule = async (req, res) => {
       workflowStatus: student.workflowStatus,
     });
   } catch (error) {
-    return res.status(500).json({
-      message: 'Could not reopen schedule.',
-      error: error.message,
-    });
+    return res.status(error.status || 500).json({ message: error.message || 'Could not reopen schedule.' });
   }
 };

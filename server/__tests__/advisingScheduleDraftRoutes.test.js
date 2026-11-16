@@ -16,6 +16,12 @@ jest.mock('../services/advisingScheduleDraftService', () => ({
 }));
 jest.mock('../services/academicHistoryService', () => ({ buildAcademicHistory: jest.fn() }));
 jest.mock('../services/advisingOverviewService', () => ({ deriveAllowance: jest.fn() }));
+jest.mock('../services/advisingScheduleWorkflowService', () => ({
+  canManageStudent: jest.fn((user, student) =>
+    user?.role === 'Coordinator' || String(student.assignedAdvisor) === String(user?.userId)
+  ),
+  removeCourseFromDraft: jest.fn(),
+}));
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -37,7 +43,8 @@ app.use(express.json());
 app.use('/api/advising-schedules', routes);
 
 const oid = () => new mongoose.Types.ObjectId();
-const tokenFor = (role, userId = oid()) =>
+const advisorId = oid();
+const tokenFor = (role, userId = role === 'Advisor' ? advisorId : oid()) =>
   ['Bearer', jwt.sign({ userId: String(userId), role }, process.env.JWT_SECRET)].join(' ');
 const populated = (value) => ({ populate: jest.fn().mockResolvedValue(value) });
 
@@ -46,6 +53,7 @@ const makeStudent = (workflowStatus = 'Not Started') => ({
   fullName: 'Omar Nabil',
   studentId: '64-20046',
   studentType: 'Advising Student',
+  assignedAdvisor: advisorId,
   major: 'Computer Science',
   currentSemester: 2,
   workflowStatus,
@@ -243,19 +251,16 @@ describe('advising schedule draft routes', () => {
     const updatedDraft = makeDraft(student, term);
     Student.findById.mockResolvedValue(student);
     advisingTerm.mockResolvedValue({ term });
-    AdvisingScheduleDraft.findOne.mockResolvedValueOnce(draft).mockReturnValueOnce(populated(updatedDraft));
-    AdvisingScheduleDraft.updateOne.mockResolvedValue({ modifiedCount: 1 });
+    AdvisingScheduleDraft.findOne.mockReturnValue(populated(updatedDraft));
 
     await request(app)
       .delete(`/api/advising-schedules/students/${student._id}/courses/${courseId}`)
       .set('Authorization', tokenFor('Coordinator'))
       .expect(200);
 
-    expect(AdvisingScheduleDraft.updateOne).toHaveBeenCalledWith(
-      expect.objectContaining({
-        courses: { $elemMatch: { course: courseId.toString(), mandatory: false } },
-      }),
-      expect.objectContaining({ $pull: { courses: { course: courseId.toString(), mandatory: false } } })
+    const { removeCourseFromDraft } = require('../services/advisingScheduleWorkflowService');
+    expect(removeCourseFromDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ studentId: student._id, termId: term._id, courseId: courseId.toString() })
     );
   });
 

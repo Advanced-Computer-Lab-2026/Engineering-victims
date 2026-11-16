@@ -48,6 +48,7 @@ const query = (result) => {
     sort: jest.fn(() => q),
     populate: jest.fn(() => q),
     select: jest.fn(() => q),
+    session: jest.fn(() => q),
     lean: jest.fn(() => Promise.resolve(result)),
     then: (resolve, reject) => Promise.resolve(result).then(resolve, reject),
   };
@@ -106,11 +107,18 @@ const makeWorld = ({ student: studentOverrides = {}, term: termOverrides = {} } 
  */
 const stubWorld = (world, { held = true, hasSchedule = true, duplicate = false, pending = [] } = {}) => {
   const spies = {};
+  const session = {
+    withTransaction: jest.fn(async (work) => work(session)),
+    endSession: jest.fn().mockResolvedValue(undefined),
+  };
+  spies.startSession = jest.spyOn(mongoose, 'startSession').mockResolvedValue(session);
   spies.userFindById = jest
     .spyOn(User, 'findById')
     .mockReturnValue(query({ _id: world.userId, email: world.student.email }));
   spies.userFind = jest.spyOn(User, 'find').mockReturnValue(query([{ _id: oid() }, { _id: oid() }]));
   spies.studentFindOne = jest.spyOn(Student, 'findOne').mockReturnValue(query(world.student));
+  spies.studentFindById = jest.spyOn(Student, 'findById').mockReturnValue(query(world.student));
+  spies.studentUpdateOne = jest.spyOn(Student, 'updateOne').mockResolvedValue({ matchedCount: 1 });
   spies.scheduleFindOne = jest.spyOn(StudentSchedule, 'findOne').mockImplementation((filter) => {
     if (filter.slotId) return query(held ? world.entry : null);
     return query(hasSchedule ? { termId: world.term._id } : null);
@@ -118,14 +126,16 @@ const stubWorld = (world, { held = true, hasSchedule = true, duplicate = false, 
   spies.termFindById = jest.spyOn(AcademicTerm, 'findById').mockReturnValue(query(world.term));
   spies.slotFindById = jest.spyOn(CourseSlot, 'findById').mockReturnValue(query(world.slot));
   spies.courseFindById = jest.spyOn(Course, 'findById').mockReturnValue(query(world.course));
-  spies.exists = jest.spyOn(SlotChangeRequest, 'exists').mockResolvedValue(duplicate ? { _id: oid() } : null);
+  spies.exists = jest.spyOn(SlotChangeRequest, 'exists').mockReturnValue(query(duplicate ? { _id: oid() } : null));
   spies.find = jest.spyOn(SlotChangeRequest, 'find').mockReturnValue(query(pending));
-  spies.create = jest.spyOn(SlotChangeRequest, 'create').mockImplementation(async (doc) => ({
-    _id: oid(),
-    status: 'Pending',
-    createdAt: new Date(),
-    ...doc,
-  }));
+  spies.create = jest.spyOn(SlotChangeRequest, 'create').mockImplementation(async (docs) =>
+    (Array.isArray(docs) ? docs : [docs]).map((doc) => ({
+      _id: oid(),
+      status: 'Pending',
+      createdAt: new Date(),
+      ...doc,
+    }))
+  );
   spies.insertMany = jest.spyOn(Notification, 'insertMany').mockImplementation(async (docs) => docs);
 
   // Anything that would change a schedule or a seat count.
@@ -140,6 +150,7 @@ const stubWorld = (world, { held = true, hasSchedule = true, duplicate = false, 
     jest.spyOn(CourseSlot.prototype, 'save'),
     jest.spyOn(StudentSchedule.prototype, 'save'),
   ];
+  spies.session = session;
   return spies;
 };
 
@@ -170,7 +181,13 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
 
     expect(res.status).toBe(201);
     expect(spies.create).toHaveBeenCalledTimes(1);
-    const saved = spies.create.mock.calls[0][0];
+    expect(spies.studentUpdateOne).toHaveBeenCalledWith(
+      { _id: world.student._id },
+      expect.objectContaining({ $inc: { __v: 1 } }),
+      { session: spies.session }
+    );
+    expect(spies.session.withTransaction).toHaveBeenCalledTimes(1);
+    const saved = spies.create.mock.calls[0][0][0];
     expect(saved).toEqual({
       student: world.student._id,
       term: world.term._id,
@@ -204,6 +221,18 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
     });
   });
 
+  it('does not insert a request if processing wins before the locked status recheck', async () => {
+    const world = makeWorld();
+    const spies = stubWorld(world);
+    spies.studentFindById.mockReturnValue(query({ ...world.student, workflowStatus: 'Processed' }));
+
+    const res = await submit(world, validBody(world));
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toMatch(/only be submitted while the schedule is Ready for Student Review/);
+    expect(spies.create).not.toHaveBeenCalled();
+  });
+
   it('never changes the schedule, the slot or the workflow status', async () => {
     const world = makeWorld();
     const spies = stubWorld(world);
@@ -226,7 +255,7 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
     );
 
     expect(res.status).toBe(201);
-    const saved = spies.create.mock.calls[0][0];
+    const saved = spies.create.mock.calls[0][0][0];
     expect(saved).not.toHaveProperty('replacementSlot');
     expect(saved).not.toHaveProperty('status');
     expect(saved.student).toBe(world.student._id);
@@ -240,7 +269,7 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
     const res = await submit(world, body);
 
     expect(res.status).toBe(201);
-    expect(spies.create.mock.calls[0][0].preferenceNote).toBe('');
+    expect(spies.create.mock.calls[0][0][0].preferenceNote).toBe('');
   });
 
   it('trims the note', async () => {
@@ -249,7 +278,7 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
 
     await submit(world, validBody(world, { preferenceNote: '   prefer Sunday   ' }));
 
-    expect(spies.create.mock.calls[0][0].preferenceNote).toBe('prefer Sunday');
+    expect(spies.create.mock.calls[0][0][0].preferenceNote).toBe('prefer Sunday');
   });
 
   it('notifies the student and their assigned Advisor', async () => {
