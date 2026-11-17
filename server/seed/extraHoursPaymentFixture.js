@@ -10,6 +10,9 @@ const { recordTransaction } = require('../services/walletService');
 const { prepareExtraHoursRequest } = require('../services/extraHoursService');
 const Plan = require('../models/InstallmentPlan');
 const { assignPlan } = require('../services/installmentBillingService');
+const Request = require('../models/ExtraHoursRequest');
+const { payWallet } = require('../services/extraHoursPaymentService');
+const { previewDeferral, confirmDeferral } = require('../services/extraHoursDeferralService');
 require('../models/GraduationPlan'); require('../models/ExitExamRequest'); require('../models/CourseRecord');
 
 // Only the launcher-created disposable database is accepted. Never seed, reset
@@ -21,6 +24,8 @@ async function seedExtraHoursPaymentFixture() {
   const password = 'ExtraHoursTest2006';
   const advisor = await User.create({ fullName: 'Extra Hours Test Advisor', email: 'advisor.extra-hours@guc.edu.eg', password, role: 'Advisor' });
   const coordinator = await User.create({ fullName: 'Extra Hours Test Coordinator', email: 'coordinator.extra-hours@guc.edu.eg', password, role: 'Coordinator' });
+  // Reqs 98-102, 127 are for Coordinators and Administrators.
+  await User.create({ fullName: 'Extra Hours Test Administrator', email: 'admin.extra-hours@guc.edu.eg', password, role: 'Administrator' });
   const now = Date.now(), start = new Date(now - 86400000), end = new Date(now + 90 * 86400000), deadline = new Date(now + 30 * 86400000);
   const year = new Date().getUTCFullYear();
   const term = await Term.create({ academicYear: `${year}/${year + 1}`, season: 'Winter', termStartDate: start, termEndDate: end, teachingStartDate: start, teachingEndDate: end, advisingDeadline: deadline, swapDeadline: deadline });
@@ -34,7 +39,10 @@ async function seedExtraHoursPaymentFixture() {
   const accounts = [];
   const plan = await Plan.create({ name: 'Development tuition plan', academicYear: `${year}/${year + 1}`, createdBy: coordinator._id,
     entries: [30, 60].map((days, index) => ({ label: `Development installment ${index + 1}`, dueDate: new Date(now + days * 86400000), baseAmount: index === 0 ? 20000 : 10000 })) });
-  for (const [index, [name, balance]] of [['wallet', 3000], ['stripe', 3000], ['insufficient', 100], ['deferred', 3000]].entries()) {
+  // Reqs 98-102: "refund" is paid from the wallet and "cancel" is deferred to the
+  // next installment below, so the financial-records page has a refundable
+  // payment and a cancellable deferred charge straight away.
+  for (const [index, [name, balance]] of [['wallet', 3000], ['stripe', 3000], ['insufficient', 100], ['deferred', 3000], ['refund', 3000], ['cancel', 3000]].entries()) {
     const email = `${name}.extra-hours@student.guc.edu.eg`;
     const student = await Student.create({ fullName: `Extra Hours ${name} Test`, email, studentId: `64-9999${index + 1}`, studentType: 'Advising Student', currentSemester: 7, academicStanding: 'Good Standing', major: 'Computer Science', workflowStatus: 'Draft', assignedAdvisor: advisor._id });
     await User.create({ fullName: student.fullName, email, password, role: 'Student' });
@@ -54,6 +62,13 @@ async function seedExtraHoursPaymentFixture() {
     }
     await recordTransaction(student._id, { type: 'Refund', amount: balance, description: 'Disposable development wallet funding' }, { notifications: false });
     await assignPlan(String(student._id), String(plan._id), coordinator._id);
+    const studentUser = await User.findOne({ email }).select('_id').lean();
+    if (name === 'refund') await payWallet(String(request._id), student._id, studentUser._id);
+    if (name === 'cancel') {
+      const saved = await Request.findByIdAndUpdate(request._id, { $set: { settlementPreference: 'Next Installment', settlementPreferenceAt: new Date() }, $inc: { __v: 1 } }, { new: true }).lean();
+      const { installment } = await previewDeferral(String(request._id), student._id);
+      await confirmDeferral(String(request._id), student._id, studentUser._id, { installmentId: String(installment.id), version: saved.__v });
+    }
     accounts.push({ email, balance, requestReference: request.reference });
   }
   return { password, accounts, coordinatorEmail: coordinator.email, advisorEmail: advisor.email };
