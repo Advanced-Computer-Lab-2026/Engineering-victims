@@ -106,7 +106,7 @@ const SemesterStandingsPage: React.FC = () => {
         title="Semester Standings"
         description="Review an advising student's finalized Winter and Spring standings, and record an authoritative semester-close GPA."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
-        meta={<CustomButton variant="secondary" size="sm" onClick={() => void load()} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>}
+        meta={<CustomButton variant="secondary" size="sm" onClick={() => void load()} isLoading={loading} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>}
       />
       {error && <div className="mb-4"><AlertBanner tone="error" title="Could not complete the request">{error}</AlertBanner></div>}
       {notice && <div className="mb-4"><AlertBanner tone="success">{notice}</AlertBanner></div>}

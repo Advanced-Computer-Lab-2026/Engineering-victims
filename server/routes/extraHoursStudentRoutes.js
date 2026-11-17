@@ -8,6 +8,7 @@ const Request = require('../models/ExtraHoursRequest');
 const { payWallet, startCheckout, confirmCheckout, cancelCheckout } = require('../services/extraHoursPaymentService');
 const { previewDeferral, confirmDeferral, serializeCharge } = require('../services/extraHoursDeferralService');
 const { getDocument, renderDocument } = require('../services/extraHoursDocumentService');
+const { listRecords, requestHistory } = require('../services/extraHoursFinanceService');
 
 router.use(authenticate, requireRole('Student'));
 router.use(async (req, res, next) => {
@@ -49,6 +50,21 @@ router.get('/', async (req, res) => {
         ratePerHour: item.ratePerHour, subtotal: item.subtotal })),
     })), pagination: { page, limit, total, totalPages: Math.ceil(total / limit) } });
   } catch { res.status(500).json({ message: 'Could not load your approved extra-hours requests.' }); }
+});
+// Req 97: the signed-in student's own payments and deferred charges. The
+// student comes from the session only, never from the query.
+router.get('/finance', async (req, res) => {
+  const parsed = z.object({ page: z.coerce.number().int().min(1).max(100000).default(1) }).strict().safeParse(req.query);
+  if (!parsed.success) return res.status(400).json({ message: 'Use a valid page number.' });
+  try { res.json(await listRecords({ student: req.extraHoursStudent._id }, { page: parsed.data.page, limit: 20 })); }
+  catch { res.status(500).json({ message: 'Could not load your payment and deferred-charge history.' }); }
+});
+// Req 95: status and decision history of one of the student's own requests.
+// Students only see requests after Coordinator approval (Req 88), so the same applies here.
+router.get('/:id/history', async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: 'Invalid extra-hours request ID.' });
+  try { res.json({ history: await requestHistory({ _id: req.params.id, student: req.extraHoursStudent._id, decision: 'Approved' }) }); }
+  catch (error) { res.status(error.status || 500).json({ message: error.status ? error.message : 'Could not load the request history.' }); }
 });
 router.post('/:requestId/preference', async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.requestId)) return res.status(400).json({ message: 'Invalid extra-hours request ID.' });

@@ -43,10 +43,10 @@ async function confirmDeferral(requestId, studentId, actor, { installmentId, ver
     const [charge] = await Charge.create([{ request: row._id, student: studentId, installment: installment._id,
       installmentReference: installment.reference, installmentLabel: installment.label, dueDate: installment.dueDate,
       amount: row.totalCost, currency: row.currency, confirmedAt: now, confirmedBy: actor }], { session });
-    await applyActivation(row, plan, session);
+    const activation = await applyActivation(row, plan, session);
     const updated = await Request.updateOne({ _id: row._id, settlementStatus: 'Awaiting Payment Choice', __v: version }, {
       $set: { settlementStatus: 'Deferred to Next Installment', settlementOption: 'Next Installment', deferredCharge: charge._id,
-        activatedAt: now, activatedHours: row.requestedHours }, $inc: { __v: 1 },
+        activatedAt: now, activatedHours: row.requestedHours, activation }, $inc: { __v: 1 },
       $push: { history: { action: 'Deferred to Next Installment', actor, at: now, note: `${charge.reference}: ${installment.reference}` } },
     }, { session });
     if (!updated.modifiedCount) throw fail('The request changed while confirming. Please refresh.');

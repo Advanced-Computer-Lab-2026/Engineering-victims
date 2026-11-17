@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { RotateCcw } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
@@ -36,18 +37,20 @@ const InstallmentBillingPage: React.FC = () => {
   const [rows, setRows] = useState<BillingInstallment[]>([]), [search, setSearch] = useState(''), [selectedPlan, setSelectedPlan] = useState('');
   const [name, setName] = useState(''), [year, setYear] = useState(''), [entries, setEntries] = useState([{ label: '', dueDate: '', baseAmount: '' }]);
   const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [success, setSuccess] = useState<string | null>(null), [refresh, setRefresh] = useState(0);
-  const [assignConfirm, setAssignConfirm] = useState(false); const refreshRows = () => setRefresh((value) => value + 1);
-  useEffect(() => { if (staff) void listBillingPlans().then((result) => setPlans(result.plans)).catch((error) => setError(errorMessage(error))); }, [staff, refresh]);
+  const [assignConfirm, setAssignConfirm] = useState(false); const [isRefreshing, setIsRefreshing] = useState(false); const refreshRows = () => { setIsRefreshing(true); setRefresh((value) => value + 1); };
+  // Every refresh bump re-runs both effects: staff clear on the plans fetch,
+  // students on the installments fetch, so the spinner always stops.
+  useEffect(() => { if (staff) void listBillingPlans().then((result) => setPlans(result.plans)).catch((error) => setError(errorMessage(error))).finally(() => setIsRefreshing(false)); }, [staff, refresh]);
   useEffect(() => {
     let active = true; setRows([]);
     if (staff && !student) return;
     setBusy(true); setError(null);
-    void listBillingInstallments(staff ? student?.id : undefined).then((result) => { if (active) setRows(result.installments); }).catch((error) => { if (active) setError(errorMessage(error)); }).finally(() => { if (active) setBusy(false); });
+    void listBillingInstallments(staff ? student?.id : undefined).then((result) => { if (active) setRows(result.installments); }).catch((error) => { if (active) setError(errorMessage(error)); }).finally(() => { if (active) { setBusy(false); setIsRefreshing(false); } });
     return () => { active = false; };
   }, [staff, student, refresh]);
   const run = async (action: () => Promise<{ message: string }>) => { setBusy(true); setError(null); setSuccess(null); try { const result = await action(); setSuccess(result.message); refreshRows(); } catch (error) { setError(errorMessage(error)); } finally { setBusy(false); } };
   return <>
-    <PageHeader title={staff ? 'Installment billing' : 'My installments'} description="Tuition installments, additional charges and recorded payments." onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))} meta={<CustomButton size="sm" disabled={busy} onClick={refreshRows}>Refresh</CustomButton>} />
+    <PageHeader title={staff ? 'Installment billing' : 'My installments'} description="Tuition installments, additional charges and recorded payments." onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))} meta={<CustomButton variant="secondary" size="sm" onClick={refreshRows} isLoading={isRefreshing} disabled={busy} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>} />
     {error && <div className="mb-4"><AlertBanner tone="error">{error}</AlertBanner></div>}{success && <div className="mb-4"><AlertBanner tone="success">{success}</AlertBanner></div>}
     {staff && <div className="mb-6 space-y-4">
       <Card className="p-5"><details><summary className="cursor-pointer font-semibold text-white">Create an installment plan</summary>

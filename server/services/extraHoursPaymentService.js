@@ -29,12 +29,12 @@ async function lockStudent(studentId, session) {
   if (!result.matchedCount) throw fail('An active Advising Student account is required.', 403);
 }
 async function finish(request, payment, plan, actor, session) {
-  await applyActivation(request, plan, session);
+  const activation = await applyActivation(request, plan, session);
   const now = new Date();
   await Payment.updateOne({ _id: payment._id }, { $set: { status: 'Succeeded', paidAt: now } }, { session });
   const result = await Request.updateOne({ _id: request._id, settlementStatus: 'Awaiting Payment Choice', __v: request.__v }, {
     $set: { settlementStatus: 'Paid', settlementOption: payment.method, settlementPreference: 'Pay Now', paymentReference: payment.reference,
-      activatedAt: now, activatedHours: request.requestedHours }, $inc: { __v: 1 },
+      activatedAt: now, activatedHours: request.requestedHours, activation }, $inc: { __v: 1 },
     $push: { history: { action: 'Paid', actor, at: now, note: `${payment.method}: ${payment.reference}` } },
   }, { session });
   if (!result.modifiedCount) throw fail('The request changed during payment.');

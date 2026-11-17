@@ -5,6 +5,8 @@ import Select from './ui/Select';
 import CustomButton from './ui/CustomButton';
 import AlertBanner from './ui/AlertBanner';
 import ConfirmDialog from './ui/ConfirmDialog';
+import ExtraHoursHistoryTimeline from './ExtraHoursHistoryTimeline';
+import { fetchAdvisorRequestHistory, type RequestHistory } from '../lib/extraHoursFinanceService';
 
 interface Context {
   student: { name: string; studentId: string };
@@ -43,6 +45,16 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [withdrawal, setWithdrawal] = useState<Context['requests'][number] | null>(null);
+  // Req 95: status and decision history of one of this Advisor's requests.
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
+  const [history, setHistory] = useState<RequestHistory | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const toggleHistory = async (id: string) => {
+    if (historyFor === id) { setHistoryFor(null); return; }
+    setHistoryFor(id); setHistory(null); setHistoryError(null);
+    try { const result = await fetchAdvisorRequestHistory(id); setHistory(result.history); }
+    catch (err) { setHistoryError(errorText(err)); }
+  };
   const submissionKey = useRef('');
   const loadVersion = useRef(0);
   const load = async (termId?: string) => {
@@ -129,7 +141,12 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
           </>}
           {context.requests.length > 0 && <section className="space-y-2"><h4 className="text-body font-semibold text-on-surface">Your recent requests for this term</h4>{context.requests.map((request) => <div key={request.id} className="space-y-2 rounded-lg border border-outline-variant p-3">
             <p className="break-all text-caption text-on-surface-variant">{request.reference} · {request.requestedHours} hours · EGP {request.totalCost} · {request.decision}</p>
-            {request.decision === 'Pending' && <CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => setWithdrawal(request)} aria-label={`Withdraw request ${request.reference}`}>Withdraw request</CustomButton>}
+            <div className="flex flex-wrap gap-2">
+              {request.decision === 'Pending' && <CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => setWithdrawal(request)} aria-label={`Withdraw request ${request.reference}`}>Withdraw request</CustomButton>}
+              <CustomButton size="sm" variant="ghost" aria-expanded={historyFor === request.id} aria-label={`${historyFor === request.id ? 'Hide' : 'View'} history of ${request.reference}`} onClick={() => void toggleHistory(request.id)}>{historyFor === request.id ? 'Hide history' : 'View history'}</CustomButton>
+            </div>
+            {historyFor === request.id && (history ? <ExtraHoursHistoryTimeline events={history.events} decision={history.decision} settlementStatus={history.settlementStatus} responseNote={history.responseNote} />
+              : historyError ? <AlertBanner tone="error">{historyError}</AlertBanner> : <p className="text-caption text-on-surface-variant">Loading history…</p>)}
           </div>)}</section>}
         </>}
       </div>}

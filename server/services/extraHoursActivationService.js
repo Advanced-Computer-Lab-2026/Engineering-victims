@@ -63,12 +63,21 @@ async function prepareActivation(request, session) {
   }
   return { newSlots: chooseSlots(groups, existing), activatedRowIds, maximumHours: quote.maximumTotalHours };
 }
+// Returns exactly what this activation changed, so Req 102 can undo only that.
 async function applyActivation(request, plan, session) {
+  const addedSchedules = [], addedSlots = [];
   for (const slot of plan.newSlots) {
     const reserved = await Slot.updateOne({ _id: slot._id, $expr: { $lt: ['$assignedCount', '$maxCapacity'] } }, { $inc: { assignedCount: 1 } }, { session });
     if (!reserved.modifiedCount) throw fail('A selected slot just filled up. Please try again.');
-    await Schedule.create([{ studentId: request.student, termId: request.term, slotId: slot._id, status: 'Active' }], { session });
+    const [row] = await Schedule.create([{ studentId: request.student, termId: request.term, slotId: slot._id, status: 'Active' }], { session });
+    addedSchedules.push(row._id); addedSlots.push(slot._id);
   }
-  if (plan.activatedRowIds.length) await Schedule.updateMany({ _id: { $in: plan.activatedRowIds }, status: 'Draft' }, { $set: { status: 'Active' } }, { session });
+  let activatedDrafts = [];
+  if (plan.activatedRowIds.length) {
+    const drafts = await Schedule.find({ _id: { $in: plan.activatedRowIds }, status: 'Draft' }).select('_id').session(session).lean();
+    activatedDrafts = drafts.map((row) => row._id);
+    if (activatedDrafts.length) await Schedule.updateMany({ _id: { $in: activatedDrafts }, status: 'Draft' }, { $set: { status: 'Active' } }, { session });
+  }
+  return { addedSchedules, addedSlots, activatedDrafts };
 }
 module.exports = { prepareActivation, applyActivation, chooseSlots, overlaps };

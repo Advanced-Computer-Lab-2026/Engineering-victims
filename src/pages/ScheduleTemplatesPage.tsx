@@ -236,6 +236,9 @@ const ScheduleTemplatesPage: React.FC = () => {
         title="Standard Schedule Groups"
         description="Create and publish group schedules, then assign normal students to build their processed schedules."
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
+        meta={view === 'students' ? (
+          <CustomButton variant="secondary" size="sm" onClick={loadStudents} isLoading={isLoadingStudents} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>
+        ) : undefined}
       />
 
       {error && <div className="mb-4"><AlertBanner tone="error" title="Action could not be completed" onDismiss={() => setError(null)}>{error}</AlertBanner></div>}
@@ -345,11 +348,10 @@ const ScheduleTemplatesPage: React.FC = () => {
         </div>
       ) : (
         <section aria-label="Assign normal students to schedule groups">
-          <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_12rem_minmax(15rem,1.2fr)_auto] xl:items-end">
+          <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(12rem,1fr)_12rem_minmax(15rem,1.2fr)] xl:items-end">
             <Select label="Major" value={studentMajor} onChange={(event) => { setStudentMajor(event.target.value); setStudentPage(1); }} options={majors.map((major) => ({ value: major, label: major }))} placeholder="Select a major" />
             <Select label="Semester" value={studentSemester} onChange={(event) => { setStudentSemester(event.target.value); setStudentPage(1); }} options={SEMESTERS.map((semester) => ({ value: String(semester), label: `Semester ${semester}` }))} />
             <CustomInput label="Find a student" value={studentSearch} onChange={(event) => { setStudentSearch(event.target.value); setStudentPage(1); }} placeholder="Name, email, or student ID" icon={<Search className="h-4 w-4" aria-hidden />} />
-            <CustomButton variant="secondary" size="sm" onClick={loadStudents} isLoading={isLoadingStudents} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>
           </div>
           <p className="mb-3 text-caption text-on-surface-variant">Assigning a group replaces the processed schedule for this term. Only published templates are available.</p>
           {availableGroups.length === 0 && <div className="mb-4 rounded-lg border border-warning bg-warning-container px-4 py-3 text-body text-warning">No published group templates match these filters. Create and publish one in Templates first.</div>}

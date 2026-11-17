@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Student = require('../models/Student');
 const Request = require('../models/ExtraHoursRequest');
 const { decideRequest } = require('../services/extraHoursDecisionService');
+const { historyEvents } = require('../services/extraHoursFinanceService');
 
 router.use(authenticate, requireRole('Coordinator'));
 router.use(async (req, res, next) => {
@@ -82,7 +83,7 @@ router.post('/:requestId/decision', async (req, res) => {
 router.get('/:requestId', async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.requestId)) return res.status(400).json({ message: 'Invalid extra-hours request ID.' });
   try {
-    const request = await populate(Request.findById(req.params.requestId)).lean();
+    const request = await populate(Request.findById(req.params.requestId)).populate('history.actor', 'fullName role').lean();
     if (!request) return res.status(404).json({ message: 'Extra-hours request not found.' });
     res.json({ request: { ...summary(request),
       items: request.items.map((item) => ({ courseId: item.course, code: item.code, name: item.name,
@@ -91,6 +92,8 @@ router.get('/:requestId', async (req, res) => {
       // Historical snapshot, deliberately not relabelled as a current approval.
       eligibility: request.eligibility, eligibilityRecordedAt: request.createdAt,
       responseNote: request.responseNote, decidedAt: request.decidedAt,
+      // Req 95: status and decision history.
+      history: historyEvents(request.history),
     } });
   } catch { res.status(500).json({ message: 'Could not load extra-hours request details.' }); }
 });
