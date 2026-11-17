@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, UserMinus, Mail, AlertCircle } from 'lucide-react';
+import { UserPlus, UserMinus, Mail, AlertCircle, RotateCcw } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 import CustomInput from '../components/ui/CustomInput';
@@ -98,6 +98,17 @@ export default function AdvisorsPage() {
       <PageHeader
         title="Advisor Management"
         description="Add or remove advisors from the advising system"
+        meta={
+          <CustomButton
+            variant="secondary"
+            size="sm"
+            onClick={fetchAdvisors}
+            isLoading={loading}
+            icon={<RotateCcw className="h-4 w-4" aria-hidden />}
+          >
+            Refresh
+          </CustomButton>
+        }
       />
 
       <div className="space-y-6">
@@ -174,15 +185,8 @@ export default function AdvisorsPage() {
 
         {/* Advisors List */}
         <Card>
-          <div className="flex items-center justify-between mb-4">
+          <div className="mb-4">
             <h3 className="text-h3 font-semibold">Current Advisors ({advisors.length})</h3>
-            <CustomButton
-              variant="secondary"
-              onClick={fetchAdvisors}
-              disabled={loading}
-            >
-              Refresh
-            </CustomButton>
           </div>
 
           {loading ? (

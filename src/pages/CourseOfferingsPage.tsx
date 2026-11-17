@@ -147,6 +147,15 @@ const CourseOfferingsPage: React.FC = () => {
             >
               New Offering
             </CustomButton>
+            <CustomButton
+              variant="secondary"
+              size="sm"
+              onClick={() => loadOfferings(true)}
+              isLoading={isRefreshing}
+              icon={<RotateCcw className="h-4 w-4" aria-hidden />}
+            >
+              Refresh
+            </CustomButton>
           </div>
         }
       />
@@ -159,15 +168,6 @@ const CourseOfferingsPage: React.FC = () => {
           onChange={(event) => setSelectedTerm(event.target.value)}
           options={terms.map(t => ({ value: t.id, label: `${t.academicYear} ${t.season}` }))}
         />
-        <CustomButton
-          variant="secondary"
-          size="sm"
-          onClick={() => loadOfferings(true)}
-          isLoading={isRefreshing}
-          icon={<RotateCcw className="h-4 w-4" aria-hidden />}
-        >
-          Refresh
-        </CustomButton>
       </div>
 
       {error && (

@@ -13,6 +13,10 @@ const ExitExamRequest = require('../models/ExitExamRequest');
 const ExtraHoursRequest = require('../models/ExtraHoursRequest');
 const ExtraHoursPayment = require('../models/ExtraHoursPayment');
 const DeferredExtraHoursCharge = require('../models/DeferredExtraHoursCharge');
+const InstallmentPlan = require('../models/InstallmentPlan');
+const InstallmentPlanAssignment = require('../models/InstallmentPlanAssignment');
+const UniversityInstallment = require('../models/UniversityInstallment');
+const InstallmentLedgerEntry = require('../models/InstallmentLedgerEntry');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const SwapRequest = require('../models/SwapRequest');
 const NotificationEvent = require('../models/NotificationEvent');
@@ -36,6 +40,7 @@ const { seedAdvisingSchedules } = require('./advisingScheduleSeed');
 const { seedSchedulingPreferences } = require('./schedulingPreferenceSeed');
 const { seedGraduationPlans } = require('./graduationPlanSeed');
 const { seedExtraHoursRequests } = require('./extraHoursDemoSeed');
+const { seedExtraHoursPayments } = require('./extraHoursPaymentDemoSeed');
 const {
   seedSlotChangeRequests,
   seedExitExamRequests,
@@ -654,6 +659,39 @@ const seedOfferings = async ({ terms, courses, instructors }) => {
 };
 
 /**
+ * CourseSlot.assignedCount is denormalised, so it has to be reconciled from
+ * the StudentSchedule rows: the capacity constants seed slots with a
+ * plausible-looking 48/24/16, and scheduleSeed/advisingScheduleSeed then
+ * $inc their own cohorts on top. A counter that does not match the real rows
+ * makes the seat math in slotChangeRequestService and
+ * extraHoursActivationService wrong (and scripts/audit-demo-rules.cjs flags
+ * every slot as drift), so derive it from the rows — the same source of truth
+ * controllers/offeringController.js reads.
+ *
+ * Called twice: before the extra-hours settlements (activation filters and
+ * reserves seats against this counter) and once more at the end, because
+ * activation increments it again while settling.
+ */
+const reconcileAssignedCounts = async () => {
+  const occupancy = await StudentSchedule.aggregate([
+    { $group: { _id: '$slotId', count: { $sum: 1 } } },
+  ]);
+  const countBySlot = new Map(occupancy.map(({ _id, count }) => [String(_id), count]));
+  const slotIds = (await CourseSlot.find({}).select('_id').lean()).map((slot) => slot._id);
+  if (slotIds.length) {
+    await CourseSlot.bulkWrite(
+      slotIds.map((slotId) => ({
+        updateOne: {
+          filter: { _id: slotId },
+          update: { $set: { assignedCount: countBySlot.get(String(slotId)) ?? 0 } },
+        },
+      })),
+      { ordered: false }
+    );
+  }
+};
+
+/**
  * Rebuilds the demo data from scratch — **destructive**. Every collection it
  * touches is emptied first, so anything created at runtime is lost.
  *
@@ -704,6 +742,14 @@ const seed = async () => {
   // keeps a draft whose student the reseed just deleted, and scripts/
   // audit-demo-rules.cjs reports it as an orphan draft.
   await AdvisingScheduleDraft.deleteMany({});
+  // Tuition billing is runtime data too: every plan assignment, installment and
+  // ledger entry names a student the reseed is about to regenerate, and the
+  // extra-hours demo plans are rebuilt below. Leaving them behind would orphan
+  // them and leave scripts/verify-seed-state.cjs with a permanent count diff.
+  await InstallmentLedgerEntry.deleteMany({});
+  await UniversityInstallment.deleteMany({});
+  await InstallmentPlanAssignment.deleteMany({});
+  await InstallmentPlan.deleteMany({});
 
   const created = await User.create([
     ...ADVISORS.map((advisor) => ({ ...advisor, password: 'password123', isActive: true })),
@@ -774,6 +820,17 @@ const seed = async () => {
   // Req 54: completed (graded) and current courses for the Advising Students.
   const courseRecords = await seedAcademicHistory({ students, courses, offerings });
   const extraHoursRequests = await seedExtraHoursRequests({ students, users: created, terms, courses });
+  // Reqs 95, 97-102, 127: approved requests already settled, so the financial
+  // records screens open on real rows instead of an empty list. The seeder
+  // tops four drafts up first and then reconciles slot counters through the
+  // same pass the end of this seed uses, because activation reserves seats
+  // against the denormalised CourseSlot.assignedCount.
+  const extraHoursPayments = await seedExtraHoursPayments({
+    students,
+    users: created,
+    terms,
+    reconcileAssignedCounts,
+  });
   const graduationPlans = await seedGraduationPlans({ students, users: created });
   const slotChangeRequests = await seedSlotChangeRequests({ students, terms, courses });
   const exitExamRequests = await seedExitExamRequests({ students, users: created });
@@ -832,30 +889,9 @@ const seed = async () => {
     )
   );
 
-  // CourseSlot.assignedCount is denormalised, so it has to be reconciled from
-  // the rows the seed just wrote: the capacity constants seed slots with a
-  // plausible-looking 48/24/16, and scheduleSeed/advisingScheduleSeed then
-  // $inc their own cohorts on top. A counter that does not match the real
-  // StudentSchedule rows makes the seat math in slotChangeRequestService and
-  // extraHoursActivationService wrong (and scripts/audit-demo-rules.cjs flags
-  // every slot as drift), so derive it from the rows — the same source of
-  // truth controllers/offeringController.js reads.
-  const occupancy = await StudentSchedule.aggregate([
-    { $group: { _id: '$slotId', count: { $sum: 1 } } },
-  ]);
-  const countBySlot = new Map(occupancy.map(({ _id, count }) => [String(_id), count]));
-  const slotIds = (await CourseSlot.find({}).select('_id').lean()).map((slot) => slot._id);
-  if (slotIds.length) {
-    await CourseSlot.bulkWrite(
-      slotIds.map((slotId) => ({
-        updateOne: {
-          filter: { _id: slotId },
-          update: { $set: { assignedCount: countBySlot.get(String(slotId)) ?? 0 } },
-        },
-      })),
-      { ordered: false }
-    );
-  }
+  // Seat counters drift while the seed writes (slot capacity constants plus
+  // the activation increments above), so the last word is the reconcile pass.
+  await reconcileAssignedCounts();
 
   return {
     users: created.length,
@@ -873,6 +909,7 @@ const seed = async () => {
     walletTransactions,
     courseRecords,
     extraHoursRequests,
+    extraHoursPayments,
     graduationPlans: graduationPlans.length,
     slotChangeRequests,
     exitExamRequests,

@@ -9,7 +9,7 @@ import {
   CreditCard,
   Info,
   Loader2,
-  RefreshCw,
+  RotateCcw,
 } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
@@ -167,16 +167,11 @@ const NotificationsPage: React.FC = () => {
           <div className="flex items-center gap-3">
             {unreadCount > 0 && <Badge tone="indigo" dot>{unreadCount} unread</Badge>}
             <CustomButton
-              variant="ghost"
+              variant="secondary"
               size="sm"
               onClick={handleRefresh}
-              disabled={isRefreshing}
-              icon={
-                <RefreshCw
-                  className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}
-                  aria-hidden
-                />
-              }
+              isLoading={isRefreshing}
+              icon={<RotateCcw className="h-4 w-4" aria-hidden />}
             >
               Refresh
             </CustomButton>

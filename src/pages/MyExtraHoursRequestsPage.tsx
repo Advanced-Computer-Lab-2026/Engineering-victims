@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ClipboardList, Loader2, Receipt } from 'lucide-react';
+import { ClipboardList, Loader2, RotateCcw, Receipt } from 'lucide-react';
 import ExtraHoursHistoryTimeline from '../components/ExtraHoursHistoryTimeline';
 import { fetchMyFinanceRecords, fetchMyRequestHistory, type FinanceRecord, type RequestHistory } from '../lib/extraHoursFinanceService';
 import PageHeader from '../components/PageHeader';
@@ -188,7 +188,7 @@ const MyExtraHoursRequestsPage: React.FC = () => {
   }, [page, refresh]);
   return <>
     <PageHeader title="My extra-hours requests" description="Your Coordinator-approved requests and itemized costs." onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
-      meta={<CustomButton size="sm" variant="secondary" disabled={loading} onClick={retry}>Refresh</CustomButton>} />
+      meta={<CustomButton size="sm" variant="secondary" isLoading={loading} onClick={retry} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>} />
     {paymentMessage && <div className="mb-4"><AlertBanner tone="info">{paymentMessage}</AlertBanner></div>}
     {error ? <AlertBanner tone="error">{error}</AlertBanner> : loading ? <Card className="flex items-center justify-center gap-2 p-12 text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading requests…</Card>
       : rows.length === 0 ? <EmptyState icon={<ClipboardList className="h-5 w-5" />} title="No approved extra-hours requests" description="Your requests appear here after Coordinator approval." />

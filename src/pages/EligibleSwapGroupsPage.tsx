@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, RefreshCcw, Calendar, BookOpen, Users, ArrowRightLeft, Eye, Clock, MapPin, UserRound, Coffee } from 'lucide-react';
+import { Loader2, RotateCcw, Calendar, BookOpen, Users, ArrowRightLeft, Eye, Clock, MapPin, UserRound, Coffee } from 'lucide-react';
 import { apiFetch, ApiError } from '../lib/api';
 import { fetchSwapGroupSchedule } from '../lib/weeklyScheduleService';
 import type { EligibleSwapGroupsResponse, ScheduleSession, SwapGroupScheduleResponse } from '../lib/types';
@@ -114,7 +114,7 @@ const EligibleSwapGroupsPage: React.FC = () => {
               size="sm"
               onClick={() => load(true)}
               isLoading={isRefreshing}
-              icon={<RefreshCcw className="h-4 w-4" />}
+              icon={<RotateCcw className="h-4 w-4" aria-hidden />}
             >
               Refresh
             </CustomButton>

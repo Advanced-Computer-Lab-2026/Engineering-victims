@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, ClipboardList } from 'lucide-react';
+import { Loader2, RotateCcw, ClipboardList } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
@@ -83,7 +83,7 @@ const ExtraHoursRequestsPage: React.FC = () => {
   return <>
     <PageHeader title="Extra-hours requests" description="Review submitted requests, eligibility checks and itemized costs." onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
       meta={detail ? <CustomButton size="sm" variant="secondary" disabled={deciding} onClick={() => { setDetail(null); setError(null); setSuccess(null); }}>Back to requests</CustomButton>
-        : <CustomButton size="sm" variant="secondary" disabled={loading || opening} onClick={() => void load()}>Refresh</CustomButton>} />
+        : <CustomButton size="sm" variant="secondary" isLoading={loading} disabled={opening} onClick={() => void load()} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>} />
     {error && <div className="mb-4"><AlertBanner tone="error">{error}</AlertBanner></div>}
     {success && <div className="mb-4"><AlertBanner tone="success">{success}</AlertBanner></div>}
     {!detail && advisorError && <div className="mb-4"><AlertBanner tone="error">{advisorError} Reload the page to retry.</AlertBanner></div>}

@@ -41,6 +41,9 @@ async function run() {
   console.log(
     `   Slot-change requests: ${result.slotChangeRequests}, exit-exam requests: ${result.exitExamRequests}, semester standings: ${result.semesterStandings}`,
   );
+  console.log(
+    `   Extra-hours requests: ${result.extraHoursRequests} (display-only) and ${result.extraHoursPayments.settled} settled with payment or deferred-charge records (${result.extraHoursPayments.addedRows} draft rows added).`,
+  );
 
   await mongoose.disconnect();
 }

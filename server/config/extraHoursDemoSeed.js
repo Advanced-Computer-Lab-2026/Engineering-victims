@@ -31,7 +31,16 @@ const subsetForHours = (courses, target, requiredCourseHours) => {
   return null;
 };
 
-const buildDemoRequest = ({ spec, student, term, coordinator, courses, records }) => {
+/**
+ * Builds the request one spec describes: saved-ready, but undecided and with no
+ * history beyond "Submitted".
+ *
+ * Only the display-only requests use this. The payment demo builds its own
+ * requests from the students' real drafts (extraHoursPaymentDemoSeed.js), so
+ * nothing here has to satisfy the loadContext() re-check that a settlement
+ * runs before any money moves.
+ */
+const buildSpecRequest = ({ spec, student, term, courses, records }) => {
   const baseline = evaluateExtraHoursRequest({ student, records });
   if (!baseline.canReceiveIncrease || baseline.standardHours === null) {
     throw new Error(`The extra-hours demo request requires an eligible student: ${student.email}.`);
@@ -71,33 +80,38 @@ const buildDemoRequest = ({ spec, student, term, coordinator, courses, records }
     const request = prepareExtraHoursRequest(input);
     request.reference = spec.reference;
     request.history.push({ action: 'Submitted', actor: student.assignedAdvisor, at: submittedAt });
-    request.history.push({
-      action: 'DemoCreated',
-      actor: student.assignedAdvisor,
-      note: 'Display-only demo request; not eligible for approval or payment.',
-      at: submittedAt,
-    });
-
-    if (spec.decision === 'Rejected') {
-      const responseNote = 'Demo request declined for display purposes.';
-      request.decision = 'Rejected';
-      request.responseNote = responseNote;
-      request.decidedBy = coordinator._id;
-      request.decidedAt = decidedAt;
-      request.history.push({ action: 'Rejected', actor: coordinator._id, note: responseNote, at: decidedAt });
-    } else {
-      request.decision = 'Withdrawn';
-      request.history.push({
-        action: 'Withdrawn',
-        actor: student.assignedAdvisor,
-        note: 'Demo request withdrawn for display purposes.',
-        at: decidedAt,
-      });
-    }
     return request;
   }
 
   throw new Error(`No valid extra-hours demo course selection exists for ${student.email}.`);
+};
+
+const buildDemoRequest = ({ spec, student, term, coordinator, courses, records }) => {
+  const request = buildSpecRequest({ spec, student, term, courses, records });
+  request.history.push({
+    action: 'DemoCreated',
+    actor: student.assignedAdvisor,
+    note: 'Display-only demo request; not eligible for approval or payment.',
+    at: submittedAt,
+  });
+
+  if (spec.decision === 'Rejected') {
+    const responseNote = 'Demo request declined for display purposes.';
+    request.decision = 'Rejected';
+    request.responseNote = responseNote;
+    request.decidedBy = coordinator._id;
+    request.decidedAt = decidedAt;
+    request.history.push({ action: 'Rejected', actor: coordinator._id, note: responseNote, at: decidedAt });
+  } else {
+    request.decision = 'Withdrawn';
+    request.history.push({
+      action: 'Withdrawn',
+      actor: student.assignedAdvisor,
+      note: 'Demo request withdrawn for display purposes.',
+      at: decidedAt,
+    });
+  }
+  return request;
 };
 
 const buildDemoRequests = ({ students, users, terms, courses, records }) => {
@@ -142,4 +156,4 @@ const seedExtraHoursRequests = async ({ students, users, terms, courses }) => {
   return requests.length;
 };
 
-module.exports = { seedExtraHoursRequests, buildDemoRequests, DEMO_REQUESTS };
+module.exports = { seedExtraHoursRequests, buildDemoRequests, buildSpecRequest, DEMO_REQUESTS };

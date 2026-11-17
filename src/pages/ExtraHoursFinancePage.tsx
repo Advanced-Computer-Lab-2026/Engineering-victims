@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Loader2, Receipt } from 'lucide-react';
+import { Loader2, RotateCcw, Receipt } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge, { type BadgeTone } from '../components/ui/Badge';
@@ -25,6 +26,10 @@ const tone = (status: string): BadgeTone => ({ Succeeded: 'emerald', Paid: 'emer
 const SELECT = 'mt-1 block w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-slate-100';
 
 const ExtraHoursFinancePage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const recordKind = searchParams.get('recordKind');
+  const recordId = searchParams.get('recordId');
+  const detailRequested = recordKind !== null || recordId !== null;
   const [rows, setRows] = useState<FinanceRecord[]>([]);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -49,6 +54,31 @@ const ExtraHoursFinancePage: React.FC = () => {
     fetchFinanceOptions().then((result) => { if (live) setOptions(result); }).catch((err) => { if (live) setError(message(err)); });
     return () => { live = false; };
   }, []);
+  useEffect(() => {
+    let live = true;
+    if (!detailRequested) {
+      setDetail(null);
+      setOpening(false);
+      return () => { live = false; };
+    }
+
+    setDetail(null);
+    setOpening(true);
+    setError(null);
+    setSuccess(null);
+    if ((recordKind !== 'payment' && recordKind !== 'deferred') || !recordId) {
+      setError('The financial record link is invalid.');
+      setOpening(false);
+      return () => { live = false; };
+    }
+
+    fetchFinanceRecord(recordKind, recordId)
+      .then((result) => { if (live) setDetail(result); })
+      .catch((err) => { if (live) setError(message(err)); })
+      .finally(() => { if (live) setOpening(false); });
+    return () => { live = false; };
+  }, [detailRequested, recordKind, recordId]);
+
   const load = useCallback(async () => {
     const current = ++version.current;
     setLoading(true); setError(null);
@@ -63,11 +93,15 @@ const ExtraHoursFinancePage: React.FC = () => {
   useEffect(() => { void load(); return () => { version.current += 1; }; }, [load]);
 
   const setFilter = (key: keyof FinanceFilters, value: string) => { setFilters((current) => ({ ...current, [key]: value })); setPage(1); };
-  const open = async (row: FinanceRecord) => {
+  const open = (row: FinanceRecord) => {
     setOpening(true); setError(null); setSuccess(null); setReason('');
-    try { setDetail(await fetchFinanceRecord(row.kind, row.id)); window.scrollTo({ top: 0 }); }
-    catch (err) { setError(message(err)); }
-    finally { setOpening(false); }
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current);
+      next.set('recordKind', row.kind);
+      next.set('recordId', row.id);
+      return next;
+    });
+    window.scrollTo({ top: 0 });
   };
   const doExport = async () => {
     setExporting(true); setError(null); setSuccess(null);
@@ -91,12 +125,11 @@ const ExtraHoursFinancePage: React.FC = () => {
   return <>
     <PageHeader title="Extra-hours financial records" description="Payments and deferred charges for extra-hours requests: search, filter, open, refund or cancel, and export."
       onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
-      meta={detail ? <CustomButton size="sm" variant="secondary" disabled={reversing} onClick={() => { setDetail(null); setError(null); setSuccess(null); }}>Back to records</CustomButton>
-        : <CustomButton size="sm" variant="secondary" disabled={loading || opening} onClick={() => void load()}>Refresh</CustomButton>} />
+      meta={!detailRequested && <CustomButton size="sm" variant="secondary" isLoading={loading} disabled={opening} onClick={() => void load()} icon={<RotateCcw className="h-4 w-4" aria-hidden />}>Refresh</CustomButton>} />
     {error && <div className="mb-4"><AlertBanner tone="error">{error}</AlertBanner></div>}
     {success && <div className="mb-4"><AlertBanner tone="success">{success}</AlertBanner></div>}
 
-    {!detail && <>
+    {!detailRequested && <>
       <form className="mb-4 space-y-2" onSubmit={(event) => { event.preventDefault(); setFilter('search', searchInput.trim()); }}>
         <div className="flex flex-wrap items-end gap-3">
           <CustomInput type="search" label="Search" placeholder="e.g. 64-40077, EHR-…, PAY-… or DEF-…" aria-describedby="finance-search-hint"
@@ -129,7 +162,7 @@ const ExtraHoursFinancePage: React.FC = () => {
       </div>
     </>}
 
-    {detail ? <div className="space-y-5">
+    {detailRequested ? detail ? <div className="space-y-5">
       <Card className="space-y-4 p-5">
         <div className="flex flex-wrap items-center gap-3"><h2 className="break-all text-lg font-semibold text-white">{detail.record.reference}</h2><Badge tone={tone(detail.record.status)}>{detail.record.status}</Badge></div>
         <dl className="grid gap-4 text-sm sm:grid-cols-2">
@@ -175,7 +208,9 @@ const ExtraHoursFinancePage: React.FC = () => {
           : `${money(detail.record.amount)} is removed from the next installment and the request is cancelled. This cannot be undone.`}
         confirmLabel={action === 'Refund' ? 'Refund' : 'Cancel charge'} cancelLabel="Keep it"
         onConfirm={() => void reverse()} onCancel={() => setConfirming(false)} />
-    </div> : loading ? <Card className="flex items-center justify-center gap-2 p-12 text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading financial records…</Card>
+    </div> : <Card className="flex items-center justify-center gap-2 p-12 text-slate-400">
+      {error ? error : <><Loader2 className="h-4 w-4 animate-spin" />Loading financial record…</>}
+    </Card> : loading ? <Card className="flex items-center justify-center gap-2 p-12 text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading financial records…</Card>
       : rows.length === 0 ? <EmptyState icon={<Receipt className="h-5 w-5" />} title={active ? 'No matching records' : 'No financial records yet'}
         description={active ? 'No records match the current search and filters. Clear them to see every record.' : 'Payments and deferred charges appear here after students settle approved extra-hours requests.'} />
       : <><p className="mb-3 text-sm text-slate-400">{total} {total === 1 ? 'record' : 'records'} · Page {page} of {pages}</p>
@@ -189,7 +224,7 @@ const ExtraHoursFinancePage: React.FC = () => {
             <td className="max-w-[12rem] break-all p-3 text-xs">{row.reference}</td>
             <td className="p-3 text-xs">{date(row.date)}</td>
             <td className="p-3"><Badge tone={tone(row.status)}>{row.status}</Badge></td>
-            <td className="p-3"><CustomButton size="sm" variant="secondary" disabled={opening} aria-label={`View record ${row.reference}`} onClick={() => void open(row)}>View details</CustomButton></td>
+            <td className="p-3"><CustomButton size="sm" variant="secondary" disabled={opening} aria-label={`View record ${row.reference}`} onClick={() => open(row)}>View details</CustomButton></td>
           </tr>)}</tbody>
         </table></Card>
         <div className="mt-4 flex gap-2"><CustomButton size="sm" variant="secondary" disabled={page === 1 || opening} onClick={() => setPage((current) => current - 1)}>Previous</CustomButton><CustomButton size="sm" variant="secondary" disabled={page >= pages || opening} onClick={() => setPage((current) => current + 1)}>Next</CustomButton></div>
