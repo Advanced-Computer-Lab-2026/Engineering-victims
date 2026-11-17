@@ -41,6 +41,23 @@ const schema = new mongoose.Schema({
   activatedAt: { type: Date, default: null },
   activatedHours: { type: Number, default: 0, min: 0, max: 34 },
   settlementStatus: { type: String, enum: ['Not Applicable', 'Awaiting Payment Choice', 'Paid', 'Deferred to Next Installment', 'Failed', 'Cancelled', 'Refunded'], default: 'Not Applicable' },
+  // Req 102: what activation added, so a refund or cancellation removes only that.
+  activation: {
+    addedSchedules: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StudentSchedule' }],
+    addedSlots: [{ type: mongoose.Schema.Types.ObjectId, ref: 'CourseSlot' }],
+    activatedDrafts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StudentSchedule' }],
+  },
+  // Req 102: the reversal record. Payment, charge and history rows are kept, never deleted.
+  reversal: {
+    kind: { type: String, enum: ['Refund', 'Deferred Charge Cancelled', null], default: null },
+    reason: { type: String, default: null },
+    by: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    at: { type: Date, default: null },
+    amount: { type: Number, default: null },
+    walletTransaction: { type: mongoose.Schema.Types.ObjectId, ref: 'WalletTransaction', default: null },
+    removedSchedules: { type: Number, default: 0 },
+    restoredDrafts: { type: Number, default: 0 },
+  },
   history: [{ action: String, actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, note: String, at: { type: Date, default: Date.now } }],
 }, { timestamps: true });
 schema.index({ requestingAdvisor: 1, decision: 1, createdAt: -1 });
