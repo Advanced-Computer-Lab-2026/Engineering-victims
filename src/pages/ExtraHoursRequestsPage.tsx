@@ -7,6 +7,7 @@ import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import CustomInput from '../components/ui/CustomInput';
 import EmptyState from '../components/ui/EmptyState';
+import ExtraHoursHistoryTimeline from '../components/ExtraHoursHistoryTimeline';
 import { fetchExtraHoursRequests, fetchExtraHoursRequest, fetchExtraHoursAdvisors, decideExtraHoursRequest, type ExtraHoursFilters, type ExtraHoursSummary, type ExtraHoursDetail } from '../lib/extraHoursReviewService';
 
 const date = (value: string | null) => value ? new Date(value).toLocaleString() : 'Not recorded';
@@ -136,6 +137,8 @@ const ExtraHoursRequestsPage: React.FC = () => {
         <p className="text-sm text-slate-300">GPA: {detail.eligibility.gpa == null ? 'Not graded yet' : detail.eligibility.gpa.toFixed(2)} · {detail.eligibility.graduationBasis}</p>
         <ul className="space-y-2">{detail.eligibility.checks.map((check, index) => <li key={`${check.code}-${index}`} className="text-sm text-slate-300"><Badge tone={check.passed ? 'emerald' : 'rose'}>{check.passed ? 'Passed' : 'Failed'}</Badge> {checkLabel(check.code, detail)}{!check.passed && ` — ${check.message}`}</li>)}</ul>
       </Card>
+      <Card className="p-5"><h2 className="mb-3 font-semibold text-white">Status and decision history</h2>
+        <ExtraHoursHistoryTimeline events={detail.history ?? []} decision={detail.decision} settlementStatus={detail.settlementStatus} /></Card>
       {detail.decision === 'Pending' && <Card className="space-y-3 p-5">
         <h2 className="font-semibold text-white">Coordinator decision</h2>
         <p className="text-sm text-slate-300">Approval rechecks current eligibility and itemized cost and makes the request available for settlement. It does not activate extra hours, add courses or take payment.</p>

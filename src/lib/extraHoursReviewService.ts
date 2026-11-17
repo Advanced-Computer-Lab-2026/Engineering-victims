@@ -22,6 +22,8 @@ export interface ExtraHoursDetail extends ExtraHoursSummary {
   eligibility: { standardHours: number; allowedHours: number; selectedHours: number; maximumTotalHours: number; gpa: number | null;
     graduationBasis: string; graduationSource: string | null; checks: { code: string; passed: boolean; message: string }[] };
   eligibilityRecordedAt: string; responseNote: string | null; decidedAt: string | null;
+  /** Req 95: status and decision history, oldest first. */
+  history: import('./extraHoursFinanceService').HistoryEvent[];
 }
 export interface ExtraHoursFilters { advisor?: string; decision?: string; settlementOption?: string; settlementStatus?: string }
 export const fetchExtraHoursAdvisors = () => apiFetch<{ advisors: { id: string; name: string; email: string }[] }>('/api/extra-hours/review/filter-options');

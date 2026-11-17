@@ -16,6 +16,7 @@ import {
   UserCog,
   Users,
   Wallet,
+  Receipt,
   ArrowRightLeft,
 } from 'lucide-react';
 import type { Role, StudentType } from './types';
@@ -65,6 +66,11 @@ export const NAV_ITEMS: NavItem[] = [
   {
     to: '/extra-hours-requests', label: 'Extra-hours Requests', icon: ClipboardList,
     roles: ['Coordinator'], description: 'Review extra-hours requests, eligibility checks and itemized costs.',
+  },
+  // Req 98-102, 127
+  {
+    to: '/extra-hours-finance', label: 'Extra-hours Payments', icon: Receipt,
+    roles: ['Coordinator', 'Administrator'], description: 'Search, filter, refund or cancel and export extra-hours payments and deferred charges.',
   },
   // Req 122: Coordinator pending-work dashboard
   {

@@ -1,5 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ClipboardList, Loader2 } from 'lucide-react';
+import { ClipboardList, Loader2, Receipt } from 'lucide-react';
+import ExtraHoursHistoryTimeline from '../components/ExtraHoursHistoryTimeline';
+import { fetchMyFinanceRecords, fetchMyRequestHistory, type FinanceRecord, type RequestHistory } from '../lib/extraHoursFinanceService';
 import PageHeader from '../components/PageHeader';
 import Card from '../components/ui/Card';
 import AlertBanner from '../components/ui/AlertBanner';
@@ -114,6 +116,48 @@ const SettlementChoice: React.FC<{ request: StudentExtraHoursRequest; onSaved: (
     {request.settlementPreference === 'Next Installment' && <DeferCharge request={request} onSaved={onSaved} />}
   </form>;
 };
+// Req 95: status and decision history of one approved request.
+const RequestHistoryToggle: React.FC<{ requestId: string; refresh: number }> = ({ requestId, refresh }) => {
+  const [open, setOpen] = useState(false), [history, setHistory] = useState<RequestHistory | null>(null), [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setHistory(null); setError(null);
+    fetchMyRequestHistory(requestId).then((result) => { if (active) setHistory(result.history); })
+      .catch((err: unknown) => { if (active) setError(err instanceof Error ? err.message : 'Could not load the request history.'); });
+    return () => { active = false; };
+  }, [open, requestId, refresh]);
+  return <div className="space-y-3 border-t border-slate-800 pt-4">
+    <CustomButton size="sm" variant="ghost" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? 'Hide status history' : 'View status and decision history'}</CustomButton>
+    {open && (error ? <AlertBanner tone="error">{error}</AlertBanner> : history
+      ? <ExtraHoursHistoryTimeline events={history.events} decision={history.decision} settlementStatus={history.settlementStatus} responseNote={history.responseNote} />
+      : <p className="text-sm text-slate-400">Loading history…</p>)}
+  </div>;
+};
+// Req 97: the student's own payments and deferred charges with settlement option and status.
+const PaymentHistory: React.FC<{ refresh: number }> = ({ refresh }) => {
+  const [rows, setRows] = useState<FinanceRecord[]>([]), [page, setPage] = useState(1), [pages, setPages] = useState(0);
+  const [loading, setLoading] = useState(true), [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    setLoading(true); setError(null);
+    fetchMyFinanceRecords(page).then((result) => { if (active) { setRows(result.records); setPages(result.pagination.totalPages); } })
+      .catch((err: unknown) => { if (active) setError(err instanceof Error ? err.message : 'Could not load your payment history.'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [page, refresh]);
+  return <section aria-labelledby="payment-history" className="mt-8 space-y-3">
+    <h2 id="payment-history" className="text-lg font-semibold text-white">Payment and deferred-charge history</h2>
+    {error ? <AlertBanner tone="error">{error}</AlertBanner> : loading ? <Card className="flex items-center justify-center gap-2 p-8 text-slate-400"><Loader2 className="h-4 w-4 animate-spin" />Loading history…</Card>
+      : rows.length === 0 ? <EmptyState icon={<Receipt className="h-5 w-5" />} title="No payments or deferred charges yet" description="Each payment attempt and each amount added to your installment will appear here." />
+      : <><Card className="overflow-x-auto"><table className="w-full min-w-[44rem] text-left text-sm text-slate-300"><caption className="sr-only">Your extra-hours payments and deferred charges</caption>
+        <thead className="text-xs uppercase text-slate-400"><tr>{['Date', 'Request', 'Settlement option', 'Reference', 'Amount', 'Status'].map((label) => <th key={label} className="p-3">{label}</th>)}</tr></thead>
+        <tbody>{rows.map((row) => <tr key={`${row.kind}-${row.id}`} className="border-t border-slate-800"><td className="p-3 text-xs">{new Date(row.date).toLocaleString()}</td><td className="max-w-[12rem] break-all p-3 text-xs">{row.request?.reference}</td><td className="p-3">{row.settlementOption}</td><td className="max-w-[12rem] break-all p-3 text-xs">{row.reference}</td><td className="p-3">{money(row.amount)}</td><td className="p-3">{row.status}</td></tr>)}</tbody>
+      </table></Card>
+        {pages > 1 && <div className="flex gap-3"><CustomButton size="sm" variant="secondary" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Previous</CustomButton><CustomButton size="sm" variant="secondary" disabled={page >= pages} onClick={() => setPage((value) => value + 1)}>Next</CustomButton></div>}
+      </>}
+  </section>;
+};
 const MyExtraHoursRequestsPage: React.FC = () => {
   const [rows, setRows] = useState<StudentExtraHoursRequest[]>([]);
   const [page, setPage] = useState(1), [pages, setPages] = useState(0);
@@ -164,10 +208,12 @@ const MyExtraHoursRequestsPage: React.FC = () => {
           <p className="font-semibold text-white">{row.requestedHours} requested extra hours · Total: {money(row.totalCost)}</p>
           <SettlementChoice request={row} onSaved={retry} />
           {['Paid', 'Deferred to Next Installment'].includes(row.settlementStatus) && <DocumentActions request={row} />}
+          <RequestHistoryToggle requestId={row.id} refresh={refresh} />
         </Card>)}
         <p className="text-sm text-slate-400">Page {page} of {pages}</p>
         <div className="flex gap-3"><CustomButton variant="secondary" disabled={page === 1} onClick={() => setPage((value) => value - 1)}>Previous</CustomButton><CustomButton variant="secondary" disabled={page >= pages} onClick={() => setPage((value) => value + 1)}>Next</CustomButton></div>
       </div>}
+    <PaymentHistory refresh={refresh} />
   </>;
 };
 export default MyExtraHoursRequestsPage;

@@ -47,6 +47,7 @@ const SemesterStandingsPage = React.lazy(() => import('./pages/SemesterStandings
 const ExtraHoursRequestsPage = React.lazy(() => import('./pages/ExtraHoursRequestsPage'));
 const MyExtraHoursRequestsPage = React.lazy(() => import('./pages/MyExtraHoursRequestsPage'));
 const InstallmentBillingPage = React.lazy(() => import('./pages/InstallmentBillingPage'));
+const ExtraHoursFinancePage = React.lazy(() => import('./pages/ExtraHoursFinancePage'));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
@@ -118,6 +119,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           <Route path="/advisors" element={<AdvisorsPage />} />
           <Route path="/schedule-templates" element={<ScheduleTemplatesPage />} />
           <Route path="/semester-standings" element={<SemesterStandingsPage />} />
+          {/* Req 98-102, 127: extra-hours financial records. */}
+          <Route path="/extra-hours-finance" element={<ExtraHoursFinancePage />} />
         </Route>
 
         <Route
