@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Request = require('../models/ExtraHoursRequest');
 const { loadContext, evaluateSelection, submitRequest } = require('../services/extraHoursSubmissionService');
 const { withdrawRequest } = require('../services/extraHoursWithdrawalService');
+const { requestHistory } = require('../services/extraHoursFinanceService');
 const objectId = z.string().refine((value) => mongoose.isValidObjectId(value));
 const selection = z.object({ studentId: objectId, termId: objectId,
   items: z.array(z.object({ courseId: objectId, requestedHours: z.number().int().min(1).max(12) }).strict()).min(1).max(34),
@@ -15,6 +16,8 @@ const submission = selection.extend({ submissionKey: z.string().uuid() });
 // before the Advisor-only submission middleware so FR 83 stays restricted.
 router.use('/review', require('./extraHoursReviewRoutes'));
 router.use('/mine', require('./extraHoursStudentRoutes'));
+// Reqs 98-102, 127: Coordinator/Administrator financial records.
+router.use('/finance', require('./extraHoursFinanceRoutes'));
 router.use(authenticate, requireRole('Advisor'));
 router.use(async (req, res, next) => {
   try {
@@ -46,6 +49,11 @@ router.post('/quote', handle(async (req, res) => {
   if (!parsed.success) return res.status(400).json({ message: 'Select valid courses and whole requested hours.' });
   const context = await loadContext(parsed.data.studentId, parsed.data.termId);
   res.json(evaluateSelection(context, parsed.data.items).quote);
+}));
+// Req 95: status and decision history of a request this Advisor submitted.
+router.get('/:id/history', handle(async (req, res) => {
+  if (!objectId.safeParse(req.params.id).success) return res.status(400).json({ message: 'Invalid extra-hours request ID.' });
+  res.json({ history: await requestHistory({ _id: req.params.id, requestingAdvisor: req.user.userId }) });
 }));
 router.post('/:id/withdraw', handle(async (req, res) => {
   if (!objectId.safeParse(req.params.id).success || !z.object({}).strict().safeParse(req.body).success) {
