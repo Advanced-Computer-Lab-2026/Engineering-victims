@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowRight,
   BellRing,
   CalendarDays,
   CheckCheck,
@@ -29,6 +31,16 @@ import type { NotificationSummary, NotificationType } from '../lib/types';
 
 type NotificationFilter = 'all' | 'unread' | 'read';
 
+/**
+ * The page a notification opens, or null when it has none worth offering.
+ * Only in-app paths are followed, and a link back to this page is not an action.
+ */
+const openableLink = (link: string | null): string | null => {
+  if (!link || !link.startsWith('/') || link.startsWith('//')) return null;
+  if (link === '/notifications') return null;
+  return link;
+};
+
 /** Icon and colour per notification type, so the list scans at a glance. */
 const TYPE_META: Record<NotificationType, { icon: typeof Info; wrap: string }> = {
   info: { icon: Info, wrap: 'bg-primary-container text-on-primary-container' },
@@ -50,6 +62,7 @@ const NotificationsPage: React.FC = () => {
   /** The row currently being marked, so only that button shows a spinner. */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const navigate = useNavigate();
 
   /**
    * Loads the list. The first load shows the page spinner; later refreshes are
@@ -124,6 +137,25 @@ const NotificationsPage: React.FC = () => {
     } finally {
       setBusyId(null);
     }
+  };
+
+  /**
+   * FR 5.0 "open": go to the page the notification is about, marking it read
+   * on the way. A failed mark never blocks the navigation.
+   */
+  const handleOpen = async (notification: NotificationSummary, link: string) => {
+    if (!notification.isRead) {
+      setBusyId(notification.id);
+      try {
+        await markNotificationRead(notification.id);
+        broadcastNotificationsChanged();
+      } catch {
+        // The row simply stays unread; the destination is what was asked for.
+      } finally {
+        setBusyId(null);
+      }
+    }
+    navigate(link);
   };
 
   /** FR 5.0 — mark every unread notification as read in one action. */
@@ -252,6 +284,7 @@ const NotificationsPage: React.FC = () => {
               {filteredNotifications.map((notification) => {
                 const meta = TYPE_META[notification.type] ?? TYPE_META.info;
                 const Icon = meta.icon;
+                const link = openableLink(notification.link);
 
                 return (
                   <li
@@ -292,7 +325,19 @@ const NotificationsPage: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="shrink-0 self-center">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
+                      {link && (
+                        <CustomButton
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpen(notification, link)}
+                          disabled={busyId !== null}
+                          icon={<ArrowRight className="h-4 w-4" aria-hidden />}
+                          aria-label={`Open: ${notification.title}`}
+                        >
+                          Open
+                        </CustomButton>
+                      )}
                       {notification.isRead ? (
                         <Badge tone="neutral">Read</Badge>
                       ) : (

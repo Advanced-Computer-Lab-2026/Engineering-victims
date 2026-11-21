@@ -399,6 +399,17 @@ The dataset is built so that no screen, filter or action is decorative:
 
 ### Troubleshooting
 
+**"…needs a database that supports transactions (a replica set)…"** — scheduling
+workflows (slot-change submissions and decisions, processing, reopening) use
+MongoDB transactions, which a standalone local `mongod` cannot run. Atlas is
+already a replica set. Locally, start MongoDB as a single-node replica set and
+initiate it once (existing data is kept; `MONGODB_URI` does not change):
+
+```bash
+mongod --config /opt/homebrew/etc/mongod.conf --replSet rs0   # or add replication.replSetName: rs0 to mongod.conf
+mongosh --eval 'rs.initiate({_id:"rs0",members:[{_id:0,host:"127.0.0.1:27017"}]})'
+```
+
 **`ECONNREFUSED 127.0.0.1:27017` from WSL** — MongoDB is installed on Windows and
 binds to Windows' loopback, which WSL cannot reach unless mirrored networking is
 enabled. Either enable it in `%UserProfile%\.wslconfig`:
