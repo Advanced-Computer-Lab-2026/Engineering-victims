@@ -22,6 +22,7 @@ export interface FinanceDetail {
     id: string; reference: string; term: string | null; advisor: { name: string; email: string } | null;
     requestedHours: number; activatedHours: number; totalCost: number; decision: string; settlementStatus: string;
     items: { code: string; name: string; requestedHours: number; ratePerHour: number; subtotal: number }[];
+    cancellationRequest?: { reason: string; at: string } | null;
     reversal: { kind: string; reason: string; at: string; by: string | null; amount: number; removedSchedules: number; restoredDrafts: number } | null;
   } | null;
   reversal: { eligible: boolean; action?: 'Refund' | 'Cancel'; reason: string | null };
