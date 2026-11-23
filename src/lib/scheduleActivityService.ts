@@ -1,6 +1,11 @@
-import { apiFetch } from './api';
+import { apiFetch, apiUrl, authHeaders } from './api';
+import {
+  scheduleHistoryQuery,
+  type ScheduleActivityAction,
+  type ScheduleHistoryFilterParams,
+} from './scheduleHistoryQuery';
 
-export type ScheduleActivityAction = 'Processed' | 'Reopened';
+export type { ScheduleActivityAction, ScheduleHistoryFilterParams };
 
 export interface ScheduleActivityEntry {
   id: string;
@@ -16,23 +21,32 @@ export interface ScheduleActivityEntry {
   occurredAt: string;
 }
 
-export interface ScheduleHistoryFilterParams {
-  action?: ScheduleActivityAction | '';
-  startDate?: string;
-  endDate?: string;
-  search?: string;
+export async function getGlobalScheduleHistory(params: ScheduleHistoryFilterParams = {}) {
+  return apiFetch<{ logs: ScheduleActivityEntry[]; total: number; matched: number }>(
+    `/api/schedule-history${scheduleHistoryQuery(params)}`
+  );
 }
 
-export async function getGlobalScheduleHistory(params: ScheduleHistoryFilterParams = {}) {
-  const query = new URLSearchParams();
-  if (params.action) query.set('action', params.action);
-  if (params.startDate) query.set('startDate', params.startDate);
-  if (params.endDate) query.set('endDate', params.endDate);
-  if (params.search?.trim()) query.set('search', params.search.trim());
-  const qs = query.toString() ? `?${query.toString()}` : '';
-  return apiFetch<{ logs: ScheduleActivityEntry[]; total: number; matched: number }>(
-    `/api/schedule-history${qs}`
-  );
+/** Req 126: downloads the CSV of the displayed history (same filters and search as the list). */
+export async function exportGlobalScheduleHistory(params: ScheduleHistoryFilterParams = {}) {
+  const response = await fetch(apiUrl(`/api/schedule-history/export${scheduleHistoryQuery(params)}`), {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || 'Could not export the schedule activity history.');
+  }
+  const name =
+    /filename="([^"]+)"/.exec(response.headers.get('Content-Disposition') || '')?.[1] ||
+    'schedule-activity-history.csv';
+  const url = URL.createObjectURL(await response.blob());
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = name;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function getStudentScheduleHistory(
