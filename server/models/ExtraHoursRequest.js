@@ -58,6 +58,13 @@ const schema = new mongoose.Schema({
     removedSchedules: { type: Number, default: 0 },
     restoredDrafts: { type: Number, default: 0 },
   },
+  // Req 120: the Advisor asks a Coordinator to refund or cancel an approved,
+  // settled request (Req 96 routes approved requests to the Req 102 flow).
+  cancellationRequest: {
+    reason: { type: String, default: null, maxlength: 1000 },
+    requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    requestedAt: { type: Date, default: null },
+  },
   history: [{ action: String, actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, note: String, at: { type: Date, default: Date.now } }],
 }, { timestamps: true });
 schema.index({ requestingAdvisor: 1, decision: 1, createdAt: -1 });

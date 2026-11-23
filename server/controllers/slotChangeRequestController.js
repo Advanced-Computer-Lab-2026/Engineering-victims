@@ -60,12 +60,30 @@ const serializeTerm = (term) =>
       }
     : null;
 
+/**
+ * The held slot as recorded on the request. Fields are copied one by one: a
+ * document created inside a transaction keeps its live session in Mongoose's
+ * internals, and spreading the subdocument would pull those into the JSON
+ * (circular structure → a 500 after the request was already saved).
+ */
+const serializeCurrentSlot = (doc) => {
+  const snapshot = doc.currentSlotSnapshot ?? {};
+  return {
+    id: doc.currentSlot,
+    groupNumber: snapshot.groupNumber,
+    dayOfWeek: snapshot.dayOfWeek,
+    startTime: snapshot.startTime,
+    endTime: snapshot.endTime,
+    room: snapshot.room,
+  };
+};
+
 const serializeRequest = (doc, course) => ({
   id: doc._id,
   status: doc.status,
   course: { id: course._id, code: course.code, name: course.name },
   slotType: doc.slotType,
-  currentSlot: { id: doc.currentSlot, ...doc.currentSlotSnapshot },
+  currentSlot: serializeCurrentSlot(doc),
   preferenceNote: doc.preferenceNote,
   submittedAt: doc.createdAt,
 });
@@ -97,7 +115,7 @@ const serializeListItem = (doc) => ({
   course: doc.course ? { id: doc.course._id, code: doc.course.code, name: doc.course.name } : null,
   term: doc.term ? { id: doc.term._id, label: `${doc.term.academicYear} ${doc.term.season}` } : null,
   slotType: doc.slotType,
-  currentSlot: { id: doc.currentSlot, ...doc.currentSlotSnapshot },
+  currentSlot: serializeCurrentSlot(doc),
   preferenceNote: doc.preferenceNote ?? '',
   submittedAt: doc.createdAt,
   withdrawnAt: doc.withdrawnAt ?? null,
@@ -155,7 +173,8 @@ const notifyRequestWithdrawn = async (student, doc) => {
       studentId: student._id,
       title: 'Slot-change request withdrawn',
       message: `${student.fullName} (${student.studentId}) withdrew their request to change ${slotLabel}.`,
-      link: `/schedule/${student._id}`,
+      // Req 43: the Advisor's review list shows withdrawn requests too.
+      link: '/slot-change-review',
     });
   } catch (error) {
     console.error('[slot-change] Could not send withdrawal notification:', error.message);
@@ -498,6 +517,9 @@ exports.getMyEligibility = async (req, res) => {
   }
 };
 
+const SUBMISSION_TRANSACTIONS_UNAVAILABLE =
+  'Your request was not sent: submitting a slot-change request needs a database that supports transactions (a replica set), and this one does not. Nothing was changed; please contact the system administrator.';
+
 /** Side effect only: a failed notification must never fail the request. */
 const notifyRequestSubmitted = async ({ userId, student, course, slotType, snapshot }) => {
   try {
@@ -518,7 +540,8 @@ const notifyRequestSubmitted = async ({ userId, student, course, slotType, snaps
         studentId: student._id,
         title: 'New slot-change request',
         message: `${student.fullName} (${student.studentId}) asked to change ${slotLabel}.`,
-        link: `/schedule/${student._id}`,
+        // Req 43-44: the page where the Advisor approves or rejects it.
+        link: '/slot-change-review',
       });
     } else {
       await notifyRole('Coordinator', {
@@ -617,6 +640,12 @@ exports.createMyRequest = async (req, res) => {
         return res.status(409).json({ message: 'You already have a pending change request for this slot.' });
       }
       if (error.status) return res.status(error.status).json({ message: error.message });
+      // Req 48 pattern: submission re-checks and inserts in one transaction, so a
+      // standalone MongoDB refuses it. Say so plainly; nothing was written.
+      if (isTransactionUnsupportedError(error)) {
+        console.error('[slot-change] Submission needs a replica set:', error.message);
+        return res.status(503).json({ message: SUBMISSION_TRANSACTIONS_UNAVAILABLE });
+      }
       throw error;
     }
 

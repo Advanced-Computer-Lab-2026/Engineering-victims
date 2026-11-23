@@ -188,6 +188,9 @@ const ExtraHoursFinancePage: React.FC = () => {
         <p className="whitespace-pre-wrap text-sm text-slate-300">Reason: {detail.request.reversal.reason}</p>
         <p className="text-xs text-slate-400">{detail.request.reversal.removedSchedules} added slot(s) removed · {detail.request.reversal.restoredDrafts} slot(s) returned to draft.</p>
       </Card>}
+      {detail.request?.cancellationRequest && !detail.request.reversal && <AlertBanner tone="info">
+        {`The Advisor asked to cancel this request on ${date(detail.request.cancellationRequest.at)}. Reason: ${detail.request.cancellationRequest.reason}`}
+      </AlertBanner>}
       <Card className="space-y-3 p-5">
         <h2 className="font-semibold text-white">{detail.record.kind === 'payment' ? 'Refund this payment' : 'Cancel this deferred charge'}</h2>
         {detail.reversal.eligible ? <>

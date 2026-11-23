@@ -101,6 +101,7 @@ const ACTION_LABELS = {
   StripePaymentCancelled: 'Gateway payment cancelled', StripePaymentRetried: 'Gateway payment retried',
   PaymentRefunded: 'Gateway payment refunded automatically', Cancelled: 'Request cancelled', Refunded: 'Refunded to wallet',
   'Deferred Charge Cancelled': 'Deferred charge removed from installment',
+  CancellationRequested: 'Cancellation requested by the Advisor',
 };
 // Expects `history.actor` populated with fullName and role.
 const historyEvents = (history = []) => history.slice().sort((a, b) => new Date(a.at) - new Date(b.at)).map((entry) => ({
@@ -158,6 +159,7 @@ async function recordDetails(kind, id) {
       requestedHours: request.requestedHours, activatedHours: request.activatedHours, totalCost: request.totalCost,
       decision: request.decision, settlementStatus: request.settlementStatus,
       items: request.items.map((item) => ({ code: item.code, name: item.name, requestedHours: item.requestedHours, ratePerHour: item.ratePerHour, subtotal: item.subtotal })),
+      cancellationRequest: request.cancellationRequest?.requestedAt ? { reason: request.cancellationRequest.reason, at: request.cancellationRequest.requestedAt } : null,
       reversal: request.reversal?.kind ? { kind: request.reversal.kind, reason: request.reversal.reason, at: request.reversal.at,
         by: request.reversal.by?.fullName ?? null, amount: request.reversal.amount,
         removedSchedules: request.reversal.removedSchedules, restoredDrafts: request.reversal.restoredDrafts } : null,

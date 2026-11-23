@@ -1,7 +1,5 @@
 const mongoose = require('mongoose');
 const Student = require('../models/Student');
-const Course = require('../models/Course');
-const User = require('../models/User');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const { buildMandatoryCandidates } = require('../services/mandatoryCourseService');
 const { buildAcademicHistory } = require('../services/academicHistoryService');
@@ -9,7 +7,7 @@ const { CATEGORY_OPTIONS, applyDecision, validateRemovalRequest } = require('../
 const { parseListQuery, buildListFilter, advisorFilterOptions } = require('../services/mandatoryRemovalListService');
 const { runInTransaction, removeCourseFromUnprocessedSchedule } = require('../services/advisingScheduleWorkflowService');
 const { supportsTransactions, isTransactionUnsupportedError } = require('../services/transactionSupport');
-const { notifyRole } = require('../services/notificationService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
 
 const courseSummary = (course) =>
   course ? { id: course._id, code: course.code, name: course.name, creditHours: course.creditHours } : null;
@@ -124,12 +122,22 @@ exports.createRequest = async (req, res) => {
 
     const populated = await requestPopulations(MandatoryRemovalRequest.findById(created._id)).lean();
 
-    // A side effect: notifyRole never throws into the request.
-    await notifyRole('Coordinator', {
-      type: 'approval',
-      title: 'Mandatory-course removal needs review',
-      message: `${student.fullName} (${student.studentId}): removal of ${populated.course?.code ?? 'a mandatory course'} was requested.`,
-    });
+    // Req 120: the new Pending request needs a Coordinator decision. A durable
+    // event keyed on this request, so a retried enqueue never notifies twice.
+    // A side effect: a queueing failure never fails the saved request.
+    try {
+      await publishNotificationEvent({
+        name: 'mandatory_removal.action_required',
+        entityId: created._id,
+        occurrence: 'submitted',
+        studentId: student._id,
+        title: 'Mandatory-course removal needs review',
+        message: `${student.fullName} (${student.studentId}): removal of ${populated.course?.code ?? 'a mandatory course'} was requested (${category}).`,
+        link: `/academic-history/${student._id}`,
+      });
+    } catch (error) {
+      console.error('[mandatory-removal] Could not queue Coordinator notification:', error.message);
+    }
 
     res.status(201).json({
       message: 'The removal request was sent to the Coordinator. The course stays mandatory until it is approved.',

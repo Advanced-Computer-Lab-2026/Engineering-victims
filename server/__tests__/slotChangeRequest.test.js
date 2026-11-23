@@ -292,7 +292,7 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
     expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
       name: 'slot_change.submitted',
       studentId: world.student._id,
-      link: `/schedule/${world.student._id}`,
+      link: '/slot-change-review',
     }));
     expect(spies.userFind).not.toHaveBeenCalled();
   });
@@ -473,6 +473,98 @@ describe('POST /api/slot-change-requests/me (req 40)', () => {
       expect(res.status).toBe(201);
       expect(world.student.workflowStatus).toBe('Ready for Student Review');
       expect(spies.create).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // Regression: the transaction returns a real document whose internals hold
+  // the live session. Spreading its snapshot into the response made
+  // JSON.stringify throw (circular structure), so a saved, notified request was
+  // answered with a 500 "Could not submit your slot-change request".
+  describe('response for a request created inside a transaction', () => {
+    const sessionBoundDoc = (doc) => {
+      const created = new SlotChangeRequest({ ...doc, _id: oid() });
+      const liveSession = { id: 'session-1' };
+      liveSession.self = liveSession; // a ClientSession is circular too
+      created.$session(liveSession);
+      return created;
+    };
+
+    it('answers 201 with the plain slot snapshot after saving and notifying', async () => {
+      const world = makeWorld();
+      const spies = stubWorld(world);
+      spies.create.mockImplementation(async (docs) => docs.map(sessionBoundDoc));
+
+      const res = await submit(world, validBody(world, { preferenceNote: '1st slot on Monday' }));
+
+      expect(res.status).toBe(201);
+      expect(res.body.message).toMatch(/was submitted/);
+      expect(res.body.request.currentSlot).toEqual({
+        id: String(world.slot._id),
+        groupNumber: world.slot.groupNumber,
+        dayOfWeek: world.slot.dayOfWeek,
+        startTime: world.slot.startTime,
+        endTime: world.slot.endTime,
+        room: world.slot.roomId,
+      });
+      expect(res.body.request.preferenceNote).toBe('1st slot on Monday');
+      expect(res.body.request.status).toBe('Pending');
+      expect(JSON.stringify(res.body)).not.toMatch(/\$__|_doc|session-1/);
+      // Request and notification behavior is unchanged: one insert, both notified.
+      expect(spies.create).toHaveBeenCalledTimes(1);
+      expect(spies.insertMany).toHaveBeenCalledTimes(1);
+      expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({ name: 'slot_change.submitted' }));
+    });
+  });
+
+  // Regression: on a standalone MongoDB the first write inside the submission
+  // transaction is refused with code 20. That surfaced as a bare 500
+  // ("Could not submit your slot-change request") carrying the driver's text.
+  describe('database without transactions', () => {
+    const standaloneRefusal = () =>
+      Object.assign(new Error('Transaction numbers are only allowed on a replica set member or mongos'), { code: 20 });
+
+    beforeEach(() => publishNotificationEvent.mockClear());
+
+    it('answers 503 with a specific message, creates nothing and notifies nobody', async () => {
+      const world = makeWorld();
+      const spies = stubWorld(world);
+      spies.studentUpdateOne.mockRejectedValue(standaloneRefusal());
+      jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const res = await submit(world, validBody(world, { preferenceNote: '1st slot on Monday' }));
+
+      expect(res.status).toBe(503);
+      expect(res.body.message).toMatch(/needs a database that supports transactions/);
+      expect(res.body.message).toMatch(/Nothing was changed/);
+      expect(res.body.error).toBeUndefined();
+      expect(spies.create).not.toHaveBeenCalled();
+      expect(spies.insertMany).not.toHaveBeenCalled();
+      expect(publishNotificationEvent).not.toHaveBeenCalled();
+      spies.writes.forEach((spy) => expect(spy).not.toHaveBeenCalled());
+      expect(spies.session.endSession).toHaveBeenCalled();
+    });
+
+    it('still runs every eligibility check before reaching the transaction', async () => {
+      const world = makeWorld({ term: { advisingDeadline: new Date(startOfToday().getTime() - DAY_MS) } });
+      const spies = stubWorld(world);
+      spies.studentUpdateOne.mockRejectedValue(standaloneRefusal());
+
+      const res = await submit(world, validBody(world));
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toMatch(/advising deadline/);
+      expect(spies.startSession).not.toHaveBeenCalled();
+    });
+
+    it('keeps other database failures as a 500', async () => {
+      const world = makeWorld();
+      const spies = stubWorld(world);
+      spies.studentUpdateOne.mockRejectedValue(new Error('connection reset'));
+
+      const res = await submit(world, validBody(world));
+
+      expect(res.status).toBe(500);
+      expect(spies.create).not.toHaveBeenCalled();
     });
   });
 
@@ -1045,7 +1137,7 @@ describe('PATCH /api/slot-change-requests/me/:id/withdraw (req 42)', () => {
         entityId: doc._id,
         occurrence: 'withdrawn',
         studentId: world.student._id,
-        link: `/schedule/${world.student._id}`,
+        link: '/slot-change-review',
       }));
       expect(publishNotificationEvent.mock.calls[0][0].message).toContain('CSEN 501 Tutorial group 4');
       // No direct or Coordinator notifications.
