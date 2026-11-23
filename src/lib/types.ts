@@ -605,6 +605,11 @@ export interface AdvisingScheduleValidationResponse {
   slotAssignments: AdvisingScheduleSlotAssignments[];
 }
 
+/** Req 63 — a req 61 mandatory candidate, plus whether the draft already holds the course. */
+export interface DraftMandatoryCandidate extends Omit<MandatoryCandidate, 'mandatory'> {
+  selected: boolean;
+}
+
 /** Req 60 — the season the bachelor project will be taken in. */
 export type BachelorProjectSeason = 'Winter' | 'Spring';
 
@@ -636,6 +641,8 @@ export interface AdvisingScheduleDraftResponse {
     limits: { maxCourses: number; maxCore: number; maxHumanities: number };
   };
   eligibleCourses: AdvisingScheduleCourseOption[];
+  /** Req 63 — the student's mandatory courses, each marked as already in the draft or not. */
+  mandatoryCandidates: DraftMandatoryCandidate[];
   creditHours: {
     selected: number;
     allowed: number;

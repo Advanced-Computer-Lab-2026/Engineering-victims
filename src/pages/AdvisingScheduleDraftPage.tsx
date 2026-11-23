@@ -14,6 +14,7 @@ import StudentPreferencesPanel from '../components/StudentPreferencesPanel';
 import { ApiError } from '../lib/api';
 import {
   addAdvisingScheduleCourse,
+  addAdvisingScheduleMandatoryCourse,
   assignAdvisingScheduleSlot,
   changeAdvisingScheduleSlot,
   createAdvisingScheduleDraft,
@@ -29,6 +30,7 @@ import type {
   AdvisingScheduleDraftCourse,
   AdvisingScheduleDraftResponse,
   AdvisingScheduleValidation,
+  DraftMandatoryCandidate,
 } from '../lib/types';
 import { formatDate, formatRelative } from '../lib/studentsService';
 
@@ -68,6 +70,8 @@ const AdvisingScheduleDraftPage: React.FC = () => {
   // Edits are staged here and only written when "Save as draft" is pressed.
   const [stagedAdds, setStagedAdds] = useState<string[]>([]);
   const [stagedRemoves, setStagedRemoves] = useState<string[]>([]);
+  // Req 63: mandatory courses are staged the same way and saved before any other course.
+  const [stagedMandatory, setStagedMandatory] = useState<string[]>([]);
 
   const load = useCallback(async (termId?: string) => {
     if (!studentId) return;
@@ -79,6 +83,7 @@ const AdvisingScheduleDraftPage: React.FC = () => {
       setSelectedTermId(response.term.id);
       setStagedAdds([]);
       setStagedRemoves([]);
+      setStagedMandatory([]);
       setSelectedSlotIds({});
       if (response.term.id) {
         const check = await fetchAdvisingScheduleValidation(studentId, response.term.id);
@@ -107,6 +112,10 @@ const AdvisingScheduleDraftPage: React.FC = () => {
     try {
       if (!data.draft) {
         await createAdvisingScheduleDraft(studentId, selectedTermId);
+      }
+      // Req 63: mandatory courses are selected before other courses.
+      for (const courseId of stagedMandatory) {
+        await addAdvisingScheduleMandatoryCourse(studentId, courseId, selectedTermId);
       }
       for (const courseId of stagedAdds) {
         await addAdvisingScheduleCourse(studentId, courseId, selectedTermId);
@@ -193,7 +202,15 @@ const AdvisingScheduleDraftPage: React.FC = () => {
   };
 
   /** Dropping a course that was only staged takes it straight back off the list. */
+  const stageMandatory = (courseId: string) => {
+    setStagedMandatory((current) => (current.includes(courseId) ? current : [...current, courseId]));
+  };
+
   const stageRemove = (courseId: string) => {
+    if (stagedMandatory.includes(courseId)) {
+      setStagedMandatory((current) => current.filter((id) => id !== courseId));
+      return;
+    }
     if (stagedAdds.includes(courseId)) {
       setStagedAdds((current) => current.filter((id) => id !== courseId));
       return;
@@ -210,8 +227,15 @@ const AdvisingScheduleDraftPage: React.FC = () => {
   const hours = data?.creditHours;
 
   const stagedAddSet = new Set(stagedAdds);
+  const stagedMandatorySet = new Set(stagedMandatory);
+  const mandatoryCandidates: DraftMandatoryCandidate[] = data?.mandatoryCandidates ?? [];
+  // Req 63: mandatory courses are selected before other courses, so no other course
+  // can be added until each one is in the draft or staged.
+  const unselectedMandatory = mandatoryCandidates.filter(
+    (candidate) => !candidate.selected && !stagedMandatorySet.has(candidate.course.id)
+  );
   const stagedRemoveSet = new Set(stagedRemoves);
-  const hasUnsavedChanges = stagedAdds.length > 0 || stagedRemoves.length > 0;
+  const hasUnsavedChanges = stagedAdds.length > 0 || stagedRemoves.length > 0 || stagedMandatory.length > 0;
 
   // Staged additions come back as plain options, so they need the flag the
   // saved draft courses carry.
@@ -220,12 +244,21 @@ const AdvisingScheduleDraftPage: React.FC = () => {
     .filter((course): course is AdvisingScheduleCourseOption => Boolean(course))
     .map((course) => ({ ...course, mandatory: false }));
 
-  const displayedCourses: AdvisingScheduleDraftCourse[] = [...draftCourses, ...stagedAddCourses];
+  const stagedMandatoryCourses: AdvisingScheduleDraftCourse[] = mandatoryCandidates
+    .filter((candidate) => stagedMandatorySet.has(candidate.course.id))
+    .map((candidate) => ({ ...candidate.course, mandatory: true }));
+
+  const displayedCourses: AdvisingScheduleDraftCourse[] = [
+    ...draftCourses,
+    ...stagedMandatoryCourses,
+    ...stagedAddCourses,
+  ];
   const availableOptions = courseOptions.filter((course) => !stagedAddSet.has(course.id));
 
   // The tiles read the saved total, so they move with the staged edits instead
   // of showing a figure the button has not written yet.
   const stagedHours =
+    stagedMandatoryCourses.reduce((total, course) => total + course.creditHours, 0) +
     stagedAdds.reduce(
       (total, id) => total + (courseOptions.find((course) => course.id === id)?.creditHours ?? 0),
       0
@@ -368,7 +401,7 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                   {displayedCourses.length ? (
                     <ul className="divide-y divide-outline-variant">
                       {displayedCourses.map((course) => {
-                        const isStagedAdd = stagedAddSet.has(course.id);
+                        const isStagedAdd = stagedAddSet.has(course.id) || stagedMandatorySet.has(course.id);
                         const isPendingRemoval = stagedRemoveSet.has(course.id);
                         const courseSlots = slotAssignments.find((item) => item.courseId === course.id);
                         return (
@@ -535,6 +568,57 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                   )}
                 </div>
 
+                <section className="mt-5" aria-labelledby="mandatory-courses-heading">
+                  <h3
+                    id="mandatory-courses-heading"
+                    className="mb-3 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant"
+                  >
+                    Mandatory courses
+                  </h3>
+                  {mandatoryCandidates.length ? (
+                    <ul className="divide-y divide-outline-variant">
+                      {mandatoryCandidates.map((candidate) => {
+                        const isStaged = stagedMandatorySet.has(candidate.course.id);
+                        return (
+                          <li key={candidate.course.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                            <div className="min-w-0">
+                              <span className="font-mono font-medium text-on-surface">{candidate.course.code}</span>
+                              <span className="ml-2 text-body text-on-surface-variant">{candidate.course.name}</span>
+                              <span className="ml-2 text-caption text-on-surface-variant">
+                                {candidate.course.creditHours} credits
+                              </span>
+                              <span className="ml-2 align-middle">
+                                <Badge tone={candidate.reason === 'Failed' ? 'rose' : 'amber'}>{candidate.reason}</Badge>
+                              </span>
+                              {candidate.inProgress && (
+                                <span className="ml-2 align-middle">
+                                  <Badge tone="sky">Retaking now</Badge>
+                                </span>
+                              )}
+                            </div>
+                            {candidate.selected ? (
+                              <Badge tone="emerald">In this draft</Badge>
+                            ) : isStaged ? (
+                              <Badge tone="amber">Not saved yet</Badge>
+                            ) : data.canEdit ? (
+                              <CustomButton
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => stageMandatory(candidate.course.id)}
+                                icon={<Plus className="h-4 w-4" aria-hidden />}
+                              >
+                                Add to draft
+                              </CustomButton>
+                            ) : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  ) : (
+                    <p className="text-body text-on-surface-variant">This student has no mandatory courses to select.</p>
+                  )}
+                </section>
+
                 {data.canEdit && (
                   <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:items-end">
                     <Select
@@ -542,6 +626,7 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                       className="flex-1"
                       value={selectedCourseId}
                       onChange={(event) => setSelectedCourseId(event.target.value)}
+                      disabled={unselectedMandatory.length > 0}
                       placeholder="Select an eligible course"
                       options={availableOptions.map((course) => ({
                         value: course.id,
@@ -551,12 +636,18 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                     <CustomButton
                       variant="secondary"
                       onClick={stageAdd}
-                      disabled={!selectedCourseId}
+                      disabled={!selectedCourseId || unselectedMandatory.length > 0}
                       icon={<Plus className="h-4 w-4" aria-hidden />}
                     >
                       Add course
                     </CustomButton>
                   </div>
+                )}
+                {data.canEdit && unselectedMandatory.length > 0 && (
+                  <p className="mt-2 text-caption text-on-surface-variant">
+                    Select the mandatory courses before other courses:{' '}
+                    {unselectedMandatory.map((candidate) => candidate.course.code).join(', ')}.
+                  </p>
                 )}
                 {data.canEdit && courseOptions.length === 0 && (
                   <p className="mt-2 text-caption text-on-surface-variant">

@@ -12,6 +12,7 @@ router.post('/students/:studentId/ready', ...staff, controller.markReadyForRevie
 router.put('/students/:studentId/bachelor-project', ...staff, controller.setBachelorProject);
 router.delete('/students/:studentId/bachelor-project', ...staff, controller.removeBachelorProject);
 router.post('/students/:studentId/courses', ...staff, controller.addCourse);
+router.post('/students/:studentId/mandatory-courses', ...staff, controller.addMandatoryCourse);
 router.post('/students/:studentId/courses/:courseId/slots', ...staff, controller.assignSlot);
 router.patch('/students/:studentId/slots/:scheduleId', ...staff, controller.changeSlot);
 router.delete('/students/:studentId/slots/:scheduleId', ...staff, controller.removeSlot);

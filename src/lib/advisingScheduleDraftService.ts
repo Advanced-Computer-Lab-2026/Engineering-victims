@@ -53,7 +53,17 @@ export const addAdvisingScheduleCourse =(studentId: string, courseId: string, te
     }
   );
 
-export const removeAdvisingScheduleCourse = (studentId: string, courseId: string, termId?: string) => {
+/** Req 63 — add one of the student's mandatory courses to the draft. */
+export const addAdvisingScheduleMandatoryCourse = (studentId: string, courseId: string, termId?: string) =>
+  apiFetch<{ draft: AdvisingScheduleDraftResponse['draft'] }>(
+    withTerm(`${endpoint(studentId)}/mandatory-courses`, termId),
+    {
+      method: 'POST',
+      body: JSON.stringify({ courseId }),
+    }
+  );
+
+export const removeAdvisingScheduleCourse =(studentId: string, courseId: string, termId?: string) => {
   return apiFetch<{ draft: AdvisingScheduleDraftResponse['draft'] }>(
     withTerm(`${endpoint(studentId)}/courses/${encodeURIComponent(courseId)}`, termId),
     { method: 'DELETE' }
