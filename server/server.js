@@ -39,6 +39,7 @@ const ProbationWarning = require("./models/ProbationWarning");
 const SwapRequest = require("./models/SwapRequest");
 const ScheduleActivityLog = require("./models/ScheduleActivityLog");
 const { startProbationWorker } = require("./services/probationService");
+const { startAdvisingReminderWorker } = require("./services/advisingReminderService");
 const semesterStandingRoutes = require("./routes/semesterStandingRoutes");
 const extraHoursRoutes = require("./routes/extraHoursRoutes");
 const ExtraHoursRequest = require("./models/ExtraHoursRequest");
@@ -144,9 +145,11 @@ async function startServer() {
     ]);
     const stopNotificationWorker = startNotificationWorker({ beforeBatch: flushStudentNotifications });
     const stopProbationWorker = startProbationWorker();
+    const stopAdvisingReminderWorker = startAdvisingReminderWorker();
     const httpServer = app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     httpServer.on("close", stopNotificationWorker);
     httpServer.on("close", stopProbationWorker);
+    httpServer.on("close", stopAdvisingReminderWorker);
   } catch (err) {
     console.error("Startup error:", err.message);
     console.error(`\nCould not connect to MongoDB at: ${MONGODB_URI}`);
