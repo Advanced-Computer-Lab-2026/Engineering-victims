@@ -8,6 +8,7 @@ const Plan = require('../models/GraduationPlan');
 const Request = require('../models/ExtraHoursRequest');
 const { evaluateExtraHoursRequest, prepareExtraHoursRequest } = require('./extraHoursService');
 const { planInputsFor, approvedExitExamCourseIdsFor, creditLimitsFor, validatePlan } = require('./graduationPlanService');
+const { publishNotificationEvent } = require('./notificationEventService');
 const fail = (message, status = 409) => Object.assign(new Error(message), { status });
 
 async function graduationAssessmentFor(student, now) {
@@ -78,11 +79,34 @@ function evaluateSelection(context, items) {
 const fingerprint = ({ studentId, termId, items }) => createHash('sha256').update(JSON.stringify({ studentId, termId,
   items: [...items].sort((a, b) => a.courseId.localeCompare(b.courseId)),
 })).digest('hex');
+// Req 120: a new request starts requiring Coordinator review. The occurrence is
+// fixed ('submitted'), so a replayed submission reuses the same event key: it
+// can recover a lost enqueue but never notifies twice. Logged, never thrown,
+// because the request itself is already saved.
+async function notifyCoordinatorsOfSubmission(request, student) {
+  if (request.decision !== 'Pending') return;
+  try {
+    const owner = student || await Student.findById(request.student).select('fullName studentId').lean();
+    await publishNotificationEvent({
+      name: 'extra_hours.action_required',
+      entityId: request._id,
+      occurrence: 'submitted',
+      studentId: request.student,
+      title: 'Extra-hours request needs review',
+      message: `${owner?.fullName ?? 'A student'}${owner?.studentId ? ` (${owner.studentId})` : ''} has an extra-hours request for `
+        + `${request.requestedHours} hour(s) (EGP ${Number(request.totalCost).toLocaleString('en-US')}). Reference: ${request.reference}.`,
+      link: `/extra-hours-requests?requestId=${request._id}`,
+    });
+  } catch (error) {
+    console.error('[extra-hours] Could not queue Coordinator notification:', error.message);
+  }
+}
 async function submitRequest(advisorId, body) {
   const hash = fingerprint(body), key = { requestingAdvisor: advisorId, submissionKey: body.submissionKey };
   const previous = await Request.findOne(key);
   if (previous) {
     if (previous.submissionFingerprint !== hash) throw fail('This submission key was used for different details.');
+    await notifyCoordinatorsOfSubmission(previous);
     return { request: previous, replay: true };
   }
   const context = await loadContext(body.studentId, body.termId);
@@ -96,8 +120,10 @@ async function submitRequest(advisorId, body) {
     if (error.code !== 11000) throw error;
     const existing = await Request.findOne(key);
     if (!existing || existing.submissionFingerprint !== hash) throw fail('Conflicting submission key.');
+    await notifyCoordinatorsOfSubmission(existing);
     return { request: existing, replay: true };
   }
+  await notifyCoordinatorsOfSubmission(request, context.student);
   return { request, replay: false };
 }
-module.exports = { loadContext, evaluateSelection, graduationAssessmentFor, submitRequest, fingerprint };
+module.exports = { loadContext, evaluateSelection, graduationAssessmentFor, submitRequest, fingerprint, notifyCoordinatorsOfSubmission };

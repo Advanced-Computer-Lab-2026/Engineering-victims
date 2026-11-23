@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const { z } = require('zod');
 const ScheduleActivityLog = require('../models/ScheduleActivityLog');
 const Student = require('../models/Student');
 const StudentSchedule = require('../models/StudentSchedule');
@@ -6,6 +7,7 @@ const User = require('../models/User');
 const { recalculate } = require('../services/workflowService');
 const { queueStudentNotification } = require('../services/studentNotificationService');
 const advisingScheduleWorkflow = require('../services/advisingScheduleWorkflowService');
+const { toCsv } = require('../utils/csv');
 
 /**
  * Req 123: Automatically records a schedule processing or reopening action.
@@ -206,46 +208,54 @@ const applyFilters = (entries, { action, startDate, endDate, search }) => {
 exports.recordScheduleActivity = recordScheduleActivity;
 
 /**
+ * Req 123: every advising student's schedule activity, newest first. Shared by
+ * the global history list and its export (Req 126) so both always hold the
+ * same entries.
+ */
+const loadGlobalEntries = async () => {
+  const [advisingStudents, coordinator, persistedLogs] = await Promise.all([
+    Student.find({ studentType: 'Advising Student' })
+      .populate('assignedAdvisor', 'fullName email')
+      .lean(),
+    User.findOne({ role: 'Coordinator' }).select('fullName email role').lean(),
+    ScheduleActivityLog.find({}).sort({ occurredAt: -1, scheduleVersion: -1 }).lean(),
+  ]);
+
+  const studentMap = new Map(advisingStudents.map((s) => [String(s._id), s]));
+  const persistedByStudent = new Map();
+
+  for (const log of persistedLogs) {
+    const key = String(log.student);
+    const list = persistedByStudent.get(key) ?? [];
+    list.push(formatPersistedLog(log, studentMap));
+    persistedByStudent.set(key, list);
+  }
+
+  const allEntries = [];
+  for (const st of advisingStudents) {
+    const persistedList = persistedByStudent.get(String(st._id)) ?? [];
+    const existingVersions = new Set(persistedList.map((e) => e.scheduleVersion));
+    const baseline = deriveBaselineEntriesForStudent(st, coordinator).filter(
+      (b) => !existingVersions.has(b.scheduleVersion)
+    );
+    allEntries.push(...persistedList, ...baseline);
+  }
+
+  return allEntries.sort(
+    (a, b) =>
+      new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime() ||
+      b.scheduleVersion - a.scheduleVersion
+  );
+};
+
+/**
  * Req 123, 124, 125: Global schedule activity history across all advising
  * students, with filtering by action type & date range and searching by
  * student ID or staff member's name or GUC email.
  */
 exports.getGlobalHistory = async (req, res) => {
   try {
-    const [advisingStudents, coordinator, persistedLogs] = await Promise.all([
-      Student.find({ studentType: 'Advising Student' })
-        .populate('assignedAdvisor', 'fullName email')
-        .lean(),
-      User.findOne({ role: 'Coordinator' }).select('fullName email role').lean(),
-      ScheduleActivityLog.find({}).sort({ occurredAt: -1, scheduleVersion: -1 }).lean(),
-    ]);
-
-    const studentMap = new Map(advisingStudents.map((s) => [String(s._id), s]));
-    const persistedByStudent = new Map();
-
-    for (const log of persistedLogs) {
-      const key = String(log.student);
-      const list = persistedByStudent.get(key) ?? [];
-      list.push(formatPersistedLog(log, studentMap));
-      persistedByStudent.set(key, list);
-    }
-
-    const allEntries = [];
-    for (const st of advisingStudents) {
-      const persistedList = persistedByStudent.get(String(st._id)) ?? [];
-      const existingVersions = new Set(persistedList.map((e) => e.scheduleVersion));
-      const baseline = deriveBaselineEntriesForStudent(st, coordinator).filter(
-        (b) => !existingVersions.has(b.scheduleVersion)
-      );
-      allEntries.push(...persistedList, ...baseline);
-    }
-
-    allEntries.sort(
-      (a, b) =>
-        new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime() ||
-        b.scheduleVersion - a.scheduleVersion
-    );
-
+    const allEntries = await loadGlobalEntries();
     const filtered = applyFilters(allEntries, req.query);
 
     return res.status(200).json({
@@ -258,6 +268,68 @@ exports.getGlobalHistory = async (req, res) => {
       message: 'Could not load schedule activity history.',
       error: error.message,
     });
+  }
+};
+
+const EXPORT_HEAD = [
+  'Student ID',
+  'Student name',
+  'Action',
+  'Schedule version',
+  'Staff full name',
+  'Staff GUC email',
+  'Staff role',
+  'Date and time (UTC)',
+  'Reopening reason',
+];
+
+/**
+ * Req 126: exports the global history exactly as displayed, using the same
+ * action, date-range and search filters as the list (Reqs 124, 125), as a CSV
+ * in the project's export format (see Req 127). Every matching entry is
+ * included because the page shows every matching entry.
+ */
+const day = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}$/)
+  .refine((value) => !Number.isNaN(Date.parse(value)));
+const exportQuery = z
+  .object({
+    action: z.union([z.enum(ScheduleActivityLog.ACTIONS), z.literal('')]).optional(),
+    startDate: z.union([day, z.literal('')]).optional(),
+    endDate: z.union([day, z.literal('')]).optional(),
+    search: z.string().optional(),
+  })
+  .strict();
+
+exports.exportGlobalHistory = async (req, res) => {
+  const parsed = exportQuery.safeParse(req.query);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: 'Use a valid action type (Processed or Reopened), dates (YYYY-MM-DD) and search text to export.',
+    });
+  }
+  try {
+    const filtered = applyFilters(await loadGlobalEntries(), parsed.data);
+    const rows = filtered.map((e) => [
+      e.studentId,
+      e.studentName,
+      e.action,
+      e.scheduleVersion,
+      e.staffName,
+      e.staffEmail,
+      e.staffRole,
+      new Date(e.occurredAt).toISOString(),
+      e.reason ?? '',
+    ]);
+    const stamp = new Date().toISOString().slice(0, 10);
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="schedule-activity-history-${stamp}.csv"`,
+    });
+    return res.status(200).send(toCsv(EXPORT_HEAD, rows));
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not export the schedule activity history.' });
   }
 };
 

@@ -223,21 +223,28 @@ exports.assignAdvisor = async (req, res) => {
     }
 
     const previous = student.assignedAdvisor ? String(student.assignedAdvisor) : null;
+    const isNewAssignment = previous !== String(advisor._id);
     student.assignedAdvisor = advisor._id;
     student.lastUpdateAt = new Date();
     await student.save();
-    try {
-      await publishNotificationEvent({
-        name: 'advisor.assigned',
-        entityId: student._id,
-        occurrence: String(new mongoose.Types.ObjectId()),
-        studentId: student._id,
-        title: 'A student was assigned to you',
-        message: `${student.fullName} (${student.studentId}) is now on your advising roster.`,
-        link: '/advising-students',
-      });
-    } catch (error) {
-      console.error('[students] Could not queue advisor-assignment notification:', error.message);
+
+    // Req 119: tell the Advisor who now holds this student. Re-saving the same
+    // Advisor assigns nobody new, so it sends nothing. The occurrence comes
+    // from the saved assignment, so a retried publish reuses the same event.
+    if (isNewAssignment) {
+      try {
+        await publishNotificationEvent({
+          name: 'advisor.assigned',
+          entityId: student._id,
+          occurrence: `${advisor._id}:${student.lastUpdateAt.getTime()}`,
+          studentId: student._id,
+          title: 'A student was assigned to you',
+          message: `${student.fullName} (${student.studentId}) is now on your advising roster.`,
+          link: `/students/${student._id}`,
+        });
+      } catch (error) {
+        console.error('[students] Could not queue advisor-assignment notification:', error.message);
+      }
     }
     await student.populate('assignedAdvisor', 'fullName email');
 

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Loader2, RotateCcw, ClipboardList } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
@@ -68,6 +69,15 @@ const ExtraHoursRequestsPage: React.FC = () => {
     catch (err) { setError(message(err)); }
     finally { setOpening(false); }
   };
+  // Req 120: a Coordinator notification links here with ?requestId=… to open that request.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedRequestId = searchParams.get('requestId');
+  useEffect(() => {
+    if (!linkedRequestId) return;
+    void open(linkedRequestId);
+    setSearchParams((current) => { const next = new URLSearchParams(current); next.delete('requestId'); return next; }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedRequestId]);
   const decide = async (decision: 'Approved' | 'Rejected') => {
     if (!detail || deciding || !responseNote.trim()) return;
     setDeciding(true); setError(null); setSuccess(null);

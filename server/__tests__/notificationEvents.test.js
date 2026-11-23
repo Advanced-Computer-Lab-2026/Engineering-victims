@@ -27,6 +27,15 @@ test('assignment resolves only the active assigned advisor, ignoring caller reci
   expect(User.find).toHaveBeenCalledWith({ role: 'Advisor', _id: 'advisor-1', isActive: true });
   expect(Event.findOneAndUpdate.mock.calls[0][1].$setOnInsert.recipients).toEqual(['advisor-1']);
 });
+test.each(['advisor.assigned', 'slot_change.submitted', 'slot_change.withdrawn'])('Req 119: %s reaches only the active assigned Advisor', async (name) => {
+  await publish({ ...input, name });
+  expect(User.find).toHaveBeenCalledWith({ role: 'Advisor', _id: 'advisor-1', isActive: true });
+  expect(Event.findOneAndUpdate.mock.calls[0][1].$setOnInsert.recipients).toEqual(['advisor-1']);
+});
+test.each(['advisor.assigned', 'slot_change.submitted', 'slot_change.withdrawn'])('Req 119: %s reaches nobody for a Normal Student', async (name) => {
+  await expect(resolveRecipients(EVENTS[name], { ...student, studentType: 'Normal Student' })).resolves.toEqual([]);
+  expect(User.find).not.toHaveBeenCalled();
+});
 test('student events resolve the owner email and role, never all students', async () => {
   await resolveRecipients(EVENTS['schedule.processed'], student);
   expect(User.find).toHaveBeenCalledWith({ role: 'Student', email: student.email, isActive: true });

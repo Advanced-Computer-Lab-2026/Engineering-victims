@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
   BellRing,
@@ -7,6 +8,7 @@ import {
   CheckCircle2,
   ClipboardCheck,
   CreditCard,
+  ExternalLink,
   Info,
   Loader2,
   RotateCcw,
@@ -24,6 +26,7 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../lib/notificationsService';
+import { notificationDestination } from '../lib/notificationLinks';
 import { formatRelative } from '../lib/studentsService';
 import type { NotificationSummary, NotificationType } from '../lib/types';
 
@@ -50,6 +53,7 @@ const NotificationsPage: React.FC = () => {
   /** The row currently being marked, so only that button shows a spinner. */
   const [busyId, setBusyId] = useState<string | null>(null);
   const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const navigate = useNavigate();
 
   /**
    * Loads the list. The first load shows the page spinner; later refreshes are
@@ -124,6 +128,25 @@ const NotificationsPage: React.FC = () => {
     } finally {
       setBusyId(null);
     }
+  };
+
+  /**
+   * Req 117/120 — open the page a notification is about. Opening counts as
+   * reading it; if that update fails the reader still gets to the page.
+   */
+  const handleOpen = async (notification: NotificationSummary, destination: string) => {
+    if (!notification.isRead) {
+      setBusyId(notification.id);
+      try {
+        await markNotificationRead(notification.id);
+        broadcastNotificationsChanged();
+      } catch {
+        // Navigation matters more than the read flag; the next load shows it unread.
+      } finally {
+        setBusyId(null);
+      }
+    }
+    navigate(destination);
   };
 
   /** FR 5.0 — mark every unread notification as read in one action. */
@@ -252,6 +275,7 @@ const NotificationsPage: React.FC = () => {
               {filteredNotifications.map((notification) => {
                 const meta = TYPE_META[notification.type] ?? TYPE_META.info;
                 const Icon = meta.icon;
+                const destination = notificationDestination(notification.link);
 
                 return (
                   <li
@@ -292,7 +316,19 @@ const NotificationsPage: React.FC = () => {
                       </p>
                     </div>
 
-                    <div className="shrink-0 self-center">
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
+                      {destination && (
+                        <CustomButton
+                          variant="secondary"
+                          size="sm"
+                          icon={<ExternalLink className="h-4 w-4" aria-hidden />}
+                          onClick={() => void handleOpen(notification, destination)}
+                          disabled={busyId !== null}
+                          aria-label={`Open: ${notification.title}`}
+                        >
+                          Open
+                        </CustomButton>
+                      )}
                       {notification.isRead ? (
                         <Badge tone="neutral">Read</Badge>
                       ) : (
