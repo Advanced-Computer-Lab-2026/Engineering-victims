@@ -71,4 +71,18 @@ const parseCsv = (text) => {
   return records;
 };
 
-module.exports = { parseCsv };
+/**
+ * CSV writer matching the project's export format (Req 127): UTF-8 byte-order
+ * mark so Excel detects the encoding, CRLF line endings, RFC 4180 quoting, and
+ * a leading apostrophe on values that a spreadsheet would run as a formula.
+ */
+const csvCell = (value) => {
+  let text = value == null ? '' : String(value);
+  if (/^[=+\-@]/.test(text)) text = `'${text}`; // stop spreadsheet formulas
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+};
+
+const toCsv = (head, rows) =>
+  `\uFEFF${[head, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')}\r\n`;
+
+module.exports = { parseCsv, csvCell, toCsv };

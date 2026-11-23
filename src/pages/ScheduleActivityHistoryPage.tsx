@@ -1,12 +1,17 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, Loader2, RotateCcw, ScrollText, Search } from 'lucide-react';
+import { Download, Eye, Loader2, RotateCcw, ScrollText, Search } from 'lucide-react';
 import { ApiError } from '../lib/api';
 import {
+  exportGlobalScheduleHistory,
   getGlobalScheduleHistory,
   type ScheduleActivityAction,
   type ScheduleActivityEntry,
 } from '../lib/scheduleActivityService';
+import {
+  canExportScheduleHistory,
+  type AppliedScheduleHistoryFilters,
+} from '../lib/scheduleHistoryQuery';
 import PageHeader from '../components/PageHeader';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
@@ -17,7 +22,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 
 /**
- * Req 123, 124, 125:
+ * Req 123, 124, 125, 126:
  * - Req 123: Coordinator / Administrator views the automatically recorded
  *            history of schedule processing and reopening actions across all
  *            advising students (showing student ID, action, schedule version,
@@ -26,6 +31,7 @@ import Select from '../components/ui/Select';
  * - Req 124: Filter the schedule activity history by action type and date range.
  * - Req 125: Search the schedule activity history using a student ID or staff
  *            member's name or GUC email.
+ * - Req 126: Export the displayed history (same filters and search) as CSV.
  */
 const ScheduleActivityHistoryPage: React.FC = () => {
   const navigate = useNavigate();
@@ -38,6 +44,12 @@ const ScheduleActivityHistoryPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Req 126: the filters behind the rows on screen, so export matches what is
+  // displayed even while a newly typed search is still waiting to load.
+  const [appliedFilters, setAppliedFilters] = useState<AppliedScheduleHistoryFilters | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const loadHistory = useCallback(
     async (refresh = false) => {
@@ -46,14 +58,16 @@ const ScheduleActivityHistoryPage: React.FC = () => {
       setError(null);
 
       try {
-        const res = await getGlobalScheduleHistory({
+        const requested: AppliedScheduleHistoryFilters = {
           action: actionFilter,
           startDate,
           endDate,
-          search,
-        });
+          search: search.trim(),
+        };
+        const res = await getGlobalScheduleHistory(requested);
         setLogs(res.logs ?? []);
         setTotalCount(res.total ?? res.logs?.length ?? 0);
+        setAppliedFilters(requested);
       } catch (err) {
         setError((err as ApiError).message || 'Could not load schedule activity history.');
       } finally {
@@ -72,6 +86,36 @@ const ScheduleActivityHistoryPage: React.FC = () => {
   }, [loadHistory]);
 
   const hasFilters = Boolean(actionFilter || startDate || endDate || search.trim());
+
+  const appliedHasFilters = Boolean(
+    appliedFilters &&
+      (appliedFilters.action || appliedFilters.startDate || appliedFilters.endDate || appliedFilters.search)
+  );
+  const canExport = canExportScheduleHistory({
+    applied: appliedFilters,
+    rowCount: logs.length,
+    isLoading: isLoading || isRefreshing,
+    isExporting,
+    hasError: Boolean(error),
+  });
+
+  const exportHistory = async () => {
+    if (!appliedFilters || !canExport) return;
+    const count = logs.length;
+    setIsExporting(true);
+    setExportError(null);
+    setExportMessage(null);
+    try {
+      await exportGlobalScheduleHistory(appliedFilters);
+      setExportMessage(
+        `Exported ${count} ${appliedHasFilters ? 'matching ' : ''}action${count === 1 ? '' : 's'} as a CSV file.`
+      );
+    } catch (err) {
+      setExportError((err as Error).message || 'Could not export the schedule activity history.');
+    } finally {
+      setIsExporting(false);
+    }
+  };
 
   const clearFilters = () => {
     setActionFilter('');
@@ -141,13 +185,41 @@ const ScheduleActivityHistoryPage: React.FC = () => {
             Showing <strong className="text-on-surface">{logs.length}</strong> of{' '}
             <strong className="text-on-surface">{totalCount}</strong> recorded actions
           </span>
-          {hasFilters && (
-            <CustomButton variant="ghost" size="sm" onClick={clearFilters}>
-              Clear filters
+          <div className="flex flex-wrap items-center gap-2">
+            {hasFilters && (
+              <CustomButton variant="ghost" size="sm" onClick={clearFilters}>
+                Clear filters
+              </CustomButton>
+            )}
+            <CustomButton
+              variant="secondary"
+              size="sm"
+              onClick={() => void exportHistory()}
+              disabled={!canExport}
+              isLoading={isExporting}
+              icon={<Download className="h-4 w-4" aria-hidden />}
+            >
+              {isExporting ? 'Exporting…' : `Export ${appliedHasFilters ? 'filtered ' : ''}history (CSV)`}
             </CustomButton>
-          )}
+          </div>
         </div>
       </Card>
+
+      {exportMessage && (
+        <div className="mb-4">
+          <AlertBanner tone="success" title="Export ready" onDismiss={() => setExportMessage(null)}>
+            {exportMessage}
+          </AlertBanner>
+        </div>
+      )}
+
+      {exportError && (
+        <div className="mb-4">
+          <AlertBanner tone="error" title="Could not export history" onDismiss={() => setExportError(null)}>
+            {exportError}
+          </AlertBanner>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4">
