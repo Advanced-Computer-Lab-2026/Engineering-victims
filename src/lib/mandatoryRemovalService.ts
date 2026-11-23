@@ -1,5 +1,9 @@
 import { apiFetch } from './api';
-import type { MandatoryRemovalRequestSummary, StudentRemovalRequestsResponse } from './types';
+import type {
+  MandatoryRemovalListResponse,
+  MandatoryRemovalRequestSummary,
+  StudentRemovalRequestsResponse,
+} from './types';
 
 export const REMOVAL_NOTE_LIMIT = 1000;
 export const RESTRICTED_PAIR_CATEGORY = 'Restricted course pair in the same term';
@@ -7,6 +11,19 @@ export const RESTRICTED_PAIR_CATEGORY = 'Restricted course pair in the same term
 /** One student's removal requests, the valid cases and whether the caller may submit one. */
 export const fetchStudentRemovalRequests = async (studentId: string): Promise<StudentRemovalRequestsResponse> =>
   apiFetch(`/api/mandatory-removal-requests/student/${encodeURIComponent(studentId)}`);
+
+export const REMOVAL_SEARCH_LIMIT = 80;
+
+/**
+ * Req 65-66: a Coordinator's list of every removal request. `search` matches a
+ * student ID, a course code, or an Advisor's name or GUC email.
+ */
+export const fetchMandatoryRemovalRequests = async (search = ''): Promise<MandatoryRemovalListResponse> =>
+  apiFetch(
+    search.trim()
+      ? `/api/mandatory-removal-requests?search=${encodeURIComponent(search.trim())}`
+      : '/api/mandatory-removal-requests'
+  );
 
 /** Req 64: the assigned Advisor asks for a mandatory course to be removed. */
 export const submitRemovalRequest = async (input: {

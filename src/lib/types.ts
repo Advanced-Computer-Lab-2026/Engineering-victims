@@ -994,6 +994,12 @@ export interface MandatoryRemovalRequestSummary {
   decidedBy: { id: string; fullName: string } | null;
 }
 
+/** Req 65-66 — every removal request, narrowed by the search text when one was given. */
+export interface MandatoryRemovalListResponse {
+  requests: MandatoryRemovalRequestSummary[];
+  search: string;
+}
+
 export interface StudentRemovalRequestsResponse {
   requests: MandatoryRemovalRequestSummary[];
   /** The valid cases, each with the sentence that explains it. */

@@ -5,6 +5,7 @@ import {
   CalendarDays,
   CalendarRange,
   ClipboardList,
+  ClipboardX,
   Contact,
   FileText,
   GraduationCap,
@@ -66,6 +67,11 @@ export const NAV_ITEMS: NavItem[] = [
   {
     to: '/extra-hours-requests', label: 'Extra-hours Requests', icon: ClipboardList,
     roles: ['Coordinator'], description: 'Review extra-hours requests, eligibility checks and itemized costs.',
+  },
+  // Req 65-66: Coordinator list and search of mandatory-course removal requests
+  {
+    to: '/coordinator/mandatory-removals', label: 'Mandatory-course Removals', icon: ClipboardX,
+    roles: ['Coordinator'], description: 'View and search the requests to remove a mandatory course from a student.',
   },
   // Req 98-102, 127
   {

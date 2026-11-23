@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const Student = require('../models/Student');
+const Course = require('../models/Course');
+const User = require('../models/User');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const { buildMandatoryCandidates } = require('../services/mandatoryCourseService');
 const { buildAcademicHistory } = require('../services/academicHistoryService');
@@ -160,6 +162,54 @@ exports.listForStudent = async (req, res) => {
       categories: CATEGORY_OPTIONS,
       canRequest: req.user.role === 'Advisor' && isAssignedTo(student, req.user.userId),
     });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load the removal requests', error: error.message });
+  }
+};
+
+const SEARCH_LIMIT = 80;
+
+/** The text as a literal, so "." or "(" typed into the search box is not read as a pattern. */
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Req 65: a Coordinator views the list of mandatory-course removal requests,
+ * newest first, whoever asked and whatever the student.
+ *
+ * Req 66: `?search=` narrows the list to requests whose student ID or course
+ * code, or whose Advisor's name or GUC email, contains the text (any case).
+ * The text is matched against those four fields only.
+ */
+exports.listAll = async (req, res) => {
+  try {
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+    if (search.length > SEARCH_LIMIT) {
+      return res.status(400).json({ message: `Search text can be at most ${SEARCH_LIMIT} characters.` });
+    }
+
+    let filter = {};
+    if (search) {
+      const pattern = new RegExp(escapeRegex(search), 'i');
+      const [students, courses, advisors] = await Promise.all([
+        Student.find({ studentId: pattern }).select('_id').lean(),
+        Course.find({ code: pattern }).select('_id').lean(),
+        User.find({ role: 'Advisor', $or: [{ fullName: pattern }, { email: pattern }] }).select('_id').lean(),
+      ]);
+      const ids = (rows) => rows.map((row) => row._id);
+      filter = {
+        $or: [
+          { student: { $in: ids(students) } },
+          { course: { $in: ids(courses) } },
+          { advisor: { $in: ids(advisors) } },
+        ],
+      };
+    }
+
+    const requests = await requestPopulations(
+      MandatoryRemovalRequest.find(filter).sort({ createdAt: -1 })
+    ).lean();
+
+    res.status(200).json({ requests: requests.map(requestSummary), search });
   } catch (error) {
     res.status(500).json({ message: 'Could not load the removal requests', error: error.message });
   }
