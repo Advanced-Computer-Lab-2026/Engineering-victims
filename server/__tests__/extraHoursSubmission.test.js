@@ -4,6 +4,7 @@ jest.mock('../models/StudentSchedule', () => ({ find: jest.fn() }));
 jest.mock('../models/CourseOffering', () => ({ find: jest.fn() }));
 jest.mock('../models/CourseRecord', () => ({ find: jest.fn(), GRADE_POINTS: { A: 1, F: 5 } }));
 jest.mock('../models/GraduationPlan', () => ({ findOne: jest.fn() }));
+jest.mock('../services/notificationEventService', () => ({ publishNotificationEvent: jest.fn().mockResolvedValue({}) }));
 const Student = require('../models/Student');
 const Term = require('../models/AcademicTerm');
 const Schedule = require('../models/StudentSchedule');
@@ -12,6 +13,7 @@ const Record = require('../models/CourseRecord');
 const Plan = require('../models/GraduationPlan');
 const Request = require('../models/ExtraHoursRequest');
 const { loadContext, evaluateSelection, fingerprint, submitRequest } = require('../services/extraHoursSubmissionService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
 const mongoose = require('mongoose');
 const id = () => new mongoose.Types.ObjectId();
 const q = (value) => { const query = { populate: () => query, sort: () => query, lean: async () => value }; return query; };
@@ -87,4 +89,10 @@ test('submission persists pending request and history without modifying schedule
   expect(result.request.settlementStatus).toBe('Not Applicable');
   expect(String(result.request.requestingAdvisor)).toBe(String(advisor));
   expect(result.request.history[0].action).toBe('Submitted');
+  // Req 120: the new Pending request is queued for active Coordinators once.
+  expect(publishNotificationEvent).toHaveBeenCalledTimes(1);
+  expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+    name: 'extra_hours.action_required', entityId: result.request._id, occurrence: 'submitted', studentId: student._id,
+    link: `/extra-hours-requests?requestId=${result.request._id}`,
+  }));
 });

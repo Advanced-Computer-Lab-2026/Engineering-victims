@@ -6,6 +6,7 @@ const User = require('../models/User');
 const Request = require('../models/ExtraHoursRequest');
 const { loadContext, evaluateSelection, submitRequest } = require('../services/extraHoursSubmissionService');
 const { withdrawRequest } = require('../services/extraHoursWithdrawalService');
+const { requestCancellation } = require('../services/extraHoursCancellationService');
 const { requestHistory } = require('../services/extraHoursFinanceService');
 const objectId = z.string().refine((value) => mongoose.isValidObjectId(value));
 const selection = z.object({ studentId: objectId, termId: objectId,
@@ -41,7 +42,8 @@ router.get('/context/:studentId', handle(async (req, res) => {
     graduationVerified: Boolean(context.graduationAssessment), selectedHours: context.selectedCourses.reduce((sum, course) => sum + course.creditHours, 0),
     courses: [...context.courses.values()].map((course) => ({ id: course._id, code: course.code, name: course.name, creditHours: course.creditHours,
       alreadySelected: context.selectedCourses.some((selected) => String(selected._id) === String(course._id)) })),
-    requests: requests.map((request) => ({ id: request._id, reference: request.reference, requestedHours: request.requestedHours, totalCost: request.totalCost, decision: request.decision })),
+    requests: requests.map((request) => ({ id: request._id, reference: request.reference, requestedHours: request.requestedHours, totalCost: request.totalCost, decision: request.decision,
+      settlementStatus: request.settlementStatus, reversed: Boolean(request.reversal?.kind), cancellationRequestedAt: request.cancellationRequest?.requestedAt ?? null })),
   });
 }));
 router.post('/quote', handle(async (req, res) => {
@@ -61,6 +63,19 @@ router.post('/:id/withdraw', handle(async (req, res) => {
   }
   const request = await withdrawRequest(req.params.id, req.user.userId);
   res.json({ request: { id: request._id, decision: request.decision }, message: 'Request withdrawn. No hours were activated and no payment was taken.' });
+}));
+// Reqs 96, 102, 120: ask a Coordinator to refund or cancel an approved, settled request.
+router.post('/:id/request-cancellation', handle(async (req, res) => {
+  const parsed = z.object({ reason: z.string().trim().min(5).max(1000) }).strict().safeParse(req.body);
+  if (!objectId.safeParse(req.params.id).success || !parsed.success) {
+    return res.status(400).json({ message: 'Give a reason of 5 to 1000 characters for cancelling this request.' });
+  }
+  const { request, replay } = await requestCancellation(req.params.id, req.user.userId, parsed.data.reason);
+  res.status(replay ? 200 : 201).json({
+    request: { id: request._id, decision: request.decision, settlementStatus: request.settlementStatus, cancellationRequestedAt: request.cancellationRequest.requestedAt },
+    message: replay ? 'Cancellation was already requested. A Coordinator will refund or cancel the charge.'
+      : 'Cancellation requested. A Coordinator will refund or cancel the charge; nothing changes until then.',
+  });
 }));
 router.post('/', handle(async (req, res) => {
   const parsed = submission.safeParse(req.body);

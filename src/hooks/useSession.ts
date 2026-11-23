@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { apiFetch, ApiError } from '../lib/api';
+import { apiFetch } from '../lib/api';
+import { createSessionStore } from '../lib/sessionStore';
 import type { SessionUser } from '../lib/types';
 
 const TOKEN_KEY = 'token';
@@ -28,82 +29,55 @@ interface SessionState {
  * ProtectedRoute, AppLayout and the pages all need the current user. Without a
  * cache, mounting them together would fire one /api/auth/me request per
  * consumer, so the result is memoised at module scope and subscribers share it.
+ * The cache is tied to the token it was loaded with (see sessionStore), so it
+ * can never show one account while requests carry another account's token.
  */
-let cachedUser: SessionUser | null = null;
-let inFlight: Promise<void> | null = null;
-const subscribers = new Set<(user: SessionUser | null) => void>();
+const store = createSessionStore<SessionUser>({
+  readToken: () => localStorage.getItem(TOKEN_KEY),
+  clearToken: () => localStorage.removeItem(TOKEN_KEY),
+  // apiFetch reads the same stored token synchronously when it sends.
+  fetchUser: async () => (await apiFetch<{ user: SessionUser }>('/api/auth/me')).user,
+});
 
-const publish = (user: SessionUser | null) => {
-  cachedUser = user;
-  subscribers.forEach((notify) => notify(user));
-};
-
-/**
- * `apiFetch` announces a rejected token rather than redirecting, so this stays
- * the one place that knows how a dead session is cleared. The guards then see
- * a null user and send the visitor to sign-in, which reads the notice.
- */
 if (typeof window !== 'undefined') {
+  /**
+   * `apiFetch` announces a rejected token rather than redirecting, so this stays
+   * the one place that knows how a dead session is cleared. The guards then see
+   * a null user and send the visitor to sign-in, which reads the notice.
+   */
   window.addEventListener('session-expired', () => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('user');
     sessionStorage.setItem(SESSION_NOTICE_KEY, 'Your session expired. Sign in again to continue.');
-    publish(null);
+    store.clear();
+  });
+
+  // localStorage is shared by every tab. When another tab signs in as someone
+  // else or signs out, this tab re-reads who it is now signed in as.
+  window.addEventListener('storage', (event) => {
+    if (event.storageArea !== localStorage) return;
+    if (event.key === TOKEN_KEY || event.key === null) void store.load();
   });
 }
 
-const load = () => {
-  if (inFlight) return inFlight;
-
-  const token = localStorage.getItem(TOKEN_KEY);
-  if (!token) {
-    publish(null);
-    inFlight = null;
-    return Promise.resolve();
-  }
-
-  inFlight = apiFetch<{ user: SessionUser }>('/api/auth/me')
-    .then((response) => publish(response.user))
-    .catch((err: ApiError) => {
-      // Only an auth failure means the session is dead. A network blip must
-      // not sign the user out.
-      if (err.status === 401) {
-        localStorage.removeItem(TOKEN_KEY);
-        publish(null);
-      } else {
-        publish(null);
-      }
-    })
-    .finally(() => {
-      inFlight = null;
-    });
-
-  return inFlight;
-};
-
 export const useSession = (): SessionState => {
-  const [user, setUser] = useState<SessionUser | null>(cachedUser);
-  const [isLoading, setIsLoading] = useState(cachedUser === null);
+  const [snapshot, setSnapshot] = useState(() => {
+    const current = store.getSnapshot();
+    return store.isCurrent() ? current : { user: null, isLoading: true };
+  });
 
   useEffect(() => {
-    subscribers.add(setUser);
-
-    if (cachedUser !== null) {
-      setIsLoading(false);
-    } else {
-      setIsLoading(true);
-      load().finally(() => setIsLoading(false));
-    }
+    const unsubscribe = store.subscribe(setSnapshot);
+    // Reload when nothing is cached or the cache belongs to a different token,
+    // e.g. a sign-in that happened while no consumer was listening.
+    void store.ensureCurrent().finally(() => setSnapshot(store.getSnapshot()));
 
     // Another component signed in or out.
-    const onAuthChange = () => {
-      setIsLoading(true);
-      load().finally(() => setIsLoading(false));
-    };
+    const onAuthChange = () => { void store.load(); };
     window.addEventListener('auth-changed', onAuthChange);
 
     return () => {
-      subscribers.delete(setUser);
+      unsubscribe();
       window.removeEventListener('auth-changed', onAuthChange);
     };
   }, []);
@@ -111,13 +85,12 @@ export const useSession = (): SessionState => {
   const logout = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem('user');
-    publish(null);
+    store.clear();
   }, []);
 
   const refresh = useCallback(() => {
-    setIsLoading(true);
-    load().finally(() => setIsLoading(false));
+    void store.load();
   }, []);
 
-  return { user, isLoading, logout, refresh };
+  return { user: snapshot.user, isLoading: snapshot.isLoading, logout, refresh };
 };

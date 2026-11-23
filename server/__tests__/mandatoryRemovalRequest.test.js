@@ -17,7 +17,7 @@ jest.mock('../models/MandatoryRemovalRequest', () => ({
 }));
 jest.mock('../services/mandatoryCourseService', () => ({ buildMandatoryCandidates: jest.fn() }));
 jest.mock('../services/academicHistoryService', () => ({ buildAcademicHistory: jest.fn() }));
-jest.mock('../services/notificationService', () => ({ notifyRole: jest.fn().mockResolvedValue([]) }));
+jest.mock('../services/notificationEventService', () => ({ publishNotificationEvent: jest.fn().mockResolvedValue({}) }));
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -27,7 +27,7 @@ const Student = require('../models/Student');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const { buildMandatoryCandidates } = require('../services/mandatoryCourseService');
 const { buildAcademicHistory } = require('../services/academicHistoryService');
-const { notifyRole } = require('../services/notificationService');
+const { publishNotificationEvent } = require('../services/notificationEventService');
 const mandatoryRemovalRoutes = require('../routes/mandatoryRemovalRoutes');
 const {
   FIRST_MAKEUP,
@@ -228,7 +228,12 @@ describe('mandatory-course removal request routes', () => {
       })
     );
     expect(response.body.request).toMatchObject({ status: 'Pending', course: { code: 'CSEN 301' } });
-    expect(notifyRole).toHaveBeenCalledWith('Coordinator', expect.objectContaining({ type: 'approval' }));
+    expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'mandatory_removal.action_required',
+      occurrence: 'submitted',
+      studentId: target._id,
+      link: `/academic-history/${target._id}`,
+    }));
   });
 
   it('answers 400 with the rule that failed and creates nothing', async () => {

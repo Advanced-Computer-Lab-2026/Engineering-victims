@@ -2,13 +2,13 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertTriangle,
-  ArrowRight,
   BellRing,
   CalendarDays,
   CheckCheck,
   CheckCircle2,
   ClipboardCheck,
   CreditCard,
+  ExternalLink,
   Info,
   Loader2,
   RotateCcw,
@@ -26,20 +26,11 @@ import {
   markAllNotificationsRead,
   markNotificationRead,
 } from '../lib/notificationsService';
+import { notificationDestination } from '../lib/notificationLinks';
 import { formatRelative } from '../lib/studentsService';
 import type { NotificationSummary, NotificationType } from '../lib/types';
 
 type NotificationFilter = 'all' | 'unread' | 'read';
-
-/**
- * The page a notification opens, or null when it has none worth offering.
- * Only in-app paths are followed, and a link back to this page is not an action.
- */
-const openableLink = (link: string | null): string | null => {
-  if (!link || !link.startsWith('/') || link.startsWith('//')) return null;
-  if (link === '/notifications') return null;
-  return link;
-};
 
 /** Icon and colour per notification type, so the list scans at a glance. */
 const TYPE_META: Record<NotificationType, { icon: typeof Info; wrap: string }> = {
@@ -140,22 +131,22 @@ const NotificationsPage: React.FC = () => {
   };
 
   /**
-   * FR 5.0 "open": go to the page the notification is about, marking it read
-   * on the way. A failed mark never blocks the navigation.
+   * Req 117/120 — open the page a notification is about. Opening counts as
+   * reading it; if that update fails the reader still gets to the page.
    */
-  const handleOpen = async (notification: NotificationSummary, link: string) => {
+  const handleOpen = async (notification: NotificationSummary, destination: string) => {
     if (!notification.isRead) {
       setBusyId(notification.id);
       try {
         await markNotificationRead(notification.id);
         broadcastNotificationsChanged();
       } catch {
-        // The row simply stays unread; the destination is what was asked for.
+        // Navigation matters more than the read flag; the next load shows it unread.
       } finally {
         setBusyId(null);
       }
     }
-    navigate(link);
+    navigate(destination);
   };
 
   /** FR 5.0 — mark every unread notification as read in one action. */
@@ -284,7 +275,7 @@ const NotificationsPage: React.FC = () => {
               {filteredNotifications.map((notification) => {
                 const meta = TYPE_META[notification.type] ?? TYPE_META.info;
                 const Icon = meta.icon;
-                const link = openableLink(notification.link);
+                const destination = notificationDestination(notification.link);
 
                 return (
                   <li
@@ -326,13 +317,13 @@ const NotificationsPage: React.FC = () => {
                     </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-2 self-center">
-                      {link && (
+                      {destination && (
                         <CustomButton
-                          variant="ghost"
+                          variant="secondary"
                           size="sm"
-                          onClick={() => handleOpen(notification, link)}
+                          icon={<ExternalLink className="h-4 w-4" aria-hidden />}
+                          onClick={() => void handleOpen(notification, destination)}
                           disabled={busyId !== null}
-                          icon={<ArrowRight className="h-4 w-4" aria-hidden />}
                           aria-label={`Open: ${notification.title}`}
                         >
                           Open

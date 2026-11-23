@@ -15,6 +15,8 @@ interface ConfirmDialogProps {
   /** Passed straight through to the confirm button, so the dialog shows the
    *  spinner while the action it confirmed is still running. */
   isLoading?: boolean;
+  /** Keeps the confirm button disabled, e.g. until a required field is valid. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -48,6 +50,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   cancelLabel = 'Cancel',
   tone = 'danger',
   isLoading = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }) => {
@@ -98,7 +101,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           <CustomButton variant="secondary" disabled={isLoading} onClick={onCancel} autoFocus>
             {cancelLabel}
           </CustomButton>
-          <CustomButton variant={styles.button} isLoading={isLoading} onClick={onConfirm}>
+          <CustomButton variant={styles.button} isLoading={isLoading} disabled={confirmDisabled} onClick={onConfirm}>
             {confirmLabel}
           </CustomButton>
         </div>

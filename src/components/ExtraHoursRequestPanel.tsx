@@ -17,7 +17,8 @@ interface Context {
   graduationVerified: boolean;
   selectedHours: number;
   courses: { id: string; code: string; name: string; creditHours: number; alreadySelected: boolean }[];
-  requests: { id: string; reference: string; requestedHours: number; totalCost: number; decision: string }[];
+  requests: { id: string; reference: string; requestedHours: number; totalCost: number; decision: string;
+    settlementStatus?: string; reversed?: boolean; cancellationRequestedAt?: string | null }[];
 }
 interface Quote {
   eligible: boolean;
@@ -45,6 +46,9 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [withdrawal, setWithdrawal] = useState<Context['requests'][number] | null>(null);
+  // Reqs 96, 102, 120: ask a Coordinator to refund or cancel an approved, settled request.
+  const [cancellation, setCancellation] = useState<Context['requests'][number] | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
   // Req 95: status and decision history of one of this Advisor's requests.
   const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [history, setHistory] = useState<RequestHistory | null>(null);
@@ -100,6 +104,18 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
     } catch (err) { setError(errorText(err)); setWithdrawal(null); }
     finally { setBusy(false); }
   };
+  const canRequestCancellation = (request: Context['requests'][number]) => request.decision === 'Approved' && !request.reversed
+    && !request.cancellationRequestedAt && ['Paid', 'Deferred to Next Installment'].includes(request.settlementStatus ?? '');
+  const requestCancellation = async () => {
+    if (!cancellation || busy || cancelReason.trim().length < 5) return;
+    setBusy(true); setError(null); setSuccess(null);
+    try {
+      const result = await apiFetch<{ request: { id: string; cancellationRequestedAt: string }; message: string }>(`/api/extra-hours/${cancellation.id}/request-cancellation`, { method: 'POST', body: JSON.stringify({ reason: cancelReason.trim() }) });
+      setContext((current) => current && ({ ...current, requests: current.requests.map((request) => request.id === result.request.id ? { ...request, cancellationRequestedAt: result.request.cancellationRequestedAt } : request) }));
+      setSuccess(result.message);
+    } catch (err) { setError(errorText(err)); }
+    finally { setBusy(false); setCancellation(null); setCancelReason(''); }
+  };
   return (
     <Card className="p-4">
       <h3 className="mb-2 text-body-lg font-semibold text-on-surface">Extra-hours request</h3>
@@ -140,9 +156,11 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
             </div>}
           </>}
           {context.requests.length > 0 && <section className="space-y-2"><h4 className="text-body font-semibold text-on-surface">Your recent requests for this term</h4>{context.requests.map((request) => <div key={request.id} className="space-y-2 rounded-lg border border-outline-variant p-3">
-            <p className="break-all text-caption text-on-surface-variant">{request.reference} · {request.requestedHours} hours · EGP {request.totalCost} · {request.decision}</p>
+            <p className="break-all text-caption text-on-surface-variant">{request.reference} · {request.requestedHours} hours · EGP {request.totalCost} · {request.decision}{request.settlementStatus && request.settlementStatus !== 'Not Applicable' ? ` · ${request.settlementStatus}` : ''}</p>
+            {request.cancellationRequestedAt && !request.reversed && <p className="text-caption text-on-surface-variant">Cancellation requested {new Date(request.cancellationRequestedAt).toLocaleString()}. Waiting for a Coordinator to refund or cancel the charge.</p>}
             <div className="flex flex-wrap gap-2">
               {request.decision === 'Pending' && <CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => setWithdrawal(request)} aria-label={`Withdraw request ${request.reference}`}>Withdraw request</CustomButton>}
+              {canRequestCancellation(request) && <CustomButton size="sm" variant="secondary" disabled={busy} onClick={() => { setCancelReason(''); setCancellation(request); }} aria-label={`Request cancellation of ${request.reference}`}>Request cancellation</CustomButton>}
               <CustomButton size="sm" variant="ghost" aria-expanded={historyFor === request.id} aria-label={`${historyFor === request.id ? 'Hide' : 'View'} history of ${request.reference}`} onClick={() => void toggleHistory(request.id)}>{historyFor === request.id ? 'Hide history' : 'View history'}</CustomButton>
             </div>
             {historyFor === request.id && (history ? <ExtraHoursHistoryTimeline events={history.events} decision={history.decision} settlementStatus={history.settlementStatus} responseNote={history.responseNote} />
@@ -152,6 +170,20 @@ const ExtraHoursRequestPanel: React.FC<{ studentId: string }> = ({ studentId }) 
       </div>}
       <ConfirmDialog open={Boolean(withdrawal)} title="Withdraw extra-hours request?" message={`Withdraw ${withdrawal?.reference ?? 'this request'} before Coordinator approval? You can submit a new request later, subject to eligibility and the advising deadline.`}
         confirmLabel="Withdraw request" cancelLabel="Keep request" isLoading={busy} onConfirm={() => void withdraw()} onCancel={() => setWithdrawal(null)} />
+      <ConfirmDialog open={Boolean(cancellation)} tone="warning" title="Request cancellation?"
+        message={<div className="space-y-3">
+          <p>{`Ask a Coordinator to cancel ${cancellation?.reference ?? 'this request'}. ${cancellation?.settlementStatus === 'Paid' ? 'The payment will be refunded to the student\'s wallet' : 'The deferred charge will be removed from the next installment'} and the extra hours revoked. Nothing changes until the Coordinator acts.`}</p>
+          <label className="block text-body text-on-surface">Reason (5 to 1000 characters)
+            <textarea value={cancelReason} maxLength={1000} rows={3} onChange={(event) => setCancelReason(event.target.value)}
+              aria-describedby="cancellation-reason-hint"
+              className="mt-1 w-full rounded border border-outline-variant bg-surface-container-lowest px-2 py-1 text-on-surface focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary" />
+          </label>
+          <p id="cancellation-reason-hint" className="text-caption text-on-surface-variant">
+            {cancelReason.trim().length < 5 ? `Use at least 5 characters (${cancelReason.trim().length}/5).` : `${cancelReason.trim().length}/1000 characters.`}
+          </p>
+        </div>}
+        confirmLabel="Send to Coordinator" cancelLabel="Keep request" isLoading={busy} confirmDisabled={cancelReason.trim().length < 5}
+        onConfirm={() => void requestCancellation()} onCancel={() => { setCancellation(null); setCancelReason(''); }} />
     </Card>
   );
 };
