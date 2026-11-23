@@ -1,4 +1,5 @@
 const { slotsOverlap } = require('./conflictService');
+const { projectCourseIssues, projectHours } = require('./bachelorProjectRules');
 
 const COMPONENTS = [
   { slotType: 'Lecture', hoursField: 'lectureHours', minimum: 1 },
@@ -26,6 +27,7 @@ const validateAdvisingDraft = ({
   slotOccupancy = new Map(),
   allowedHours = 0,
   approvedExtraHours = 0,
+  bachelorProject = null,
 }) => {
   const issues = [];
   const selectedIds = new Set(courses.map((entry) => idOf(entry.course)));
@@ -53,7 +55,21 @@ const validateAdvisingDraft = ({
 
   const selectedHours = courses.reduce((total, entry) => total + (Number(entry.course?.creditHours) || 0), 0);
   const maximumHours = Number(allowedHours) + Number(approvedExtraHours);
-  if (selectedHours > maximumHours) {
+  if (bachelorProject) {
+    // Req 60: with the project the cap on courses applies, and humanities are
+    // extra hours that must be covered by an approved extra-hours request.
+    const courseDocs = courses.map((entry) => entry.course).filter(Boolean);
+    projectCourseIssues(courseDocs).forEach((message) => {
+      issues.push({ code: 'bachelor-project-courses', message });
+    });
+    const { humanitiesHours, extraHours } = projectHours({ courses: courseDocs, allowedHours: Number(allowedHours) });
+    if (extraHours > Number(approvedExtraHours)) {
+      issues.push({
+        code: 'bachelor-project-extra-hours',
+        message: `With the bachelor project, ${humanitiesHours} humanities hours count as extra hours. The draft needs ${extraHours} approved extra hours; ${Number(approvedExtraHours)} are approved.`,
+      });
+    }
+  } else if (selectedHours > maximumHours) {
     issues.push({
       code: 'credit-hour-limit',
       message: `The draft has ${selectedHours} credit hours; the allowed total is ${maximumHours}.`,

@@ -14,6 +14,7 @@ jest.mock('../services/advisingScheduleDraftService', () => ({
   eligibleNonMandatoryCourses: jest.fn(),
   progressionSemesterFor: jest.fn(({ student }) => student.currentSemester),
 }));
+jest.mock('../services/bachelorProjectService', () => ({ loadBachelorEligibility: jest.fn() }));
 jest.mock('../services/academicHistoryService', () => ({ buildAcademicHistory: jest.fn() }));
 jest.mock('../services/advisingOverviewService', () => ({ deriveAllowance: jest.fn() }));
 jest.mock('../services/advisingScheduleWorkflowService', () => ({
@@ -33,6 +34,7 @@ const AcademicTerm = require('../models/AcademicTerm');
 const AdvisingScheduleDraft = require('../models/AdvisingScheduleDraft');
 const { advisingTerm } = require('../services/schedulingPreferenceService');
 const { buildAcademicHistory } = require('../services/academicHistoryService');
+const { loadBachelorEligibility } = require('../services/bachelorProjectService');
 const { deriveAllowance } = require('../services/advisingOverviewService');
 const { buildMandatoryCandidates } = require('../services/mandatoryCourseService');
 const { eligibleNonMandatoryCourses } = require('../services/advisingScheduleDraftService');
@@ -78,6 +80,7 @@ beforeEach(() => {
     }),
   });
   buildAcademicHistory.mockResolvedValue({ summary: { gpa: null } });
+  loadBachelorEligibility.mockResolvedValue({ eligible: false, explanation: 'Not eligible: test default.' });
   deriveAllowance.mockReturnValue({
     allowedHours: 30,
     standardHours: 30,

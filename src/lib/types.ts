@@ -605,6 +605,9 @@ export interface AdvisingScheduleValidationResponse {
   slotAssignments: AdvisingScheduleSlotAssignments[];
 }
 
+/** Req 60 — the season the bachelor project will be taken in. */
+export type BachelorProjectSeason = 'Winter' | 'Spring';
+
 export interface AdvisingScheduleDraftResponse {
   student: {
     id: string;
@@ -619,11 +622,19 @@ export interface AdvisingScheduleDraftResponse {
   draft: {
     id: string;
     termId: string;
+    bachelorProject: { season: BachelorProjectSeason } | null;
     courses: AdvisingScheduleDraftCourse[];
     createdAt: string;
     updatedAt: string;
   } | null;
   canEdit: boolean;
+  /** Req 60 — eligibility is req 59's rule; `selection` is what is saved on the draft. */
+  bachelorProject: {
+    eligible: boolean;
+    explanation: string;
+    selection: { season: BachelorProjectSeason } | null;
+    limits: { maxCourses: number; maxCore: number; maxHumanities: number };
+  };
   eligibleCourses: AdvisingScheduleCourseOption[];
   creditHours: {
     selected: number;

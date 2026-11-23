@@ -7,6 +7,7 @@ import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import EmptyState from '../components/ui/EmptyState';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import BachelorProjectPanel from '../components/BachelorProjectPanel';
 import PageHeader from '../components/PageHeader';
 import Select from '../components/ui/Select';
 import StudentPreferencesPanel from '../components/StudentPreferencesPanel';
@@ -164,6 +165,25 @@ const AdvisingScheduleDraftPage: React.FC = () => {
     }
   };
 
+  /**
+   * Req 60: the bachelor project is saved straight away (it is a single choice,
+   * not a staged list), so take the refreshed draft as given. Calling load()
+   * here would throw away any courses still staged for "Save as draft".
+   */
+  const applyBachelorProjectChange = async (response: AdvisingScheduleDraftResponse) => {
+    setData(response);
+    setNotice(
+      response.bachelorProject.selection
+        ? `Bachelor project saved for ${response.bachelorProject.selection.season}.`
+        : 'Bachelor project removed from the draft.'
+    );
+    if (studentId && response.term.id) {
+      const check = await fetchAdvisingScheduleValidation(studentId, response.term.id);
+      setValidation(check.validation);
+      setSlotAssignments(check.slotAssignments);
+    }
+  };
+
   const stageAdd = () => {
     if (!selectedCourseId) return;
     setStagedAdds((current) =>
@@ -215,12 +235,16 @@ const AdvisingScheduleDraftPage: React.FC = () => {
       0
     );
   const selectedHours = hours ? hours.selected + stagedHours : 0;
+  // With the bachelor project the API counts humanities hours as extra, which
+  // the browser cannot work out for a course that is only staged. So the saved
+  // extra and remaining figures are shown as they are until the draft is saved.
+  const hasProject = Boolean(data?.bachelorProject.selection);
   const displayHours = hours
     ? {
         ...hours,
         selected: selectedHours,
-        extra: Math.max(0, selectedHours - hours.allowed),
-        remaining: Math.max(0, hours.allowed - selectedHours),
+        extra: hasProject ? hours.extra : Math.max(0, selectedHours - hours.allowed),
+        remaining: hasProject ? hours.remaining : Math.max(0, hours.allowed - selectedHours),
       }
     : undefined;
 
@@ -328,6 +352,14 @@ const AdvisingScheduleDraftPage: React.FC = () => {
                     </AlertBanner>
                   </div>
                 )}
+
+                <BachelorProjectPanel
+                  studentId={data.student.id}
+                  termId={selectedTermId}
+                  project={data.bachelorProject}
+                  canEdit={data.canEdit}
+                  onChange={applyBachelorProjectChange}
+                />
 
                 <div className="mt-5">
                   <h3 className="mb-3 text-caption font-semibold uppercase tracking-eyebrow text-on-surface-variant">

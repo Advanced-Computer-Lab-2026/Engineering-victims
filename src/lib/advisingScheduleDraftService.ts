@@ -1,5 +1,9 @@
 import { apiFetch } from './api';
-import type { AdvisingScheduleDraftResponse, AdvisingScheduleValidationResponse } from './types';
+import type {
+  AdvisingScheduleDraftResponse,
+  AdvisingScheduleValidationResponse,
+  BachelorProjectSeason,
+} from './types';
 
 const endpoint = (studentId: string) => `/api/advising-schedules/students/${encodeURIComponent(studentId)}`;
 const withTerm = (path: string, termId?: string) =>
@@ -20,7 +24,27 @@ export const createAdvisingScheduleDraft = (
     body: JSON.stringify({ termId }),
   });
 
-export const addAdvisingScheduleCourse = (studentId: string, courseId: string, termId?: string) =>
+/** Req 60 — add the bachelor project to the draft, or change its season. */
+export const setAdvisingScheduleBachelorProject = (
+  studentId: string,
+  season: BachelorProjectSeason,
+  termId?: string
+): Promise<AdvisingScheduleDraftResponse> =>
+  apiFetch<AdvisingScheduleDraftResponse>(`${endpoint(studentId)}/bachelor-project`, {
+    method: 'PUT',
+    body: JSON.stringify({ season, termId }),
+  });
+
+/** Req 60 — take the bachelor project off the draft. */
+export const removeAdvisingScheduleBachelorProject = (
+  studentId: string,
+  termId?: string
+): Promise<AdvisingScheduleDraftResponse> =>
+  apiFetch<AdvisingScheduleDraftResponse>(withTerm(`${endpoint(studentId)}/bachelor-project`, termId), {
+    method: 'DELETE',
+  });
+
+export const addAdvisingScheduleCourse =(studentId: string, courseId: string, termId?: string) =>
   apiFetch<{ draft: AdvisingScheduleDraftResponse['draft'] }>(
     withTerm(`${endpoint(studentId)}/courses`, termId),
     {
