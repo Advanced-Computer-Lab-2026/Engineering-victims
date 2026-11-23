@@ -1,5 +1,6 @@
 const Course = require('../models/Course');
 const CourseRecord = require('../models/CourseRecord');
+const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const { requiredCourseFilter, FAIL } = require('./academicHistoryService');
 
 const FAILED = 'Failed';
@@ -23,13 +24,17 @@ const UNATTENDED = 'Unattended';
  */
 
 /**
- * The course ids with an approved mandatory-course removal for this student.
- *
- * Mandatory-removal requests (req 64-69) do not exist yet, so nothing can have
- * been approved and the set is always empty. When they land, only this
- * function has to read them; the candidates and the API shape stay as they are.
+ * The course ids with an approved mandatory-course removal for this student
+ * (req 69). A Rejected or Pending request leaves the course mandatory, so only
+ * Approved ones count.
  */
-const approvedRemovalsFor = async () => new Set();
+const approvedRemovalsFor = async (student) => {
+  const courseIds = await MandatoryRemovalRequest.distinct('course', {
+    student: student._id,
+    status: 'Approved',
+  });
+  return new Set(courseIds.map(String));
+};
 
 const courseSummary = (course) => ({
   id: course._id,

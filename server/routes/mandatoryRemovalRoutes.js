@@ -19,4 +19,11 @@ router.get(
   mandatoryRemovalController.listForStudent
 );
 
+// Req 68: open one request from the list. Declared after '/student/:studentId'
+// so "student" is not read as an id.
+router.get('/:id', authenticate, requireRole('Coordinator'), mandatoryRemovalController.getOne);
+
+// Req 69: approve or reject a request with a response note.
+router.post('/:id/decision', authenticate, requireRole('Coordinator'), mandatoryRemovalController.decide);
+
 module.exports = router;

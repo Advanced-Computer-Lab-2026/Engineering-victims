@@ -15,6 +15,7 @@ jest.mock('../models/MandatoryRemovalRequest', () => ({
   findOne: jest.fn(),
   findById: jest.fn(),
   find: jest.fn(),
+  distinct: jest.fn(),
   create: jest.fn(),
 }));
 jest.mock('../services/mandatoryCourseService', () => ({ buildMandatoryCandidates: jest.fn() }));
@@ -73,6 +74,7 @@ const list = (search, role = 'Coordinator') => {
 
 beforeEach(() => {
   jest.resetAllMocks();
+  MandatoryRemovalRequest.distinct.mockResolvedValue([]);
   Student.find.mockReturnValue(idQuery([]));
   Course.find.mockReturnValue(idQuery([]));
   User.find.mockReturnValue(idQuery([]));
@@ -100,6 +102,9 @@ describe('GET /api/mandatory-removal-requests (req 65)', () => {
       reason: 'The first makeup has not been sat yet.',
     });
     expect(res.body.requests[1]).toMatchObject({ status: 'Rejected', responseNote: 'Not a valid case.' });
+    // Nothing is filtered, and no Advisor has asked yet, so there are no Advisor choices.
+    expect(res.body.filters).toEqual({ status: '', advisor: '', submittedFrom: '', submittedTo: '' });
+    expect(res.body.advisors).toEqual([]);
     // Without a search nothing narrows the list, so the other models are not queried.
     expect(Student.find).not.toHaveBeenCalled();
     expect(Course.find).not.toHaveBeenCalled();

@@ -5,7 +5,10 @@ const User = require('../models/User');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const { buildMandatoryCandidates } = require('../services/mandatoryCourseService');
 const { buildAcademicHistory } = require('../services/academicHistoryService');
-const { CATEGORY_OPTIONS, validateRemovalRequest } = require('../services/mandatoryRemovalService');
+const { CATEGORY_OPTIONS, applyDecision, validateRemovalRequest } = require('../services/mandatoryRemovalService');
+const { parseListQuery, buildListFilter, advisorFilterOptions } = require('../services/mandatoryRemovalListService');
+const { runInTransaction, removeCourseFromUnprocessedSchedule } = require('../services/advisingScheduleWorkflowService');
+const { supportsTransactions, isTransactionUnsupportedError } = require('../services/transactionSupport');
 const { notifyRole } = require('../services/notificationService');
 
 const courseSummary = (course) =>
@@ -167,51 +170,165 @@ exports.listForStudent = async (req, res) => {
   }
 };
 
-const SEARCH_LIMIT = 80;
-
-/** The text as a literal, so "." or "(" typed into the search box is not read as a pattern. */
-const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /**
  * Req 65: a Coordinator views the list of mandatory-course removal requests,
  * newest first, whoever asked and whatever the student.
  *
- * Req 66: `?search=` narrows the list to requests whose student ID or course
- * code, or whose Advisor's name or GUC email, contains the text (any case).
- * The text is matched against those four fields only.
+ * Req 66: `?search=` narrows it to requests whose student ID or course code, or
+ * whose Advisor's name or GUC email, contains the text (any case).
+ *
+ * Req 67: `?advisor=` (the Advisor who asked), `?status=` and
+ * `?submittedFrom=` / `?submittedTo=` narrow it further. The search and every
+ * filter combine with AND. The response also carries the Advisors the filter
+ * offers, taken from all requests so choosing one does not shrink the choices.
  */
 exports.listAll = async (req, res) => {
   try {
-    const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
-    if (search.length > SEARCH_LIMIT) {
-      return res.status(400).json({ message: `Search text can be at most ${SEARCH_LIMIT} characters.` });
-    }
+    const parsed = parseListQuery(req.query);
+    if (parsed.error) return res.status(400).json({ message: parsed.error });
+    const { values } = parsed;
 
-    let filter = {};
-    if (search) {
-      const pattern = new RegExp(escapeRegex(search), 'i');
-      const [students, courses, advisors] = await Promise.all([
-        Student.find({ studentId: pattern }).select('_id').lean(),
-        Course.find({ code: pattern }).select('_id').lean(),
-        User.find({ role: 'Advisor', $or: [{ fullName: pattern }, { email: pattern }] }).select('_id').lean(),
-      ]);
-      const ids = (rows) => rows.map((row) => row._id);
-      filter = {
-        $or: [
-          { student: { $in: ids(students) } },
-          { course: { $in: ids(courses) } },
-          { advisor: { $in: ids(advisors) } },
-        ],
-      };
-    }
+    const filter = await buildListFilter(values);
+    const [requests, advisors] = await Promise.all([
+      requestPopulations(MandatoryRemovalRequest.find(filter).sort({ createdAt: -1 })).lean(),
+      advisorFilterOptions(),
+    ]);
 
-    const requests = await requestPopulations(
-      MandatoryRemovalRequest.find(filter).sort({ createdAt: -1 })
-    ).lean();
-
-    res.status(200).json({ requests: requests.map(requestSummary), search });
+    res.status(200).json({
+      requests: requests.map(requestSummary),
+      search: values.search,
+      filters: {
+        status: values.status,
+        advisor: values.advisor,
+        submittedFrom: values.submittedFrom,
+        submittedTo: values.submittedTo,
+      },
+      advisors,
+    });
   } catch (error) {
     res.status(500).json({ message: 'Could not load the removal requests', error: error.message });
+  }
+};
+
+/**
+ * Req 68: one request, opened from the list (plain, searched or filtered). The
+ * body is exactly a list row, read fresh from the database.
+ */
+exports.getOne = async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) {
+      return res.status(400).json({ message: 'That removal request id is not valid.' });
+    }
+    const request = await requestPopulations(MandatoryRemovalRequest.findById(req.params.id)).lean();
+    if (!request) return res.status(404).json({ message: 'Removal request not found.' });
+
+    res.status(200).json({ request: requestSummary(request) });
+  } catch (error) {
+    res.status(500).json({ message: 'Could not load the removal request', error: error.message });
+  }
+};
+
+const TRANSACTIONS_UNAVAILABLE =
+  'Approving a removal needs a database that supports transactions (a replica set), and this one does not. Nothing was changed.';
+const TRANSACTIONS_UNCHECKED =
+  'Could not reach the database to start the approval. Nothing was changed. Please try again shortly.';
+
+/** A refusal that carries the status to answer with. */
+class DecisionRefusal extends Error {
+  constructor(status, message) {
+    super(message);
+    this.status = status;
+  }
+}
+
+/** The request as the screens show it, re-read after a decision (null if that read fails). */
+const decidedRequest = async (id) => {
+  try {
+    const request = await requestPopulations(MandatoryRemovalRequest.findById(id)).lean();
+    return request ? requestSummary(request) : null;
+  } catch {
+    return null;
+  }
+};
+
+const decisionFields = (request) => ({
+  status: request.status,
+  responseNote: request.responseNote,
+  decidedBy: request.decidedBy,
+  decidedAt: request.decidedAt,
+});
+
+/**
+ * Req 69: a Coordinator approves or rejects a Pending request and provides a
+ * response note.
+ *
+ * Rejection changes only the request, so it is one guarded update (a request
+ * decided meanwhile is refused, not overwritten). Approval also takes the
+ * course off the mandatory list and out of any unprocessed schedule, which is
+ * several records, so it runs in one transaction. Like req 48's decisions, it is
+ * refused up front on a database without transactions and is never done partly.
+ */
+exports.decide = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return res.status(404).json({ message: 'Removal request not found.' });
+
+    const request = await MandatoryRemovalRequest.findById(id);
+    if (!request) return res.status(404).json({ message: 'Removal request not found.' });
+
+    const wasPending = request.status === 'Pending';
+    const error = applyDecision({
+      request,
+      decision: req.body?.decision,
+      note: req.body?.note,
+      coordinatorId: req.user.userId,
+    });
+    if (error) return res.status(wasPending ? 400 : 409).json({ message: error });
+
+    const approve = request.status === 'Approved';
+    if (approve) {
+      let supported;
+      try {
+        supported = await supportsTransactions();
+      } catch (checkError) {
+        console.error('[mandatory-removal] Could not check transaction support:', checkError);
+        return res.status(503).json({ message: TRANSACTIONS_UNCHECKED });
+      }
+      if (!supported) return res.status(503).json({ message: TRANSACTIONS_UNAVAILABLE });
+    }
+
+    const alreadyDecided = new DecisionRefusal(409, 'This removal request has already been decided.');
+    if (approve) {
+      await runInTransaction(async (session) => {
+        const saved = await MandatoryRemovalRequest.findOneAndUpdate(
+          { _id: request._id, status: 'Pending' },
+          { $set: decisionFields(request) },
+          { new: true, session }
+        );
+        if (!saved) throw alreadyDecided;
+        await removeCourseFromUnprocessedSchedule({ studentId: saved.student, courseId: saved.course, session });
+      });
+    } else {
+      const saved = await MandatoryRemovalRequest.findOneAndUpdate(
+        { _id: request._id, status: 'Pending' },
+        { $set: decisionFields(request) },
+        { new: true }
+      );
+      if (!saved) throw alreadyDecided;
+    }
+
+    res.status(200).json({
+      message: approve
+        ? 'Removal approved. The course is no longer mandatory for this student.'
+        : 'Removal rejected. The course stays mandatory for this student.',
+      request: await decidedRequest(request._id),
+    });
+  } catch (error) {
+    // DecisionRefusal here, or a refusal raised by the schedule workflow (e.g. the student is gone).
+    if (Number.isInteger(error?.status)) return res.status(error.status).json({ message: error.message });
+    if (isTransactionUnsupportedError(error)) return res.status(503).json({ message: TRANSACTIONS_UNAVAILABLE });
+    console.error('[mandatory-removal] Decision failed:', error);
+    res.status(500).json({ message: 'Could not save the decision. Nothing was changed.' });
   }
 };
 

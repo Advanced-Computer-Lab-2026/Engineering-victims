@@ -95,8 +95,42 @@ const validateRemovalRequest = ({ candidates, completedHours, courseId, category
   return null;
 };
 
+/**
+ * Req 69: a Coordinator approves or rejects a removal request and provides a
+ * response note. Same shape as the exit-exam decision (req 109), which the
+ * sheet words the same way: only a Pending request can be decided, and the
+ * note is required (req 48's "optional response note" is worded differently).
+ *
+ * On success it sets the decision on `request` (not saved here) and returns
+ * null; otherwise it returns the message to answer with and changes nothing.
+ * Approving also takes the course off the mandatory list and out of any
+ * unprocessed schedule; that is the caller's job, because it touches other
+ * records.
+ */
+const applyDecision = ({ request, decision, note, coordinatorId, now = new Date() }) => {
+  if (decision !== 'approve' && decision !== 'reject') {
+    return 'Choose whether to approve or reject the removal request.';
+  }
+  if (request.status !== 'Pending') {
+    return 'Only a pending removal request can be decided.';
+  }
+
+  const responseNote = typeof note === 'string' ? note.trim() : '';
+  if (!responseNote) return 'Add a response note for the Advisor.';
+  if (responseNote.length > NOTE_LIMIT) {
+    return `Keep the response note under ${NOTE_LIMIT} characters.`;
+  }
+
+  request.status = decision === 'approve' ? 'Approved' : 'Rejected';
+  request.responseNote = responseNote;
+  request.decidedBy = coordinatorId;
+  request.decidedAt = now;
+  return null;
+};
+
 module.exports = {
   NOTE_LIMIT,
+  applyDecision,
   DEFERRAL_HOURS,
   FIRST_MAKEUP,
   SECOND_MAKEUP,

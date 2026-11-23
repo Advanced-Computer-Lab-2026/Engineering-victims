@@ -1,48 +1,55 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ClipboardX, Loader2, Search } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ClipboardX, ListFilter, Loader2, Search, X } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
+import MandatoryRemovalDetailDrawer from '../components/MandatoryRemovalDetailDrawer';
 import AlertBanner from '../components/ui/AlertBanner';
 import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import CustomButton from '../components/ui/CustomButton';
 import CustomInput from '../components/ui/CustomInput';
 import EmptyState from '../components/ui/EmptyState';
+import Select from '../components/ui/Select';
 import { usePageTitle } from '../hooks/usePageTitle';
 import { ApiError } from '../lib/api';
-import { fetchMandatoryRemovalRequests, REMOVAL_SEARCH_LIMIT } from '../lib/mandatoryRemovalService';
+import { REMOVAL_STATUS_TONE, REMOVAL_STATUSES } from '../lib/mandatoryRemovalDisplay';
+import { fetchMandatoryRemovalRequests, NO_REMOVAL_QUERY, REMOVAL_SEARCH_LIMIT } from '../lib/mandatoryRemovalService';
 import { formatDate } from '../lib/studentsService';
-import type { MandatoryRemovalRequestSummary, MandatoryRemovalStatus } from '../lib/types';
+import type { MandatoryRemovalListResponse, MandatoryRemovalQuery, MandatoryRemovalRequestSummary } from '../lib/types';
 
-const STATUS_TONE: Record<MandatoryRemovalStatus, 'amber' | 'emerald' | 'neutral'> = {
-  Pending: 'amber',
-  Approved: 'emerald',
-  Rejected: 'neutral',
-};
+const hasCriteria = (query: MandatoryRemovalQuery) => Object.values(query).some((value) => Boolean(value));
 
 /**
  * Req 65: a Coordinator views the list of mandatory-course removal requests.
  * Req 66: ...and searches it using a student ID, a course code, or an Advisor's
  * name or GUC email.
+ * Req 67: ...and filters it by Advisor, request status and submission date.
+ * Req 68: ...and opens a request from the displayed results to see its details.
+ *
+ * The search runs when Search is pressed; each filter applies as soon as it
+ * changes, like the slot-change list (req 45). Everything combines.
  */
 const MandatoryRemovalRequestsPage: React.FC = () => {
   usePageTitle('Mandatory-course removal requests');
 
   const [requests, setRequests] = useState<MandatoryRemovalRequestSummary[]>([]);
+  const [advisors, setAdvisors] = useState<MandatoryRemovalListResponse['advisors']>([]);
+  const [applied, setApplied] = useState<MandatoryRemovalQuery>(NO_REMOVAL_QUERY);
   const [searchInput, setSearchInput] = useState('');
-  const [appliedSearch, setAppliedSearch] = useState('');
+  const [selected, setSelected] = useState<MandatoryRemovalRequestSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Only the newest search may update the list, so a slow earlier answer cannot overwrite it.
+  // Only the newest load may update the list, so a slow earlier answer cannot overwrite it.
   const latestLoad = useRef(0);
 
-  const load = useCallback(async (search: string) => {
+  const load = useCallback(async (query: MandatoryRemovalQuery, { silent = false } = {}) => {
     const ticket = ++latestLoad.current;
-    setIsLoading(true);
+    if (!silent) setIsLoading(true);
     setError(null);
     try {
-      const response = await fetchMandatoryRemovalRequests(search);
+      const response = await fetchMandatoryRemovalRequests(query);
       if (ticket !== latestLoad.current) return;
       setRequests(response.requests);
+      setAdvisors(response.advisors);
     } catch (err) {
       if (ticket !== latestLoad.current) return;
       setRequests([]);
@@ -53,23 +60,34 @@ const MandatoryRemovalRequestsPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    void load('');
-  }, [load]);
+    void load(applied);
+  }, [applied, load]);
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    const term = searchInput.trim();
-    setAppliedSearch(term);
-    void load(term);
+    setApplied((current) => ({ ...current, search: searchInput.trim() }));
   };
 
-  const clearSearch = () => {
+  const setFilter = (key: Exclude<keyof MandatoryRemovalQuery, 'search'>) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      setApplied((current) => ({ ...current, [key]: event.target.value }));
+
+  const clearAll = () => {
     setSearchInput('');
-    setAppliedSearch('');
-    void load('');
+    setApplied(NO_REMOVAL_QUERY);
   };
 
-  const hasSearch = Boolean(appliedSearch);
+  const criteria = hasCriteria(applied) || Boolean(searchInput.trim());
+  const filtered = hasCriteria(applied);
+
+  const statusOptions = REMOVAL_STATUSES.map((status) => ({ value: status, label: status }));
+  const advisorOptions = useMemo(
+    () => advisors.map((advisor) => ({ value: advisor.id, label: `${advisor.fullName} (${advisor.email})` })),
+    [advisors]
+  );
+
+  // Req 69: after a decision, refresh the list behind the drawer with the same search and filters.
+  const refreshQuietly = useCallback(() => void load(applied, { silent: true }), [applied, load]);
 
   return (
     <>
@@ -80,43 +98,88 @@ const MandatoryRemovalRequestsPage: React.FC = () => {
           !isLoading && !error ? (
             <Badge tone="neutral">
               {requests.length} {requests.length === 1 ? 'request' : 'requests'}
-              {hasSearch ? ' found' : ''}
+              {filtered ? ' found' : ''}
             </Badge>
           ) : undefined
         }
         onOpenNav={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}
       />
 
-      <form role="search" onSubmit={submitSearch} className="mb-2 flex flex-col gap-2 md:flex-row md:items-end">
-        <CustomInput
-          type="search"
-          label="Search requests"
-          icon={<Search className="h-4 w-4" aria-hidden />}
-          placeholder="Student ID, course code, or Advisor name or email"
-          maxLength={REMOVAL_SEARCH_LIMIT}
-          value={searchInput}
-          onChange={(event) => setSearchInput(event.target.value)}
-          className="md:max-w-md"
-        />
-        <CustomButton type="submit" icon={<Search className="h-4 w-4" aria-hidden />} disabled={isLoading}>
-          Search
-        </CustomButton>
-        {(searchInput || hasSearch) && (
-          <CustomButton type="button" variant="secondary" onClick={clearSearch} disabled={isLoading}>
-            Clear search
+      <Card tone="raised" className="mb-5 p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-on-surface-variant">
+            <ListFilter className="h-4 w-4" aria-hidden />
+            <h2 className="text-body font-semibold">Search and filter</h2>
+          </div>
+          {criteria && (
+            <CustomButton variant="secondary" size="sm" onClick={clearAll} icon={<X className="h-4 w-4" aria-hidden />}>
+              Clear all
+            </CustomButton>
+          )}
+        </div>
+
+        <form role="search" onSubmit={submitSearch} className="flex flex-col gap-2 md:flex-row md:items-end">
+          <CustomInput
+            type="search"
+            label="Search requests"
+            icon={<Search className="h-4 w-4" aria-hidden />}
+            placeholder="Student ID, course code, or Advisor name or email"
+            maxLength={REMOVAL_SEARCH_LIMIT}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            className="md:max-w-md"
+          />
+          <CustomButton type="submit" icon={<Search className="h-4 w-4" aria-hidden />} disabled={isLoading}>
+            Search
           </CustomButton>
-        )}
-      </form>
-      <p className="mb-4 text-caption text-on-surface-variant">
-        Matches a student ID, a course code, or an Advisor&apos;s name or GUC email.
-      </p>
+        </form>
+        <p className="mb-4 mt-2 text-caption text-on-surface-variant">
+          Matches a student ID, a course code, or an Advisor&apos;s name or GUC email.
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Select
+            id="removal-status"
+            label="Status"
+            value={applied.status}
+            onChange={setFilter('status')}
+            options={statusOptions}
+            placeholder="All statuses"
+          />
+          <Select
+            id="removal-advisor"
+            label="Advisor"
+            value={applied.advisor}
+            onChange={setFilter('advisor')}
+            options={advisorOptions}
+            placeholder={advisorOptions.length === 0 ? 'No Advisor has asked yet' : 'All Advisors'}
+            disabled={advisorOptions.length === 0 && !applied.advisor}
+          />
+          <CustomInput
+            id="removal-from"
+            type="date"
+            label="Submitted from"
+            value={applied.submittedFrom}
+            max={applied.submittedTo || undefined}
+            onChange={setFilter('submittedFrom')}
+          />
+          <CustomInput
+            id="removal-to"
+            type="date"
+            label="Submitted to"
+            value={applied.submittedTo}
+            min={applied.submittedFrom || undefined}
+            onChange={setFilter('submittedTo')}
+          />
+        </div>
+      </Card>
 
       {error ? (
         <div className="space-y-3">
           <AlertBanner tone="error" title="Could not load the removal requests">
             {error}
           </AlertBanner>
-          <CustomButton variant="secondary" onClick={() => void load(appliedSearch)}>
+          <CustomButton variant="secondary" onClick={() => void load(applied)}>
             Try again
           </CustomButton>
         </div>
@@ -128,13 +191,13 @@ const MandatoryRemovalRequestsPage: React.FC = () => {
       ) : requests.length === 0 ? (
         <EmptyState
           icon={<ClipboardX className="h-5 w-5" aria-hidden />}
-          title={hasSearch ? 'No matching requests' : 'No removal requests yet'}
+          title={filtered ? 'No matching requests' : 'No removal requests yet'}
           description={
-            hasSearch
-              ? `No request matches “${appliedSearch}”. Check the student ID, the course code, or the Advisor's name or email.`
+            filtered
+              ? 'No request matches the current search and filters. Clear them to see every request.'
               : 'Requests appear here after an Advisor asks to remove a mandatory course.'
           }
-          action={hasSearch ? { label: 'Clear search', onClick: clearSearch } : undefined}
+          action={filtered ? { label: 'Clear search and filters', onClick: clearAll } : undefined}
         />
       ) : (
         <Card tone="raised" className="overflow-hidden">
@@ -153,10 +216,34 @@ const MandatoryRemovalRequestsPage: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-outline-variant">
                 {requests.map((request) => (
-                  <tr key={request.id} className="align-top hover:bg-surface-container">
+                  <tr
+                    key={request.id}
+                    onClick={() => setSelected(request)}
+                    className={`cursor-pointer align-top transition-colors hover:bg-surface-container ${
+                      selected?.id === request.id ? 'bg-primary-container' : ''
+                    }`}
+                  >
                     <td className="px-4 py-3">
-                      <p className="text-on-surface">{request.student?.fullName ?? 'Unknown student'}</p>
-                      <p className="font-mono text-caption text-on-surface-variant">{request.student?.studentId ?? '—'}</p>
+                      {/* Req 68: the keyboard-reachable way to open the details; the row click is a mouse shortcut. */}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelected(request);
+                        }}
+                        aria-haspopup="dialog"
+                        aria-label={`Open request details for ${request.student?.fullName ?? 'a removed student'}, ${
+                          request.course?.code ?? 'removed course'
+                        }`}
+                        className="text-left underline-offset-4 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                      >
+                        <span className="block font-medium text-on-surface hover:text-primary">
+                          {request.student?.fullName ?? 'Unknown student'}
+                        </span>
+                        <span className="block font-mono text-caption text-on-surface-variant">
+                          {request.student?.studentId ?? '—'}
+                        </span>
+                      </button>
                     </td>
                     <td className="px-4 py-3">
                       <p className="font-mono text-caption text-on-surface">{request.course?.code ?? '—'}</p>
@@ -168,7 +255,7 @@ const MandatoryRemovalRequestsPage: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-on-surface-variant">{request.category}</td>
                     <td className="px-4 py-3">
-                      <Badge tone={STATUS_TONE[request.status]} dot>
+                      <Badge tone={REMOVAL_STATUS_TONE[request.status]} dot>
                         {request.status}
                       </Badge>
                     </td>
@@ -180,6 +267,13 @@ const MandatoryRemovalRequestsPage: React.FC = () => {
           </div>
         </Card>
       )}
+
+      <MandatoryRemovalDetailDrawer
+        selected={selected}
+        onClose={() => setSelected(null)}
+        onStale={refreshQuietly}
+        onDecided={refreshQuietly}
+      />
     </>
   );
 };

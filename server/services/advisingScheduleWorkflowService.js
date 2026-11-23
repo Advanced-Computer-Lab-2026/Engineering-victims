@@ -425,6 +425,55 @@ const removeCourseFromDraft = async ({ user, studentId, termId, courseId }) =>
     return { draft };
   });
 
+/**
+ * The slot-row statuses of a schedule that is not final yet. Marking a schedule
+ * Ready for Student Review turns its Draft rows Active, and processing turns
+ * both Draft and Active rows Processed, so these two are "unprocessed".
+ */
+const UNPROCESSED_SCHEDULE_STATUSES = ['Draft', 'Active'];
+
+/**
+ * Req 69: an approved removal "removes the course from the mandatory list and
+ * any unprocessed draft schedule". The mandatory list is read from the approved
+ * request itself (mandatoryCourseService), so this only deals with schedules.
+ *
+ * A student whose schedule is Processed is left untouched: that schedule is
+ * final. Otherwise the course comes out of every draft of the student, and its
+ * unprocessed slot rows (Draft, and the Active rows of a schedule already marked
+ * Ready for Student Review) are deleted with the freed seats counted back. Must
+ * run inside a transaction (the caller's), so it is all or nothing.
+ */
+const removeCourseFromUnprocessedSchedule = async ({ studentId, courseId, session }) => {
+  await lockStudent(studentId, session);
+  const student = await withSession(Student.findById(studentId).select('workflowStatus'), session);
+  if (!student) throw fail(404, 'Advising student not found.');
+  if (student.workflowStatus === 'Processed') return { skipped: 'processed', slotRows: 0, drafts: 0 };
+
+  const offerings = await withSession(CourseOffering.find({ courseId }).select('_id'), session);
+  const slots = offerings.length
+    ? await withSession(CourseSlot.find({ offeringId: { $in: offerings.map((offering) => offering._id) } }).select('_id'), session)
+    : [];
+  const slotIds = slots.map((slot) => slot._id);
+
+  let slotRows = 0;
+  if (slotIds.length) {
+    const deleted = await StudentSchedule.deleteMany(
+      { studentId, status: { $in: UNPROCESSED_SCHEDULE_STATUSES }, slotId: { $in: slotIds } },
+      { session }
+    );
+    slotRows = deleted.deletedCount ?? 0;
+    for (const slotId of slotIds) await reconcileSlotCount(slotId, session);
+  }
+
+  const updated = await AdvisingScheduleDraft.updateMany(
+    { student: studentId, 'courses.course': courseId },
+    { $pull: { courses: { course: courseId } } },
+    { session }
+  );
+
+  return { skipped: null, slotRows, drafts: updated.modifiedCount ?? 0 };
+};
+
 const validateForStudent = async ({ user, studentId, termId, session = null, expectedStatus = null }) => {
   const { student, term } = await loadStudentForEdit({ user, studentId, termId, session, expectedStatus });
   return { student, term, ...(await loadDraftValidation({ student, term, session })) };
@@ -561,6 +610,7 @@ module.exports = {
   changeCourseSlot,
   removeCourseSlot,
   removeCourseFromDraft,
+  removeCourseFromUnprocessedSchedule,
   validateForStudent,
   markReadyForReview,
   assertValidForProcessing,

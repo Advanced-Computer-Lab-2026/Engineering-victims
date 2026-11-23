@@ -994,10 +994,30 @@ export interface MandatoryRemovalRequestSummary {
   decidedBy: { id: string; fullName: string } | null;
 }
 
-/** Req 65-66 — every removal request, narrowed by the search text when one was given. */
+/** Req 66-67 — what the removal-request list is narrowed by; '' means not set. */
+export interface MandatoryRemovalQuery {
+  search: string;
+  status: '' | MandatoryRemovalStatus;
+  /** An Advisor id: the Advisor who asked for the removal. */
+  advisor: string;
+  /** Submission dates as YYYY-MM-DD; the end day is included. */
+  submittedFrom: string;
+  submittedTo: string;
+}
+
+/** Req 65-67 — every removal request, narrowed by the search text and filters when given. */
 export interface MandatoryRemovalListResponse {
   requests: MandatoryRemovalRequestSummary[];
   search: string;
+  filters: Omit<MandatoryRemovalQuery, 'search'>;
+  /** The Advisors who have asked for a removal, for the Advisor filter. */
+  advisors: Array<{ id: string; fullName: string; email: string }>;
+}
+
+/** Req 69 — the decided request and what was done. */
+export interface MandatoryRemovalDecisionResponse {
+  message: string;
+  request: MandatoryRemovalRequestSummary | null;
 }
 
 export interface StudentRemovalRequestsResponse {
