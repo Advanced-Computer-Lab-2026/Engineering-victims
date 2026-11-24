@@ -1,5 +1,6 @@
 const Request = require('../models/ExtraHoursRequest');
 const { loadContext, evaluateSelection } = require('./extraHoursSubmissionService');
+const { publishStudentNotification } = require('./studentNotificationService');
 const fail = (message, status = 409) => Object.assign(new Error(message), { status });
 
 async function decideRequest(requestId, coordinatorId, { decision, responseNote }) {
@@ -32,6 +33,22 @@ async function decideRequest(requestId, coordinatorId, { decision, responseNote 
     $inc: { __v: 1 }, $push: { history: { action: decision, actor: coordinatorId, note: responseNote, at: now } },
   }, { new: true, runValidators: true }).lean();
   if (!updated) throw fail('The request changed while you were reviewing it. Refresh and try again.');
+
+  // FR 117: notify the student that their extra-hours request was decided
+  try {
+    await publishStudentNotification('extra_hours.decided', {
+      entityId: updated._id,
+      occurrence: `decided-${now.getTime()}`,
+      decision: updated.decision,
+      studentId: updated.student,
+      reference: updated.reference,
+    });
+  } catch (notificationError) {
+    // Log but don't fail the decision — it's already committed
+    console.error('[extra-hours] Failed to send decision notification:', notificationError);
+  }
+
   return updated;
 }
 module.exports = { decideRequest };
+

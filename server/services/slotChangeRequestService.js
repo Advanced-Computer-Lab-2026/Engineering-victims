@@ -9,6 +9,7 @@ const SlotChangeRequest = require('../models/SlotChangeRequest');
 const { deadlineEnd } = require('./schedulingPreferenceService');
 const { escapeRegex, studentIdVariants } = require('./studentQueryService');
 const { slotsOverlap } = require('./conflictService');
+const { publishStudentNotification } = require('./studentNotificationService');
 
 const { SLOT_TYPES, NOTE_LIMIT, STATUSES } = SlotChangeRequest;
 
@@ -740,6 +741,18 @@ const approveSlotChangeRequest = async ({ user, requestId, replacementSlotId, re
         { session }
       );
 
+      // FR 117: notify the student that their slot-change request was approved
+      await publishStudentNotification(
+        'slot_change.decided',
+        {
+          entityId: request._id,
+          occurrence: `decided-${now.getTime()}`,
+          decision: 'Approved',
+          studentId: student._id,
+        },
+        { session }
+      );
+
       return request._id;
     });
   } catch (error) {
@@ -788,6 +801,19 @@ const rejectSlotChangeRequest = async ({ user, requestId, responseNote }) =>
     if (rejected.modifiedCount !== 1) {
       throw new SlotChangeDecisionError(409, 'This request was decided or withdrawn a moment ago.');
     }
+
+    // FR 117: notify the student that their slot-change request was rejected
+    await publishStudentNotification(
+      'slot_change.decided',
+      {
+        entityId: request._id,
+        occurrence: `decided-${now.getTime()}`,
+        decision: 'Rejected',
+        studentId: student._id,
+      },
+      { session }
+    );
+
     return request._id;
   });
 
