@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const { randomUUID } = require('crypto');
+const pendingStudentNotificationSchema = require('./pendingStudentNotificationSchema');
 const itemSchema = new mongoose.Schema({
   course: { type: mongoose.Schema.Types.ObjectId, ref: 'Course', required: true },
   code: { type: String, required: true }, name: { type: String, required: true },
@@ -65,6 +66,7 @@ const schema = new mongoose.Schema({
     requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     requestedAt: { type: Date, default: null },
   },
+  pendingStudentNotificationEvents: { type: [pendingStudentNotificationSchema], default: [] },
   history: [{ action: String, actor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, note: String, at: { type: Date, default: Date.now } }],
 }, { timestamps: true });
 schema.index({ requestingAdvisor: 1, decision: 1, createdAt: -1 });

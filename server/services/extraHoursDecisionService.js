@@ -1,6 +1,6 @@
 const Request = require('../models/ExtraHoursRequest');
 const { loadContext, evaluateSelection } = require('./extraHoursSubmissionService');
-const { publishStudentNotification } = require('./studentNotificationService');
+const { buildStudentNotification } = require('./studentNotificationService');
 const fail = (message, status = 409) => Object.assign(new Error(message), { status });
 
 async function decideRequest(requestId, coordinatorId, { decision, responseNote }) {
@@ -24,29 +24,24 @@ async function decideRequest(requestId, coordinatorId, { decision, responseNote 
     }
   }
   const now = new Date();
+  const notificationEvent = buildStudentNotification('extra_hours.decided', {
+    entityId: request._id,
+    occurrence: `decided-${now.getTime()}`,
+    decision,
+    reference: request.reference,
+  });
   // Conditional single-document update prevents two reviewers from overwriting
-  // each other. Decisions never modify schedules, student allowances or money.
+  // each other. The notification is queued in this same atomic update.
   const updated = await Request.findOneAndUpdate({ _id: requestId, decision: 'Pending', __v: request.__v,
     settlementStatus: 'Not Applicable', settlementOption: null }, {
     $set: { decision, responseNote, decidedBy: coordinatorId, decidedAt: now,
       settlementStatus: decision === 'Approved' ? 'Awaiting Payment Choice' : 'Not Applicable' },
-    $inc: { __v: 1 }, $push: { history: { action: decision, actor: coordinatorId, note: responseNote, at: now } },
+    $inc: { __v: 1 }, $push: {
+      history: { action: decision, actor: coordinatorId, note: responseNote, at: now },
+      pendingStudentNotificationEvents: notificationEvent,
+    },
   }, { new: true, runValidators: true }).lean();
   if (!updated) throw fail('The request changed while you were reviewing it. Refresh and try again.');
-
-  // FR 117: notify the student that their extra-hours request was decided
-  try {
-    await publishStudentNotification('extra_hours.decided', {
-      entityId: updated._id,
-      occurrence: `decided-${now.getTime()}`,
-      decision: updated.decision,
-      studentId: updated.student,
-      reference: updated.reference,
-    });
-  } catch (notificationError) {
-    // Log but don't fail the decision — it's already committed
-    console.error('[extra-hours] Failed to send decision notification:', notificationError);
-  }
 
   return updated;
 }

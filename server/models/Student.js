@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const pendingStudentNotificationSchema = require('./pendingStudentNotificationSchema');
 
 /**
  * Workflow status is derived from completed actions rather than set by hand, so
@@ -92,14 +93,7 @@ const studentSchema = new mongoose.Schema(
     lastUpdateAt: { type: Date, default: Date.now },
     // Notification outbox: committed atomically with the student action. A
     // background relay acknowledges each entry only after durable publication.
-    pendingNotificationEvents: [{
-      name: { type: String, required: true },
-      entityId: { type: String, required: true },
-      occurrence: { type: String, required: true },
-      title: { type: String, required: true },
-      message: { type: String, required: true },
-      link: { type: String, required: true },
-    }],
+    pendingNotificationEvents: { type: [pendingStudentNotificationSchema], default: [] },
   },
   { timestamps: true }
 );
