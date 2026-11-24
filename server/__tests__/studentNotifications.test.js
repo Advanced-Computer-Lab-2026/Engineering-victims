@@ -1,10 +1,16 @@
 jest.mock('../models/Student', () => ({ find: jest.fn(), updateOne: jest.fn(), findById: jest.fn() }));
 jest.mock('../models/WalletTransaction', () => ({ find: jest.fn(), updateOne: jest.fn(), create: jest.fn(), TYPES: ['Refund', 'Payment'], DIRECTION: { Refund: 'Credit', Payment: 'Debit' } }));
 jest.mock('../models/Wallet', () => ({ findOneAndUpdate: jest.fn() }));
+jest.mock('../models/ExtraHoursRequest', () => ({ find: jest.fn(), updateOne: jest.fn() }));
+jest.mock('../models/GraduationPlan', () => ({ find: jest.fn(), updateOne: jest.fn() }));
+jest.mock('../models/ExitExamRequest', () => ({ find: jest.fn(), updateOne: jest.fn() }));
 jest.mock('../services/notificationEventService', () => ({ publishNotificationEvent: jest.fn() }));
 const Student = require('../models/Student');
 const Transaction = require('../models/WalletTransaction');
 const Wallet = require('../models/Wallet');
+const ExtraHoursRequest = require('../models/ExtraHoursRequest');
+const GraduationPlan = require('../models/GraduationPlan');
+const ExitExamRequest = require('../models/ExitExamRequest');
 const { publishNotificationEvent } = require('../services/notificationEventService');
 const { TEMPLATES, buildStudentNotification, publishStudentNotification, queueStudentNotification, flushStudentNotifications } = require('../services/studentNotificationService');
 const { recordTransaction } = require('../services/walletService');
@@ -19,6 +25,9 @@ beforeEach(() => {
   publishNotificationEvent.mockResolvedValue({});
   Student.find.mockReturnValue(query([]));
   Transaction.find.mockReturnValue(query([]));
+  ExtraHoursRequest.find.mockReturnValue(query([]));
+  GraduationPlan.find.mockReturnValue(query([]));
+  ExitExamRequest.find.mockReturnValue(query([]));
 });
 test.each(Object.keys(TEMPLATES))('%s produces a controlled student notification', (name) => {
   const event = buildStudentNotification(name, { entityId: 'request-1', occurrence: 'version-1', amount: 120.5, decision: 'Approved' });
@@ -52,6 +61,56 @@ test('successful student relay derives owner from its saved document and acknowl
   await flushStudentNotifications();
   expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({ studentId: 'owner', occurrence: 'action' }));
   expect(Student.updateOne).toHaveBeenCalledWith({ _id: 'owner' }, { $pull: { pendingNotificationEvents: { _id: 'pending-1' } } });
+});
+test('decision notification outboxes publish and acknowledge their own persisted events', async () => {
+  const cases = [
+    [ExtraHoursRequest, 'extra_hours.decided', 'extra-request'],
+    [GraduationPlan, 'graduation_plan.decided', 'graduation-plan'],
+    [ExitExamRequest, 'exit_exam.decided', 'exit-request'],
+  ];
+  for (const [Model, name, entityId] of cases) {
+    const pending = {
+      _id: `${entityId}-event`,
+      ...buildStudentNotification(name, { entityId, occurrence: 'decision-1', decision: 'Approved' }),
+    };
+    Model.find.mockReturnValue(query([{
+      _id: entityId,
+      student: 'owner',
+      pendingStudentNotificationEvents: [pending],
+    }]));
+  }
+
+  await flushStudentNotifications();
+
+  for (const [Model, name, entityId] of cases) {
+    expect(publishNotificationEvent).toHaveBeenCalledWith(expect.objectContaining({
+      name, entityId, studentId: 'owner', occurrence: 'decision-1',
+    }));
+    expect(Model.updateOne).toHaveBeenCalledWith(
+      { _id: entityId, 'pendingStudentNotificationEvents._id': `${entityId}-event` },
+      { $pull: { pendingStudentNotificationEvents: { _id: `${entityId}-event` } } }
+    );
+  }
+});
+test('decision event remains queued when publication fails and is retried later', async () => {
+  const pending = {
+    _id: 'extra-event',
+    ...buildStudentNotification('extra_hours.decided', {
+      entityId: 'extra-request', occurrence: 'decision-1', decision: 'Approved',
+    }),
+  };
+  ExtraHoursRequest.find.mockReturnValue(query([{
+    _id: 'extra-request', student: 'owner', pendingStudentNotificationEvents: [pending],
+  }]));
+  publishNotificationEvent.mockRejectedValueOnce(new Error('offline'));
+  const onError = jest.fn();
+
+  await flushStudentNotifications({ onError });
+  expect(ExtraHoursRequest.updateOne).not.toHaveBeenCalled();
+
+  await flushStudentNotifications({ onError });
+  expect(publishNotificationEvent.mock.calls[0][0]).toEqual(publishNotificationEvent.mock.calls[1][0]);
+  expect(ExtraHoursRequest.updateOne).toHaveBeenCalledTimes(1);
 });
 test('enqueue failure retains the pending entry for retry without repeating the action', async () => {
   const pending = { _id: 'pending-1', ...buildStudentNotification('schedule.processed', { entityId: 'term', occurrence: 'action' }) };

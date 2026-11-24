@@ -14,6 +14,7 @@ const { deriveAllowance } = require('./advisingOverviewService');
 const { buildMandatoryCandidates } = require('./mandatoryCourseService');
 const { slotsOverlap } = require('./conflictService');
 const { idOf, requiredCount, validateAdvisingDraft } = require('./advisingScheduleValidation');
+const { queueStudentNotification } = require('./studentNotificationService');
 
 const EDITABLE_STATUSES = new Set(['Not Started', 'Draft', 'Reopened']);
 const SCHEDULE_STATUSES = ['Draft', 'Active', 'Processed'];
@@ -493,6 +494,11 @@ const markReadyForReview = async ({ user, studentId, termId }) =>
     );
     result.student.workflowStatus = 'Ready for Student Review';
     result.student.lastUpdateAt = new Date();
+    // FR 117: notify the student that their schedule is ready for review
+    queueStudentNotification(result.student, 'schedule.review_ready', {
+      entityId: result.term._id,
+      occurrence: `review-${result.student.lastUpdateAt.getTime()}`,
+    });
     await result.student.save({ session });
     return { validation: result.validation, workflowStatus: result.student.workflowStatus };
   });

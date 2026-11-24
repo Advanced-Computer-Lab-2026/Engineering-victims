@@ -1,5 +1,8 @@
 const Student = require('../models/Student');
 const WalletTransaction = require('../models/WalletTransaction');
+const ExtraHoursRequest = require('../models/ExtraHoursRequest');
+const GraduationPlan = require('../models/GraduationPlan');
+const ExitExamRequest = require('../models/ExitExamRequest');
 const { publishNotificationEvent } = require('./notificationEventService');
 
 // FR 117: templates own wording and destinations. Internal workflow producers
@@ -70,6 +73,30 @@ async function flushStudentNotifications({ onError = console.error } = {}) {
         });
         await Student.updateOne({ _id: student._id }, { $pull: { pendingNotificationEvents: { _id: pending._id } } });
       } catch { onError('[notifications] Student event remains pending:', String(pending._id)); }
+    }
+  }
+  for (const [Model, label] of [
+    [ExtraHoursRequest, 'Extra-hours'],
+    [GraduationPlan, 'Graduation-plan'],
+    [ExitExamRequest, 'Exit-exam'],
+  ]) {
+    const records = await Model.find({ 'pendingStudentNotificationEvents.0': { $exists: true } })
+      .select('student pendingStudentNotificationEvents').limit(25);
+    for (const record of records) {
+      for (const pending of record.pendingStudentNotificationEvents.slice(0, 25)) {
+        try {
+          await publishNotificationEvent({
+            name: pending.name, entityId: pending.entityId, occurrence: pending.occurrence,
+            title: pending.title, message: pending.message, link: pending.link, studentId: record.student,
+          });
+          await Model.updateOne(
+            { _id: record._id, 'pendingStudentNotificationEvents._id': pending._id },
+            { $pull: { pendingStudentNotificationEvents: { _id: pending._id } } }
+          );
+        } catch {
+          onError(`[notifications] ${label} event remains pending:`, String(pending._id));
+        }
+      }
     }
   }
   const transactions = await WalletTransaction.find({ notificationPending: true }).limit(25);

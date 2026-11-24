@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const pendingStudentNotificationSchema = require('./pendingStudentNotificationSchema');
 
 /**
  * Req 103-107: an Advisor's graduation plan for one Advising Student.
@@ -51,6 +52,7 @@ const graduationPlanSchema = new mongoose.Schema(
     responseNote: { type: String, default: '', trim: true },
     decidedAt: { type: Date, default: null },
     decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    pendingStudentNotificationEvents: { type: [pendingStudentNotificationSchema], default: [] },
   },
   { timestamps: true }
 );

@@ -8,7 +8,7 @@ const { remainingCoursesFor } = require('../services/graduationPlanService');
 const { validateRequest, applyDecision } = require('../services/exitExamRequestService');
 const { notify } = require('../services/notificationService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
-const { publishStudentNotification } = require('../services/studentNotificationService');
+const { buildStudentNotification } = require('../services/studentNotificationService');
 
 const requestSummary = (request) => ({
   id: request._id,
@@ -187,6 +187,13 @@ exports.decideRequest = async (req, res) => {
       return res.status(request.status === 'Pending' ? 400 : 409).json({ message: error });
     }
 
+    const course = await Course.findById(request.course).select('code').lean();
+    const notificationEvent = buildStudentNotification('exit_exam.decided', {
+      entityId: request._id,
+      occurrence: request.decidedAt.toISOString(),
+      decision: request.status,
+      reference: course?.code,
+    });
     const updated = await ExitExamRequest.findOneAndUpdate(
       { _id: request._id, status: 'Pending' },
       {
@@ -196,6 +203,7 @@ exports.decideRequest = async (req, res) => {
           decidedBy: request.decidedBy,
           decidedAt: request.decidedAt,
         },
+        $push: { pendingStudentNotificationEvents: notificationEvent },
       },
       { new: true, runValidators: true }
     );
@@ -203,10 +211,7 @@ exports.decideRequest = async (req, res) => {
       return res.status(409).json({ message: 'This exit-exam request has already been reviewed.' });
     }
 
-    const [student, course] = await Promise.all([
-      Student.findById(updated.student).select('fullName studentId email').lean(),
-      Course.findById(updated.course).select('code').lean(),
-    ]);
+    const student = await Student.findById(updated.student).select('fullName studentId email').lean();
     if (student) {
       const decision = updated.status === 'Approved' ? 'approved' : 'rejected';
       const notice = {
@@ -215,17 +220,6 @@ exports.decideRequest = async (req, res) => {
         message: `The Coordinator ${decision} the request for ${course?.code ?? 'the failed course'}. ${updated.responseNote}`,
       };
       await notify(updated.advisor, { ...notice, link: '/graduation-plans' });
-      try {
-        await publishStudentNotification('exit_exam.decided', {
-          entityId: updated._id,
-          occurrence: updated.decidedAt.toISOString(),
-          studentId: updated.student,
-          decision: updated.status,
-          reference: course?.code,
-        });
-      } catch (error) {
-        console.error('[exit-exam] Could not queue student decision notification:', error.message);
-      }
     }
 
     const populated = await requestPopulations(ExitExamRequest.findById(updated._id)).lean();

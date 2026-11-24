@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const pendingStudentNotificationSchema = require('./pendingStudentNotificationSchema');
 
 const STATUSES = ['Pending', 'Approved', 'Rejected'];
 const NOTE_LIMIT = 1000;
@@ -13,6 +14,7 @@ const exitExamRequestSchema = new mongoose.Schema(
     responseNote: { type: String, trim: true, default: '', maxlength: NOTE_LIMIT },
     decidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     decidedAt: { type: Date, default: null },
+    pendingStudentNotificationEvents: { type: [pendingStudentNotificationSchema], default: [] },
   },
   { timestamps: true }
 );

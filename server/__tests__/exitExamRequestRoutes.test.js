@@ -10,10 +10,6 @@ jest.mock('../services/notificationService', () => ({
 jest.mock('../services/notificationEventService', () => ({
   publishNotificationEvent: jest.fn().mockResolvedValue({}),
 }));
-jest.mock('../services/studentNotificationService', () => ({
-  publishStudentNotification: jest.fn().mockResolvedValue({}),
-}));
-
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
@@ -25,7 +21,6 @@ const Student = require('../models/Student');
 const User = require('../models/User');
 const { remainingCoursesFor } = require('../services/graduationPlanService');
 const { publishNotificationEvent } = require('../services/notificationEventService');
-const { publishStudentNotification } = require('../services/studentNotificationService');
 const exitExamRequestRoutes = require('../routes/exitExamRequestRoutes');
 
 const app = express();
@@ -276,14 +271,16 @@ describe('exit-exam request access (reqs 108, 109, 115)', () => {
           status: 'Approved',
           responseNote: 'Approved because no valid placement remains.',
         }),
+        $push: {
+          pendingStudentNotificationEvents: expect.objectContaining({
+            name: 'exit_exam.decided',
+            entityId: String(requestId),
+            message: 'Your exit-exam request has been approved. Reference: CSEN 301.',
+          }),
+        },
       }),
       { new: true, runValidators: true }
     );
     expect(response.body.request.status).toBe('Approved');
-    expect(publishStudentNotification).toHaveBeenCalledWith('exit_exam.decided', expect.objectContaining({
-      studentId,
-      decision: 'Approved',
-      reference: 'CSEN 301',
-    }));
   });
 });

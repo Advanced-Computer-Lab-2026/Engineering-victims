@@ -23,6 +23,11 @@ test('approval revalidates official context and cost and only updates the reques
   expect(update.$set).toMatchObject({ decision: 'Approved', responseNote: 'Eligible and cost confirmed.', decidedBy: 'coordinator', settlementStatus: 'Awaiting Payment Choice' });
   expect(update.$set.decidedAt).toBeInstanceOf(Date);
   expect(update.$push.history).toMatchObject({ action: 'Approved', actor: 'coordinator', note: 'Eligible and cost confirmed.' });
+  expect(update.$push.pendingStudentNotificationEvents).toMatchObject({
+    name: 'extra_hours.decided',
+    entityId: 'request',
+    message: 'Your extra-hours request has been approved.',
+  });
   expect(update.$inc).toEqual({ __v: 1 }); expect(options.runValidators).toBe(true);
 });
 test('rejection works even if current eligibility cannot be loaded', async () => {

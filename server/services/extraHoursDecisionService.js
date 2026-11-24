@@ -1,5 +1,6 @@
 const Request = require('../models/ExtraHoursRequest');
 const { loadContext, evaluateSelection } = require('./extraHoursSubmissionService');
+const { buildStudentNotification } = require('./studentNotificationService');
 const fail = (message, status = 409) => Object.assign(new Error(message), { status });
 
 async function decideRequest(requestId, coordinatorId, { decision, responseNote }) {
@@ -23,15 +24,26 @@ async function decideRequest(requestId, coordinatorId, { decision, responseNote 
     }
   }
   const now = new Date();
+  const notificationEvent = buildStudentNotification('extra_hours.decided', {
+    entityId: request._id,
+    occurrence: `decided-${now.getTime()}`,
+    decision,
+    reference: request.reference,
+  });
   // Conditional single-document update prevents two reviewers from overwriting
-  // each other. Decisions never modify schedules, student allowances or money.
+  // each other. The notification is queued in this same atomic update.
   const updated = await Request.findOneAndUpdate({ _id: requestId, decision: 'Pending', __v: request.__v,
     settlementStatus: 'Not Applicable', settlementOption: null }, {
     $set: { decision, responseNote, decidedBy: coordinatorId, decidedAt: now,
       settlementStatus: decision === 'Approved' ? 'Awaiting Payment Choice' : 'Not Applicable' },
-    $inc: { __v: 1 }, $push: { history: { action: decision, actor: coordinatorId, note: responseNote, at: now } },
+    $inc: { __v: 1 }, $push: {
+      history: { action: decision, actor: coordinatorId, note: responseNote, at: now },
+      pendingStudentNotificationEvents: notificationEvent,
+    },
   }, { new: true, runValidators: true }).lean();
   if (!updated) throw fail('The request changed while you were reviewing it. Refresh and try again.');
+
   return updated;
 }
 module.exports = { decideRequest };
+
