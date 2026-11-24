@@ -605,6 +605,14 @@ export interface AdvisingScheduleValidationResponse {
   slotAssignments: AdvisingScheduleSlotAssignments[];
 }
 
+/** Req 63 — a req 61 mandatory candidate, plus whether the draft already holds the course. */
+export interface DraftMandatoryCandidate extends Omit<MandatoryCandidate, 'mandatory'> {
+  selected: boolean;
+}
+
+/** Req 60 — the season the bachelor project will be taken in. */
+export type BachelorProjectSeason = 'Winter' | 'Spring';
+
 export interface AdvisingScheduleDraftResponse {
   student: {
     id: string;
@@ -619,12 +627,22 @@ export interface AdvisingScheduleDraftResponse {
   draft: {
     id: string;
     termId: string;
+    bachelorProject: { season: BachelorProjectSeason } | null;
     courses: AdvisingScheduleDraftCourse[];
     createdAt: string;
     updatedAt: string;
   } | null;
   canEdit: boolean;
+  /** Req 60 — eligibility is req 59's rule; `selection` is what is saved on the draft. */
+  bachelorProject: {
+    eligible: boolean;
+    explanation: string;
+    selection: { season: BachelorProjectSeason } | null;
+    limits: { maxCourses: number; maxCore: number; maxHumanities: number };
+  };
   eligibleCourses: AdvisingScheduleCourseOption[];
+  /** Req 63 — the student's mandatory courses, each marked as already in the draft or not. */
+  mandatoryCandidates: DraftMandatoryCandidate[];
   creditHours: {
     selected: number;
     allowed: number;
@@ -974,6 +992,32 @@ export interface MandatoryRemovalRequestSummary {
   submittedAt: string;
   decidedAt: string | null;
   decidedBy: { id: string; fullName: string } | null;
+}
+
+/** Req 66-67 — what the removal-request list is narrowed by; '' means not set. */
+export interface MandatoryRemovalQuery {
+  search: string;
+  status: '' | MandatoryRemovalStatus;
+  /** An Advisor id: the Advisor who asked for the removal. */
+  advisor: string;
+  /** Submission dates as YYYY-MM-DD; the end day is included. */
+  submittedFrom: string;
+  submittedTo: string;
+}
+
+/** Req 65-67 — every removal request, narrowed by the search text and filters when given. */
+export interface MandatoryRemovalListResponse {
+  requests: MandatoryRemovalRequestSummary[];
+  search: string;
+  filters: Omit<MandatoryRemovalQuery, 'search'>;
+  /** The Advisors who have asked for a removal, for the Advisor filter. */
+  advisors: Array<{ id: string; fullName: string; email: string }>;
+}
+
+/** Req 69 — the decided request and what was done. */
+export interface MandatoryRemovalDecisionResponse {
+  message: string;
+  request: MandatoryRemovalRequestSummary | null;
 }
 
 export interface StudentRemovalRequestsResponse {

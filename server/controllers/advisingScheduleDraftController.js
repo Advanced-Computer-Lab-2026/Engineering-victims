@@ -12,6 +12,18 @@ const {
 const { buildAcademicHistory } = require('../services/academicHistoryService');
 const { deriveAllowance } = require('../services/advisingOverviewService');
 const workflow = require('../services/advisingScheduleWorkflowService');
+const { loadBachelorEligibility } = require('../services/bachelorProjectService');
+const Course = require('../models/Course');
+const { approvedExtraHoursFor } = require('../services/draftHoursService');
+const { sumHours, mandatoryHoursBlock, mandatoryCoursesOf } = require('../services/mandatoryScheduleRules');
+const {
+  MAX_COURSES,
+  MAX_CORE,
+  MAX_HUMANITIES,
+  isValidSeason,
+  projectCourseIssues,
+  projectHours,
+} = require('../services/bachelorProjectRules');
 
 const EDITABLE_STATUSES = new Set(['Not Started', 'Draft', 'Reopened']);
 
@@ -31,6 +43,7 @@ const findAdvisingStudent = async (studentId, user) => {
 const serializeDraft = (draft) => ({
   id: String(draft._id),
   termId: String(draft.term),
+  bachelorProject: draft.bachelorProject ? { season: draft.bachelorProject.season } : null,
   courses: (draft.courses ?? []).map((entry) => ({
     id: String(entry.course?._id ?? entry.course),
     code: entry.course?.code,
@@ -45,7 +58,7 @@ const serializeDraft = (draft) => ({
 const loadDraft = (student, term) =>
   AdvisingScheduleDraft.findOne({ student: student._id, term: term._id }).populate(
     'courses.course',
-    'code name creditHours'
+    'code name courseType creditHours'
   );
 
 const resolveTerm = async (termId) => {
@@ -111,24 +124,66 @@ const findOrMigrateDraft = async (student, term, userId, createIfMissing = false
   return draft ? loadDraft(student, term) : null;
 };
 
-const respondWithDraft = async (res, student, term, terms, draft, statusCode = 200) => {
-  const currentTerm = (await advisingTerm())?.term ?? term;
+/**
+ * The credit-hour allowance for the term being drafted. It follows the student's
+ * progression to that term, so it is shared by the draft response and by the
+ * rules that run while courses are added: both must use the same figure.
+ */
+const allowanceFor = ({ student, term, currentTerm, history }) => {
   const progressionSemester = progressionSemesterFor({ student, term, currentTerm });
   const allowanceStudent =
     Number.isInteger(progressionSemester) && progressionSemester >= 1 && progressionSemester <= 10
       ? { ...student, currentSemester: progressionSemester }
       : student;
-  const [eligibleCourses, history] = await Promise.all([
+  return deriveAllowance({ student: allowanceStudent, gpa: history.summary.gpa });
+};
+
+/** Req 63: the student's mandatory courses, each marked as already in the draft or not. */
+const describeMandatoryCandidates = (candidates, draft) => {
+  const selectedIds = new Set((draft?.courses ?? []).map((entry) => String(entry.course?._id ?? entry.course)));
+  return (candidates ?? []).map((candidate) => ({
+    course: {
+      id: String(candidate.course.id),
+      code: candidate.course.code,
+      name: candidate.course.name,
+      creditHours: candidate.course.creditHours,
+    },
+    reason: candidate.reason,
+    semester: candidate.semester,
+    term: candidate.term,
+    inProgress: candidate.inProgress,
+    selected: selectedIds.has(String(candidate.course.id)),
+  }));
+};
+
+const respondWithDraft = async (res, student, term, terms, draft, statusCode = 200) => {
+  const currentTerm = (await advisingTerm())?.term ?? term;
+  const [eligibleCourses, history, bachelorEligibility, mandatoryCandidates] = await Promise.all([
     eligibleNonMandatoryCourses({ student, term, currentTerm, draft }),
     buildAcademicHistory(student),
+    loadBachelorEligibility(student),
+    buildMandatoryCandidates(student),
   ]);
-  const allowance = deriveAllowance({ student: allowanceStudent, gpa: history.summary.gpa });
+  const allowance = allowanceFor({ student, term, currentTerm, history });
   const selectedHours = (draft?.courses ?? []).reduce(
     (total, entry) => total + (entry.course?.creditHours ?? 0),
     0
   );
-  const extraHours = Math.max(0, selectedHours - allowance.allowedHours);
-  const remainingHours = Math.max(0, allowance.allowedHours - selectedHours);
+  // Req 60: with the bachelor project, humanities hours are extra hours and
+  // only the other courses use the allowance.
+  const project = draft?.bachelorProject ?? null;
+  const projectTotals = project
+    ? projectHours({
+        courses: (draft?.courses ?? []).map((entry) => entry.course).filter(Boolean),
+        allowedHours: allowance.allowedHours,
+      })
+    : null;
+  const extraHours = projectTotals
+    ? projectTotals.extraHours
+    : Math.max(0, selectedHours - allowance.allowedHours);
+  const remainingHours = projectTotals
+    ? Math.max(0, allowance.allowedHours - projectTotals.otherHours)
+    : Math.max(0, allowance.allowedHours - selectedHours);
 
   res.status(statusCode).json({
     student: {
@@ -144,6 +199,7 @@ const respondWithDraft = async (res, student, term, terms, draft, statusCode = 2
     draft: draft ? serializeDraft(draft) : null,
     canEdit: EDITABLE_STATUSES.has(student.workflowStatus),
     eligibleCourses,
+    mandatoryCandidates: describeMandatoryCandidates(mandatoryCandidates, draft),
     creditHours: {
       selected: selectedHours,
       allowed: allowance.allowedHours,
@@ -151,6 +207,13 @@ const respondWithDraft = async (res, student, term, terms, draft, statusCode = 2
       remaining: remainingHours,
       standardAllowance: allowance.standardHours,
       isProbation: allowance.isProbation,
+    },
+    // Req 60: eligibility comes from req 59's rule; `selection` is what is saved.
+    bachelorProject: {
+      eligible: bachelorEligibility.eligible,
+      explanation: bachelorEligibility.explanation,
+      selection: project ? { season: project.season } : null,
+      limits: { maxCourses: MAX_COURSES, maxCore: MAX_CORE, maxHumanities: MAX_HUMANITIES },
     },
   });
 };
@@ -244,6 +307,50 @@ exports.addCourse = async (req, res) => {
     const eligible = await eligibleNonMandatoryCourses({ student, term, currentTerm, draft });
     if (!eligible.some((course) => course.id === String(courseId))) {
       return res.status(400).json({ message: 'That course is not eligible to add to this draft schedule.' });
+    }
+
+    // Req 60: with the bachelor project the draft is capped at four courses.
+    if (draft.bachelorProject) {
+      const populatedDraft = await loadDraft(student, term);
+      const existing = (populatedDraft?.courses ?? []).map((entry) => entry.course).filter(Boolean);
+      const adding = eligible.find((course) => course.id === String(courseId));
+      const issues = projectCourseIssues([...existing, adding]);
+      if (issues.length) return res.status(409).json({ message: issues[0], issues });
+    }
+
+    // Req 63: "Mandatory courses are selected before other courses", so no other
+    // course is added while a mandatory course of this student is still unselected.
+    const inDraftIds = new Set((draft.courses ?? []).map((entry) => String(entry.course?._id ?? entry.course)));
+    const unselected = ((await buildMandatoryCandidates(student)) ?? []).filter(
+      (candidate) => !inDraftIds.has(String(candidate.course.id))
+    );
+    if (unselected.length) {
+      return res.status(409).json({
+        message: `Select the mandatory courses before other courses: ${unselected
+          .map((candidate) => candidate.course.code)
+          .join(', ')}.`,
+      });
+    }
+
+    // Req 63: "If mandatory courses consume all allowed hours, no other course
+    // may be added without approved extra hours."
+    if ((draft.courses ?? []).some((entry) => entry.mandatory)) {
+      const populatedDraft = await loadDraft(student, term);
+      const entries = populatedDraft?.courses ?? [];
+      const adding = eligible.find((course) => course.id === String(courseId));
+      const [history, approvedExtraHours] = await Promise.all([
+        buildAcademicHistory(student),
+        approvedExtraHoursFor(student, term),
+      ]);
+      const allowance = allowanceFor({ student, term, currentTerm, history });
+      const blocked = mandatoryHoursBlock({
+        mandatoryHours: sumHours(mandatoryCoursesOf(entries)),
+        selectedHours: sumHours(entries.map((entry) => entry.course).filter(Boolean)),
+        newHours: Number(adding?.creditHours) || 0,
+        allowedHours: allowance.allowedHours,
+        approvedExtraHours,
+      });
+      if (blocked) return res.status(409).json({ message: blocked });
     }
 
     const result = await AdvisingScheduleDraft.updateOne(
@@ -390,5 +497,169 @@ exports.markReadyForReview = async (req, res) => {
       message: error.message || 'Could not mark the schedule ready for review.',
       validation: error.details,
     });
+  }
+};
+
+/**
+ * Req 60: add the bachelor project to an eligible student's draft, or change
+ * the season it will be taken in. Idempotent, so choosing Winter then Spring
+ * simply updates the one selection.
+ */
+exports.setBachelorProject = async (req, res) => {
+  try {
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
+    if (!student) return res.status(status).json({ message });
+    if (!EDITABLE_STATUSES.has(student.workflowStatus)) {
+      return res.status(409).json({ message: 'This advising schedule is no longer an editable draft.' });
+    }
+    const { season, termId } = req.body ?? {};
+    if (!isValidSeason(season)) {
+      return res.status(400).json({ message: 'Choose Winter or Spring for the bachelor project.' });
+    }
+
+    const [selected, terms] = await Promise.all([
+      resolveTerm(termId),
+      AcademicTerm.find().sort({ termStartDate: 1 }).lean(),
+    ]);
+    if (!selected.term) {
+      return res.status(selected.status ?? 400).json({
+        message: selected.message ?? 'There is no academic term available for advising schedules.',
+      });
+    }
+    const { term } = selected;
+
+    const draft = await loadDraft(student, term);
+    if (!draft) return res.status(404).json({ message: 'Create a draft before adding the bachelor project.' });
+
+    const eligibility = await loadBachelorEligibility(student);
+    if (!eligibility.eligible) return res.status(409).json({ message: eligibility.explanation });
+
+    const issues = projectCourseIssues((draft.courses ?? []).map((entry) => entry.course).filter(Boolean));
+    if (issues.length) {
+      return res.status(409).json({
+        message: `${issues[0]} Remove the extra courses from the draft first.`,
+        issues,
+      });
+    }
+
+    await AdvisingScheduleDraft.updateOne(
+      { _id: draft._id },
+      {
+        $set: {
+          bachelorProject: { season, setBy: req.user.userId, setAt: new Date() },
+          updatedBy: req.user.userId,
+        },
+      }
+    );
+    student.lastUpdateAt = new Date();
+    await student.save();
+
+    const updated = await loadDraft(student, term);
+    return respondWithDraft(res, student, term, terms, updated);
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not save the bachelor project', error: error.message });
+  }
+};
+
+/** Req 60: take the bachelor project back off a draft. */
+exports.removeBachelorProject = async (req, res) => {
+  try {
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
+    if (!student) return res.status(status).json({ message });
+    if (!EDITABLE_STATUSES.has(student.workflowStatus)) {
+      return res.status(409).json({ message: 'This advising schedule is no longer an editable draft.' });
+    }
+
+    const [selected, terms] = await Promise.all([
+      resolveTerm(req.query.termId),
+      AcademicTerm.find().sort({ termStartDate: 1 }).lean(),
+    ]);
+    if (!selected.term) {
+      return res.status(selected.status ?? 400).json({
+        message: selected.message ?? 'There is no academic term available for advising schedules.',
+      });
+    }
+    const { term } = selected;
+
+    const draft = await loadDraft(student, term);
+    if (!draft) return res.status(404).json({ message: 'There is no draft schedule for this term.' });
+
+    await AdvisingScheduleDraft.updateOne(
+      { _id: draft._id },
+      { $set: { bachelorProject: null, updatedBy: req.user.userId } }
+    );
+    student.lastUpdateAt = new Date();
+    await student.save();
+
+    const updated = await loadDraft(student, term);
+    return respondWithDraft(res, student, term, terms, updated);
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not remove the bachelor project', error: error.message });
+  }
+};
+
+/**
+ * Req 63: add one of the student's mandatory courses to the draft.
+ *
+ * Only a course on the student's mandatory list (req 61) is accepted, and it is
+ * stored with mandatory: true, which is what stops it being removed as an
+ * ordinary course. Mandatory courses are never refused for hours: they are
+ * owed whatever the allowance, and the review check reports any overflow.
+ */
+exports.addMandatoryCourse = async (req, res) => {
+  try {
+    const { student, status, message } = await findAdvisingStudent(req.params.studentId, req.user);
+    if (!student) return res.status(status).json({ message });
+    if (!EDITABLE_STATUSES.has(student.workflowStatus)) {
+      return res.status(409).json({ message: 'This advising schedule is no longer an editable draft.' });
+    }
+    const { courseId } = req.body ?? {};
+    if (!mongoose.isValidObjectId(courseId)) {
+      return res.status(400).json({ message: 'Choose a valid course.' });
+    }
+
+    const selected = await resolveTerm(req.query.termId);
+    if (!selected.term) {
+      return res.status(selected.status ?? 400).json({
+        message: selected.message ?? 'There is no academic term available for advising schedules.',
+      });
+    }
+    const { term } = selected;
+    const draft = await AdvisingScheduleDraft.findOne({ student: student._id, term: term._id });
+    if (!draft) return res.status(404).json({ message: 'Create a draft before adding courses.' });
+
+    const candidates = await buildMandatoryCandidates(student);
+    if (!candidates.some((candidate) => String(candidate.course.id) === String(courseId))) {
+      return res.status(400).json({ message: "That course is not one of the student's mandatory courses." });
+    }
+    if ((draft.courses ?? []).some((entry) => String(entry.course?._id ?? entry.course) === String(courseId))) {
+      return res.status(409).json({ message: 'That course is already in this draft schedule.' });
+    }
+
+    // Req 60: a mandatory course still counts toward the project's four-course cap.
+    if (draft.bachelorProject) {
+      const [populatedDraft, adding] = await Promise.all([
+        loadDraft(student, term),
+        Course.findById(courseId).select('code name courseType creditHours').lean(),
+      ]);
+      const existing = (populatedDraft?.courses ?? []).map((entry) => entry.course).filter(Boolean);
+      const issues = projectCourseIssues([...existing, adding].filter(Boolean));
+      if (issues.length) return res.status(409).json({ message: issues[0], issues });
+    }
+
+    const result = await AdvisingScheduleDraft.updateOne(
+      { _id: draft._id, 'courses.course': { $ne: courseId } },
+      { $push: { courses: { course: courseId, mandatory: true } }, $set: { updatedBy: req.user.userId } }
+    );
+    if (!result.modifiedCount) {
+      return res.status(409).json({ message: 'That course is already in this draft schedule.' });
+    }
+
+    student.lastUpdateAt = new Date();
+    await student.save();
+    const updated = await loadDraft(student, term);
+    return res.status(200).json({ draft: serializeDraft(updated) });
+  } catch (error) {
+    return res.status(500).json({ message: 'Could not add the mandatory course to the draft schedule', error: error.message });
   }
 };

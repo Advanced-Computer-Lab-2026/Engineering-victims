@@ -43,6 +43,7 @@ const GraduationPlansRoute = React.lazy(() => import('./pages/GraduationPlansRou
 const GraduationPlanBuilderPage = React.lazy(() => import('./pages/GraduationPlanBuilderPage'));
 const MyGraduationPlanPage = React.lazy(() => import('./pages/MyGraduationPlanPage'));
 const ExitExamRequestsPage = React.lazy(() => import('./pages/ExitExamRequestsPage'));
+const MandatoryRemovalRequestsPage = React.lazy(() => import('./pages/MandatoryRemovalRequestsPage'));
 const SemesterStandingsPage = React.lazy(() => import('./pages/SemesterStandingsPage'));
 const ExtraHoursRequestsPage = React.lazy(() => import('./pages/ExtraHoursRequestsPage'));
 const MyExtraHoursRequestsPage = React.lazy(() => import('./pages/MyExtraHoursRequestsPage'));
@@ -131,6 +132,8 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }
         >
           <Route path="/exit-exam-requests" element={<ExitExamRequestsPage />} />
+          {/* Req 65-66: mandatory-course removal requests. */}
+          <Route path="/coordinator/mandatory-removals" element={<MandatoryRemovalRequestsPage />} />
           <Route path="/extra-hours-requests" element={<ExtraHoursRequestsPage />} />
         </Route>
 

@@ -809,6 +809,8 @@ module.exports = {
   staffRequestScope,
   parseStaffSearch,
   parseStaffListQuery,
+  parseDateBound,
+  submittedCondition,
   courseCodePattern,
   buildStaffRequestFilter,
   staffFilterOptions,

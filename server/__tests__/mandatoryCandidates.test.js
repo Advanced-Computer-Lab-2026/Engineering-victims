@@ -11,6 +11,7 @@ jest.mock('../models/User', () => ({ findById: jest.fn() }));
 jest.mock('../models/Student', () => ({ findById: jest.fn(), findOne: jest.fn() }));
 jest.mock('../models/CourseRecord', () => ({ find: jest.fn() }));
 jest.mock('../models/Course', () => ({ find: jest.fn() }));
+jest.mock('../models/MandatoryRemovalRequest', () => ({ distinct: jest.fn() }));
 
 const express = require('express');
 const jwt = require('jsonwebtoken');
@@ -19,12 +20,14 @@ const request = require('supertest');
 const Student = require('../models/Student');
 const CourseRecord = require('../models/CourseRecord');
 const Course = require('../models/Course');
+const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const academicHistoryRoutes = require('../routes/academicHistoryRoutes');
 const { deriveCandidates, approvedRemovalsFor } = require('../services/mandatoryCourseService');
 
 const app = express();
 app.use('/api/academic-history', academicHistoryRoutes);
 
+const oid = () => new mongoose.Types.ObjectId();
 const tokenFor = (role) => `Bearer ${jwt.sign({ userId: String(new mongoose.Types.ObjectId()), role }, process.env.JWT_SECRET)}`;
 
 const makeStudent = (overrides = {}) => ({
@@ -182,8 +185,30 @@ describe('deriveCandidates', () => {
     expect(candidates.every((candidate) => candidate.mandatory === true)).toBe(true);
   });
 
-  it('has no approved removals until req 64-69 exist', async () => {
-    expect((await approvedRemovalsFor(makeStudent())).size).toBe(0);
+  describe('approved removals (req 69)', () => {
+    beforeEach(() => {
+      MandatoryRemovalRequest.distinct.mockReset();
+    });
+
+    it('is the set of courses with an Approved removal for this student, and only Approved ones', async () => {
+      const removed = oid();
+      MandatoryRemovalRequest.distinct.mockResolvedValue([removed]);
+      const student = makeStudent();
+
+      const result = await approvedRemovalsFor(student);
+
+      expect([...result]).toEqual([String(removed)]);
+      // A Pending or Rejected request leaves the course mandatory, so only Approved is asked for.
+      expect(MandatoryRemovalRequest.distinct).toHaveBeenCalledWith('course', {
+        student: student._id,
+        status: 'Approved',
+      });
+    });
+
+    it('is empty for a student with no approved removal', async () => {
+      MandatoryRemovalRequest.distinct.mockResolvedValue([]);
+      expect((await approvedRemovalsFor(makeStudent())).size).toBe(0);
+    });
   });
 });
 
@@ -191,7 +216,9 @@ describe('GET /api/academic-history/:studentId/mandatory-candidates', () => {
   /** Student.findById(...).populate(...) resolving to `student`. */
   const populated = (student) => ({ populate: jest.fn().mockResolvedValue(student) });
 
-  const withData = (student, records) => {
+  /** `approvedRemovals` are the course ids with an Approved removal request (req 69). */
+  const withData = (student, records, approvedRemovals = []) => {
+    MandatoryRemovalRequest.distinct.mockResolvedValue(approvedRemovals);
     Student.findById.mockReturnValue(populated(student));
     CourseRecord.find.mockReturnValue({ populate: () => ({ lean: () => Promise.resolve(records) }) });
     Course.find.mockReturnValue({ select: () => ({ lean: () => Promise.resolve(CATALOGUE) }) });
@@ -238,6 +265,19 @@ describe('GET /api/academic-history/:studentId/mandatory-candidates', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.candidates).toEqual([]);
+  });
+
+  it('leaves out a course once its removal has been approved (req 69), and keeps the others', async () => {
+    const student = makeStudent();
+    const records = cleanRecords()
+      .map((row) => (row.course === CSEN102 ? { ...row, grade: 'F' } : row))
+      .map((row) => (row.course === MATH103 ? { ...row, grade: 'F' } : row));
+    withData(student, records, [CSEN102._id]);
+
+    const res = await request(app).get(url(student._id)).set('Authorization', tokenFor('Coordinator'));
+
+    expect(res.status).toBe(200);
+    expect(res.body.candidates.map((candidate) => candidate.course.code)).toEqual(['MATH 103']);
   });
 
   it('is closed to Students', async () => {

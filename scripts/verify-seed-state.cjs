@@ -79,8 +79,11 @@ const dump = async (db) => {
 const buildChecks = (data) => {
   const terms = new Map(data.academicterms.map((t) => [String(t._id), `${t.academicYear} ${t.season}`]));
   const students = new Map(data.students.map((s) => [String(s._id), `${s.major}::${s.currentSemester}::${s.studentType}`]));
+  const studentNumbers = new Map(data.students.map((s) => [String(s._id), s.studentId]));
   const slots = new Map(data.courseslots.map((s) => [String(s._id), `${s.dayOfWeek}|${s.startTime}|${s.slotType}`]));
   const courses = new Map(data.courses.map((c) => [String(c._id), c.courseCode]));
+  const removalCourses = new Map(data.courses.map((c) => [String(c._id), c.code]));
+  const userEmails = new Map(data.users.map((u) => [String(u._id), u.email]));
 
   return [
     // password hashes are dropped here and verified separately
@@ -127,6 +130,17 @@ const buildChecks = (data) => {
         ...r,
         studentId: students.get(String(r.studentId)),
         courseId: courses.get(String(r.courseId)),
+      })),
+    ],
+    [
+      'mandatoryremovalrequests',
+      fingerprint(data.mandatoryremovalrequests ?? [], (request) => ({
+        ...request,
+        student: studentNumbers.get(String(request.student)),
+        course: removalCourses.get(String(request.course)),
+        advisor: userEmails.get(String(request.advisor)),
+        pairedCourse: removalCourses.get(String(request.pairedCourse)),
+        decidedBy: userEmails.get(String(request.decidedBy)),
       })),
     ],
   ];

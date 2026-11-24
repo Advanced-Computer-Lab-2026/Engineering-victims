@@ -41,6 +41,7 @@ const { seedSchedulingPreferences } = require('./schedulingPreferenceSeed');
 const { seedGraduationPlans } = require('./graduationPlanSeed');
 const { seedExtraHoursRequests } = require('./extraHoursDemoSeed');
 const { seedExtraHoursPayments } = require('./extraHoursPaymentDemoSeed');
+const { seedMandatoryRemovalRequests } = require('./mandatoryRemovalDemoSeed');
 const {
   seedSlotChangeRequests,
   seedExitExamRequests,
@@ -819,6 +820,7 @@ const seed = async () => {
   const walletTransactions = await seedWallets(students);
   // Req 54: completed (graded) and current courses for the Advising Students.
   const courseRecords = await seedAcademicHistory({ students, courses, offerings });
+  const mandatoryRemovalRequests = await seedMandatoryRemovalRequests({ students, users: created });
   const extraHoursRequests = await seedExtraHoursRequests({ students, users: created, terms, courses });
   // Reqs 95, 97-102, 127: approved requests already settled, so the financial
   // records screens open on real rows instead of an empty list. The seeder
@@ -908,6 +910,7 @@ const seed = async () => {
     schedulingPreferences,
     walletTransactions,
     courseRecords,
+    mandatoryRemovalRequests,
     extraHoursRequests,
     extraHoursPayments,
     graduationPlans: graduationPlans.length,
