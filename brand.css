@@ -3,10 +3,10 @@
    --------------------------------------------------------------------------
    Palette and typeface for the University Schedule Management System.
 
-   Modern dashboard design: Royal blue (#4169E1) primary with card-based
-   layout, soft shadows, rounded corners. Friendly, professional aesthetic.
+   Light workspace with one accessible blue (#2459CC) action family, neutral
+   navigation and semantic status colors.
    
-   See decisions/011-modern-dashboard-redesign.md.
+   See decisions/012-navigation-and-action-repair.md.
    ========================================================================== */
 
 :root {
@@ -29,7 +29,7 @@
   --blue-900: #1e3a8a;
 
   /* ---------- Light roles (default) ----------------------------------- */
-  --brand-primary: #4169E1;
+  --brand-primary: #2459cc;
   --brand-on-primary: #ffffff;
   --brand-primary-container: #dbeafe;
   --brand-on-primary-container: #1e3a8a;
@@ -67,7 +67,7 @@
   --brand-surface: #ffffff;
   --brand-on-surface: #111827;
   --brand-surface-variant: #f9fafb;
-  --brand-on-surface-variant: #6b7280;
+  --brand-on-surface-variant: #526078;
 
   --brand-surface-container-lowest: #ffffff;
   --brand-surface-container-low: #fafbfc;
@@ -75,7 +75,7 @@
   --brand-surface-container-high: #f0f2f5;
   --brand-surface-container-highest: #e5e7eb;
 
-  --brand-outline: #d1d5db;
+  --brand-outline: #a5b2c5;
   --brand-outline-variant: #e5e7eb;
 
   --brand-inverse-surface: #1f2937;

@@ -1,14 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, User } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, User, Menu, PanelLeftClose } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
+import HistoryButtons from './HistoryButtons';
 
 /**
  * Clean top navigation bar with search, notifications, and user menu.
  * Follows modern dashboard patterns. See decisions/011-modern-dashboard-redesign.md.
  */
-const TopNavBar: React.FC = () => {
+const TopNavBar: React.FC<{ navExpanded: boolean; isDesktop: boolean }> = ({ navExpanded, isDesktop }) => {
   const navigate = useNavigate();
   const { user, logout } = useSession();
   const { unreadCount } = useUnreadCount();
@@ -45,17 +46,24 @@ const TopNavBar: React.FC = () => {
   if (!user) return null;
 
   return (
-    <header className="sticky left-0 right-0 top-0 z-30 bg-white/80 backdrop-blur-md lg:left-64">
-      <div className="flex h-20 items-center justify-between gap-4 px-6">
+    <header className="sticky top-0 z-sticky border-b border-outline-variant bg-surface">
+      <div className="flex min-h-16 items-center justify-between gap-3 px-4 md:px-6">
         {/* Left side - could add breadcrumbs or page context here */}
-        <div className="flex-1" />
+        <div className="flex items-center gap-2">
+          <button type="button" className="nav-toggle flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant hover:bg-surface-container focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={navExpanded ? 'Collapse navigation' : 'Expand navigation'} aria-controls="main-navigation" aria-expanded={navExpanded}
+            onClick={() => document.dispatchEvent(new CustomEvent('toggle-nav'))}>
+            {navExpanded && isDesktop ? <PanelLeftClose className="h-5 w-5" aria-hidden /> : <Menu className="h-5 w-5" aria-hidden />}
+          </button>
+          <HistoryButtons />
+        </div>
 
         {/* Right side actions */}
         <div className="flex items-center gap-3">
           {/* Greeting */}
           <div className="hidden text-right lg:block">
-            <p className="text-body text-gray-900">Hello, <strong className="font-semibold">{user.fullName?.split(' ')[0]}</strong></p>
-            <p className="text-caption text-gray-600">Welcome to GUC {user.role}</p>
+            <p className="text-body text-on-surface">Hello, <strong className="font-semibold">{user.fullName?.split(' ')[0]}</strong></p>
+            <p className="text-caption text-on-surface-variant">Welcome to GUC {user.role}</p>
           </div>
 
           {/* Notifications */}
@@ -63,11 +71,11 @@ const TopNavBar: React.FC = () => {
             type="button"
             onClick={handleNotificationsClick}
             aria-label={unreadCount ? `${unreadCount} unread notifications` : 'Notifications'}
-            className="relative flex h-11 w-11 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100"
+            className="relative flex h-11 w-11 items-center justify-center rounded-xl text-on-surface-variant transition-colors hover:bg-surface-container"
           >
             <Bell className="h-5 w-5" aria-hidden />
             {!!unreadCount && (
-              <span className="absolute right-0.5 top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1.5 text-caption font-bold leading-none text-white shadow-sm">
+              <span className="absolute right-0.5 top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-error px-1.5 text-caption font-bold leading-none text-on-error shadow-sm">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -80,22 +88,23 @@ const TopNavBar: React.FC = () => {
               onClick={() => setUserMenuOpen(!userMenuOpen)}
               aria-expanded={userMenuOpen}
               aria-haspopup="true"
-              className="flex h-11 items-center gap-2 rounded-xl bg-gray-100 px-3 text-gray-700 transition-colors hover:bg-gray-200"
+              aria-label="Account menu"
+              className="flex h-11 items-center gap-2 rounded-xl bg-surface-container px-3 text-on-surface transition-colors hover:bg-surface-container-high"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-caption font-bold text-white shadow-sm">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-container text-caption font-bold text-on-primary-container">
                 {user.fullName?.charAt(0).toUpperCase() ?? 'U'}
               </div>
               <ChevronDown className="h-4 w-4" aria-hidden />
             </button>
 
             {userMenuOpen && (
-              <div className="absolute right-0 top-14 w-64 rounded-2xl border border-gray-200 bg-white shadow-xl">
-                <div className="border-b border-gray-100 p-4">
-                  <p className="truncate text-body font-semibold text-gray-900">
+              <div className="absolute right-0 top-14 w-64 rounded-2xl border border-outline-variant bg-surface shadow-xl">
+                <div className="border-b border-outline-variant p-4">
+                  <p className="truncate text-body font-semibold text-on-surface">
                     {user.fullName}
                   </p>
-                  <p className="truncate text-caption text-gray-600">{user.email}</p>
-                  <span className="mt-2 inline-flex items-center rounded-full bg-blue-50 px-2.5 py-1 text-caption font-semibold text-blue-700">
+                  <p className="truncate text-caption text-on-surface-variant">{user.email}</p>
+                  <span className="mt-2 inline-flex items-center rounded-full bg-primary-container px-2.5 py-1 text-caption font-semibold text-on-primary-container">
                     {user.role}
                   </span>
                 </div>
@@ -106,7 +115,7 @@ const TopNavBar: React.FC = () => {
                       setUserMenuOpen(false);
                       navigate('/profile');
                     }}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-body text-gray-700 transition-colors hover:bg-gray-50"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-body text-on-surface transition-colors hover:bg-surface-container-low"
                   >
                     <User className="h-5 w-5" aria-hidden />
                     Profile
@@ -114,7 +123,7 @@ const TopNavBar: React.FC = () => {
                   <button
                     type="button"
                     onClick={handleLogout}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-body text-red-600 transition-colors hover:bg-red-50"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-body text-error transition-colors hover:bg-error-container"
                   >
                     <LogOut className="h-5 w-5" aria-hidden />
                     Sign Out

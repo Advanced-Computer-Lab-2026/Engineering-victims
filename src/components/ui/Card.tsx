@@ -7,9 +7,9 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const TONES: Record<CardTone, string> = {
-  default: 'bg-white border-gray-200',
-  raised: 'bg-white border-gray-200 shadow-lg shadow-gray-200/50',
-  flat: 'bg-white border-gray-100',
+  default: 'bg-surface border-outline-variant',
+  raised: 'bg-surface border-outline-variant shadow-elevation-1',
+  flat: 'bg-surface border-outline-variant',
 };
 
 /**

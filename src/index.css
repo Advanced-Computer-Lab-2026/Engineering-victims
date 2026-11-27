@@ -16,6 +16,59 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Navigation stays mounted for entry and exit motion; desktop width and the
+   mobile transform are independent, so neither breakpoint cancels the other. */
+.app-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: var(--z-modal);
+  display: flex;
+  flex-direction: column;
+  width: min(80vw, calc(var(--space-64) * 4));
+  height: 100dvh;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-outline-variant);
+  transform: translateX(-100%);
+  visibility: hidden;
+  transition: transform var(--duration-slow) var(--ease-standard),
+    width var(--duration-base) var(--ease-standard),
+    visibility var(--duration-slow);
+}
+.app-sidebar--open { transform: translateX(0); visibility: visible; }
+.sidebar-desktop-space { display: none; }
+.sidebar-brand { min-height: var(--space-80); border-bottom: 1px solid var(--color-outline-variant); }
+.sidebar-links { padding-top: var(--space-16); }
+.sidebar-link { text-decoration: none; }
+.sidebar-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.sidebar-label { transition: opacity var(--duration-fast) var(--ease-standard); }
+.nav-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: color-mix(in srgb, var(--color-scrim) 40%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--duration-base) var(--ease-standard), visibility var(--duration-slow);
+}
+.nav-scrim--open { opacity: 1; visibility: visible; }
+.app-button { transition: background-color var(--duration-fast), color var(--duration-fast), border-color var(--duration-fast); }
+.app-button svg { flex-shrink: 0; }
+.page-header__actions { margin-left: auto; align-self: center; }
+@media (max-width: 767px) {
+  .page-header__actions { width: 100%; margin-left: 0; }
+  .page-header__actions > button { flex: 1; }
+}
+@media (min-width: 1024px) {
+  .sidebar-desktop-space { display: block; width: var(--space-80); flex-shrink: 0; }
+  .app-sidebar { position: fixed; width: calc(var(--space-64) * 4); transform: none; visibility: visible; overflow: hidden; transition: none; box-shadow: var(--shadow-2); }
+  .app-sidebar--collapsed { width: var(--space-80); }
+  .app-sidebar .sidebar-brand, .app-sidebar .sidebar-links { width: calc(var(--space-64) * 4); }
+  .app-sidebar--collapsed .sidebar-label { opacity: 0; }
+  .app-sidebar--collapsed .sidebar-badge { opacity: 0; }
+  .nav-scrim { display: none; }
+}
+
 @layer base {
   html {
     font-family: theme('fontFamily.sans');

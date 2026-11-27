@@ -194,7 +194,7 @@ const DashboardPage: React.FC = () => {
         <section className="mb-6" aria-labelledby="student-overview-heading">
           <h2
             id="student-overview-heading"
-            className="mb-3 text-h3 font-bold text-gray-900"
+            className="mb-3 text-h3 font-bold text-on-surface"
           >
             Your semester at a glance
           </h2>
@@ -254,8 +254,8 @@ const DashboardPage: React.FC = () => {
       )}
 
       <Card tone="raised" className="mt-6 p-6">
-        <h2 className="text-h3 font-bold text-gray-900">Getting started</h2>
-        <p className="mt-1 text-body text-gray-700">
+        <h2 className="text-h3 font-bold text-on-surface">Getting started</h2>
+        <p className="mt-1 text-body text-on-surface-variant">
           Every page in the sidebar is listed here too. Your access depends on your role.
         </p>
         {/* Same source as the sidebar, filtered by the same rules, so the two can
@@ -333,17 +333,17 @@ interface StatCardProps {
  * colour of its own.
  */
 const TONES = [
-  { icon: 'text-blue-600', ring: 'hover:border-blue-600 focus-visible:ring-blue-600' },
-  { icon: 'text-blue-600', ring: 'hover:border-blue-600 focus-visible:ring-blue-600' },
-  { icon: 'text-blue-600', ring: 'hover:border-blue-600 focus-visible:ring-blue-600' },
-  { icon: 'text-blue-600', ring: 'hover:border-blue-600 focus-visible:ring-blue-600' },
+  { icon: 'text-primary', ring: 'hover:border-primary focus-visible:ring-primary' },
+  { icon: 'text-primary', ring: 'hover:border-primary focus-visible:ring-primary' },
+  { icon: 'text-primary', ring: 'hover:border-primary focus-visible:ring-primary' },
+  { icon: 'text-primary', ring: 'hover:border-primary focus-visible:ring-primary' },
 ];
 
 const TONE_CLASSES: Record<StatCardProps['tone'], string> = {
-  indigo: 'bg-blue-100 text-blue-700',
-  sky: 'bg-blue-100 text-blue-700',
-  amber: 'bg-blue-100 text-blue-700',
-  rose: 'bg-blue-100 text-blue-700',
+  indigo: 'bg-primary-container text-on-primary-container',
+  sky: 'bg-primary-container text-on-primary-container',
+  amber: 'bg-primary-container text-on-primary-container',
+  rose: 'bg-primary-container text-on-primary-container',
 };
 
 const StatCard: React.FC<StatCardProps> = ({ label, value, detail, icon, tone, onClick }) => {
@@ -373,9 +373,9 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, detail, icon, tone, o
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-caption font-medium uppercase tracking-eyebrow text-gray-600">{label}</p>
-          <p className="mt-1 text-h1 font-bold tracking-tight text-gray-900">{value}</p>
-          <p className="mt-1 truncate text-caption text-gray-700">{detail}</p>
+          <p className="text-caption font-medium uppercase tracking-eyebrow text-on-surface-variant">{label}</p>
+          <p className="mt-1 text-h1 font-bold tracking-tight text-on-surface">{value}</p>
+          <p className="mt-1 truncate text-caption text-on-surface-variant">{detail}</p>
         </div>
         <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${TONE_CLASSES[tone]}`}>
           {icon}

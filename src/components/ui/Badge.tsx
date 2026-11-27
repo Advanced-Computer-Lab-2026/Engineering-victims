@@ -13,21 +13,21 @@ interface BadgeProps {
 }
 
 const TONES: Record<BadgeTone, string> = {
-  neutral: 'bg-gray-100 text-gray-800 ring-gray-200',
-  indigo: 'bg-blue-50 text-blue-800 ring-blue-200',
-  emerald: 'bg-blue-50 text-blue-800 ring-blue-200',
-  amber: 'bg-blue-50 text-blue-800 ring-blue-200',
-  rose: 'bg-blue-50 text-blue-800 ring-blue-200',
-  sky: 'bg-blue-50 text-blue-800 ring-blue-200',
+  neutral: 'bg-surface-container text-on-surface-variant ring-outline-variant',
+  indigo: 'bg-primary-container text-on-primary-container ring-primary-container',
+  emerald: 'bg-success-container text-on-success-container ring-success-container',
+  amber: 'bg-warning-container text-on-warning-container ring-warning-container',
+  rose: 'bg-error-container text-on-error-container ring-error-container',
+  sky: 'bg-info-container text-on-info-container ring-info-container',
 };
 
 const DOTS: Record<BadgeTone, string> = {
-  neutral: 'bg-gray-500',
-  indigo: 'bg-blue-600',
-  emerald: 'bg-blue-600',
-  amber: 'bg-blue-600',
-  rose: 'bg-blue-600',
-  sky: 'bg-blue-600',
+  neutral: 'bg-on-surface-variant',
+  indigo: 'bg-primary',
+  emerald: 'bg-success',
+  amber: 'bg-warning',
+  rose: 'bg-error',
+  sky: 'bg-info',
 };
 
 const Badge: React.FC<BadgeProps> = ({ tone = 'neutral', dot = false, icon = null, className = '', children }) => (
