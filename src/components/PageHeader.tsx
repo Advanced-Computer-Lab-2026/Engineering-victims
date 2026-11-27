@@ -16,15 +16,15 @@ const PageHeader: React.FC<PageHeaderProps> = ({ title, description, meta, onOpe
         type="button"
         onClick={onOpenNav}
         aria-label="Open navigation"
-        className="flex h-11 w-11 items-center justify-center rounded-lg text-on-surface-variant transition-colors hover:bg-surface-container hover:text-on-surface lg:hidden"
+        className="flex h-11 w-11 items-center justify-center rounded-xl text-gray-700 transition-colors hover:bg-gray-100 lg:hidden"
       >
         <Menu className="h-5 w-5" aria-hidden />
       </button>
     )}
 
     <div className="min-w-0 flex-1">
-      <h1 className="text-h2 font-bold tracking-tight text-on-surface md:text-h1">{title}</h1>
-      {description && <p className="mt-1 text-body text-on-surface-variant">{description}</p>}
+      <h1 className="text-h2 font-bold tracking-tight text-gray-900 md:text-h1">{title}</h1>
+      {description && <p className="mt-1 text-body text-gray-700">{description}</p>}
     </div>
 
     {meta && <div className="shrink-0">{meta}</div>}

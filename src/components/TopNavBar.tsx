@@ -48,12 +48,12 @@ const TopNavBar: React.FC = () => {
     <header className="sticky left-0 right-0 top-0 z-30 bg-white/80 backdrop-blur-md lg:left-20">
       <div className="flex h-20 items-center justify-between gap-4 px-6">
         {/* Search bar */}
-        <div className="flex max-w-md flex-1 items-center gap-3 rounded-2xl bg-gray-100 px-4 py-3 text-gray-600 transition-colors focus-within:bg-gray-200 focus-within:ring-2 focus-within:ring-primary/20">
+        <div className="flex max-w-md flex-1 items-center gap-3 rounded-2xl bg-gray-100 px-4 py-3 text-gray-700 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20">
           <Search className="h-5 w-5" aria-hidden />
           <input
             type="text"
             placeholder="Search transactions, courses, students..."
-            className="flex-1 bg-transparent text-body text-gray-900 placeholder-gray-500 outline-none"
+            className="flex-1 bg-transparent text-body text-gray-900 placeholder-gray-600 outline-none"
           />
         </div>
 
@@ -61,8 +61,8 @@ const TopNavBar: React.FC = () => {
         <div className="flex items-center gap-3">
           {/* Greeting */}
           <div className="hidden text-right lg:block">
-            <p className="text-caption text-gray-600">Hello, <strong className="text-gray-900">{user.fullName?.split(' ')[0]}</strong></p>
-            <p className="text-caption text-gray-500">Welcome to STMIK {user.role}</p>
+            <p className="text-body text-gray-900">Hello, <strong className="font-semibold">{user.fullName?.split(' ')[0]}</strong></p>
+            <p className="text-caption text-gray-600">Welcome to GUC {user.role}</p>
           </div>
 
           {/* Notifications */}
