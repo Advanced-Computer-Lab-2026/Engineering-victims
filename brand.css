@@ -44,25 +44,25 @@
   --brand-tertiary-container: #ede9fe;
   --brand-on-tertiary-container: #5b21b6;
 
-  --brand-error: #ef4444;
+  --brand-error: #dc2626;
   --brand-on-error: #ffffff;
-  --brand-error-container: #fee2e2;
-  --brand-on-error-container: #7f1d1d;
+  --brand-error-container: #fef2f2;
+  --brand-on-error-container: #991b1b;
 
-  --brand-success: #10b981;
+  --brand-success: #059669;
   --brand-on-success: #ffffff;
   --brand-success-container: #d1fae5;
-  --brand-on-success-container: #064e3b;
+  --brand-on-success-container: #065f46;
 
-  --brand-warning: #f59e0b;
-  --brand-on-warning: #000000;
+  --brand-warning: #d97706;
+  --brand-on-warning: #ffffff;
   --brand-warning-container: #fef3c7;
-  --brand-on-warning-container: #78350f;
+  --brand-on-warning-container: #92400e;
 
-  --brand-info: #3b82f6;
+  --brand-info: #0284c7;
   --brand-on-info: #ffffff;
-  --brand-info-container: #dbeafe;
-  --brand-on-info-container: #1e3a8a;
+  --brand-info-container: #e0f2fe;
+  --brand-on-info-container: #075985;
 
   --brand-surface: #ffffff;
   --brand-on-surface: #111827;

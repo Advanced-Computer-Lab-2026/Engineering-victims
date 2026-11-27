@@ -45,7 +45,7 @@ const TopNavBar: React.FC = () => {
   if (!user) return null;
 
   return (
-    <header className="sticky left-0 right-0 top-0 z-30 bg-white/80 backdrop-blur-md lg:left-20">
+    <header className="sticky left-0 right-0 top-0 z-30 bg-white/80 backdrop-blur-md lg:left-64">
       <div className="flex h-20 items-center justify-between gap-4 px-6">
         {/* Left side - could add breadcrumbs or page context here */}
         <div className="flex-1" />
