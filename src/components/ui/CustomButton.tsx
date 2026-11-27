@@ -15,14 +15,14 @@ interface CustomButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement
 
 const VARIANTS: Record<Variant, string> = {
   primary:
-    'bg-primary text-on-primary shadow-elevation-1 hover:brightness-110 active:translate-y-px disabled:hover:brightness-100',
+    'bg-primary text-on-primary shadow-md hover:shadow-lg hover:brightness-105 active:scale-[0.98] disabled:hover:brightness-100',
   secondary:
-    'bg-surface-container text-on-surface ring-1 ring-inset ring-outline-variant hover:bg-surface-container-high active:translate-y-px',
-  ghost: 'text-on-surface-variant hover:bg-surface-container hover:text-on-surface active:translate-y-px',
+    'bg-white text-gray-700 ring-2 ring-inset ring-gray-200 hover:bg-gray-50 active:scale-[0.98]',
+  ghost: 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 active:scale-[0.98]',
   // Destructive action that lives outside a filled primary slot, e.g. sign out.
   'danger-ghost':
-    'text-on-surface-variant hover:bg-error-container hover:text-on-error-container active:translate-y-px',
-  danger: 'bg-error text-on-error hover:brightness-110 active:translate-y-px',
+    'text-gray-600 hover:bg-red-50 hover:text-red-600 active:scale-[0.98]',
+  danger: 'bg-error text-on-error shadow-md hover:shadow-lg hover:brightness-105 active:scale-[0.98]',
 };
 
 const SIZES: Record<Size, string> = {
@@ -50,7 +50,7 @@ const CustomButton: React.FC<CustomButtonProps> = ({
       type={type}
       disabled={isDisabled}
       aria-busy={isLoading || undefined}
-      className={`inline-flex items-center justify-center rounded-lg font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:opacity-50 disabled:cursor-not-allowed ${
+      className={`inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
         VARIANTS[variant]
       } ${SIZES[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
       {...props}

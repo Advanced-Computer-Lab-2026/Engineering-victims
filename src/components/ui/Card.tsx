@@ -7,16 +7,20 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const TONES: Record<CardTone, string> = {
-  default: 'bg-surface-container-low border-outline-variant',
-  raised: 'bg-surface-container border-outline-variant shadow-elevation-2',
-  flat: 'bg-surface-container-low border-outline-variant',
+  default: 'bg-white border-gray-200',
+  raised: 'bg-white border-gray-200 shadow-lg shadow-gray-200/50',
+  flat: 'bg-white border-gray-100',
 };
 
+/**
+ * Card component with modern rounded corners and soft shadows.
+ * See decisions/011-modern-dashboard-redesign.md.
+ */
 const Card = forwardRef<HTMLDivElement, CardProps>(
   ({ tone = 'default', className = '', children, ...props }, ref) => (
     <div
       ref={ref}
-      className={`rounded-lg border ${TONES[tone]} relative overflow-hidden ${className}`}
+      className={`rounded-2xl border ${TONES[tone]} relative overflow-hidden ${className}`}
       {...props}
     >
       {children}

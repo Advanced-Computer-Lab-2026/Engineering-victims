@@ -33,7 +33,7 @@ const AppLayout: React.FC = () => {
   }, [pathname]);
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-gray-50 font-sans text-on-surface">
+    <div className="flex h-dvh overflow-hidden bg-gray-100 font-sans text-on-surface">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
