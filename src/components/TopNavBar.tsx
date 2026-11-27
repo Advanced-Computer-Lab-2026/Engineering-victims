@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, ChevronDown, LogOut, Search, User } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, User } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 
@@ -47,15 +47,8 @@ const TopNavBar: React.FC = () => {
   return (
     <header className="sticky left-0 right-0 top-0 z-30 bg-white/80 backdrop-blur-md lg:left-20">
       <div className="flex h-20 items-center justify-between gap-4 px-6">
-        {/* Search bar */}
-        <div className="flex max-w-md flex-1 items-center gap-3 rounded-2xl bg-gray-100 px-4 py-3 text-gray-700 transition-colors focus-within:bg-white focus-within:ring-2 focus-within:ring-primary/20">
-          <Search className="h-5 w-5" aria-hidden />
-          <input
-            type="text"
-            placeholder="Search transactions, courses, students..."
-            className="flex-1 bg-transparent text-body text-gray-900 placeholder-gray-600 outline-none"
-          />
-        </div>
+        {/* Left side - could add breadcrumbs or page context here */}
+        <div className="flex-1" />
 
         {/* Right side actions */}
         <div className="flex items-center gap-3">
