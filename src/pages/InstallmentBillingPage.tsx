@@ -7,6 +7,7 @@ import CustomButton from '../components/ui/CustomButton';
 import CustomInput from '../components/ui/CustomInput';
 import AlertBanner from '../components/ui/AlertBanner';
 import ConfirmDialog from '../components/ui/ConfirmDialog';
+import InstallmentsEmptyState from '../components/InstallmentsEmptyState';
 import { listBillingPlans, createBillingPlan, searchBillingStudents, assignBillingPlan, listBillingInstallments, recordBillingEntry, type BillingPlan, type BillingStudent, type BillingInstallment } from '../lib/installmentBillingService';
 const money = (value: number) => `EGP ${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const inputStyle = 'block w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-slate-100';
@@ -36,14 +37,16 @@ const InstallmentBillingPage: React.FC = () => {
   const [plans, setPlans] = useState<BillingPlan[]>([]), [students, setStudents] = useState<BillingStudent[]>([]), [student, setStudent] = useState<BillingStudent | null>(null);
   const [rows, setRows] = useState<BillingInstallment[]>([]), [search, setSearch] = useState(''), [selectedPlan, setSelectedPlan] = useState('');
   const [name, setName] = useState(''), [year, setYear] = useState(''), [entries, setEntries] = useState([{ label: '', dueDate: '', baseAmount: '' }]);
-  const [busy, setBusy] = useState(false), [error, setError] = useState<string | null>(null), [success, setSuccess] = useState<string | null>(null), [refresh, setRefresh] = useState(0);
+  // Starts busy: the very first paint is the loading line, never a flash of
+  // the empty state before the installments request has even been sent.
+  const [busy, setBusy] = useState(true), [error, setError] = useState<string | null>(null), [success, setSuccess] = useState<string | null>(null), [refresh, setRefresh] = useState(0);
   const [assignConfirm, setAssignConfirm] = useState(false); const [isRefreshing, setIsRefreshing] = useState(false); const refreshRows = () => { setIsRefreshing(true); setRefresh((value) => value + 1); };
   // Every refresh bump re-runs both effects: staff clear on the plans fetch,
   // students on the installments fetch, so the spinner always stops.
   useEffect(() => { if (staff) void listBillingPlans().then((result) => setPlans(result.plans)).catch((error) => setError(errorMessage(error))).finally(() => setIsRefreshing(false)); }, [staff, refresh]);
   useEffect(() => {
     let active = true; setRows([]);
-    if (staff && !student) return;
+    if (staff && !student) { setBusy(false); return; }
     setBusy(true); setError(null);
     void listBillingInstallments(staff ? student?.id : undefined).then((result) => { if (active) setRows(result.installments); }).catch((error) => { if (active) setError(errorMessage(error)); }).finally(() => { if (active) { setBusy(false); setIsRefreshing(false); } });
     return () => { active = false; };
@@ -67,7 +70,14 @@ const InstallmentBillingPage: React.FC = () => {
       <ConfirmDialog open={assignConfirm} title="Assign installment plan" tone="warning" isLoading={busy} confirmLabel="Assign plan" message={<>Assign {plans.find((plan) => plan.id === selectedPlan)?.name} to {student?.name}? This creates the student's tuition installments. A different plan cannot replace an existing academic-year assignment here.</>} onCancel={() => { if (!busy) setAssignConfirm(false); }} onConfirm={() => { if (student && selectedPlan) void run(() => assignBillingPlan(student.id, selectedPlan)).then(() => setAssignConfirm(false)); }} />
     </div>}
     {busy && <p role="status" className="mb-4 text-slate-400">Loading or saving billing records…</p>}
-    {!busy && !rows.length && <p className="text-slate-400">{staff && !student ? 'Choose a student to view or assign installments.' : 'No installment plan has been assigned yet.'}</p>}
+    {/* An empty list means two different things: for staff it is "pick a
+        student first"; for a student it is genuinely nothing to pay, which
+        gets the astronaut. */}
+    {!busy && !rows.length && (staff ? (
+      <p className="text-slate-400">{student ? 'No installment plan has been assigned yet.' : 'Choose a student to view or assign installments.'}</p>
+    ) : (
+      <InstallmentsEmptyState />
+    ))}
     <div className="space-y-4">{rows.map((row) => <Card key={row.id} className="space-y-3 p-5"><h2 className="font-semibold text-white">{row.label} · {row.academicYear}</h2><p className="break-all text-sm text-slate-400">{row.reference} · Due {new Date(row.dueDate).toLocaleDateString()} · {row.status}</p>
       <dl className="grid gap-2 text-sm text-slate-300 sm:grid-cols-3">{[['Base tuition', row.baseAmount], ['Adjustments', row.adjustments], ['Deferred extra hours', row.deferredAmount], ['Total', row.total], ['Payments received', row.paid], ['Amount due', row.amountDue]].map(([label, value]) => <div key={label}><dt>{label}</dt><dd className="font-semibold text-white">{money(Number(value))}</dd></div>)}</dl>
       {row.charges.map((charge) => <p key={charge.reference} className="break-all text-sm text-slate-300">Extra-hours charge {charge.reference}: {money(charge.amount)} · {charge.status}</p>)}

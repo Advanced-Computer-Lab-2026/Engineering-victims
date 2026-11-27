@@ -61,6 +61,432 @@
   }
 }
 
+/* Opening animation on the sign-in route (decisions/005-login-intro-animation.md).
+   A wordmark that writes itself in, a brand hairline, then a hand-over.
+
+   It is decorative: the overlay is aria-hidden and pointer-events-free, and
+   the component unmounts itself once the last keyframe has run. Under
+   prefers-reduced-motion it never renders. Motion resolves to the tokens only
+   — one stagger step per --duration-fast, one beat per --duration-slow. */
+.guc-intro {
+  animation: guc-intro-leave var(--duration-slow) var(--ease-accelerate) both;
+  animation-delay: calc(var(--duration-slow) * 4);
+}
+
+.guc-intro__letter {
+  display: inline-block;
+  padding-inline: var(--space-8);
+  animation: guc-intro-write var(--duration-slow) var(--ease-decelerate) both;
+  animation-delay: var(--duration-fast);
+}
+
+.guc-intro__letter:nth-child(2) {
+  animation-delay: calc(var(--duration-fast) * 2);
+}
+
+.guc-intro__letter:nth-child(3) {
+  animation-delay: calc(var(--duration-fast) * 3);
+}
+
+.guc-intro__rule {
+  transform-origin: center;
+  animation: guc-intro-rule var(--duration-base) var(--ease-decelerate) both;
+  animation-delay: calc(var(--duration-fast) * 4);
+}
+
+.guc-intro__caption {
+  animation: guc-intro-reveal var(--duration-base) var(--ease-standard) both;
+  animation-delay: calc(var(--duration-fast) * 5);
+}
+
+@keyframes guc-intro-write {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-16));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(var(--space-0));
+  }
+}
+
+@keyframes guc-intro-rule {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes guc-intro-reveal {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes guc-intro-leave {
+  from {
+    opacity: 1;
+    visibility: visible;
+  }
+  to {
+    opacity: 0;
+    visibility: hidden;
+  }
+}
+
+/* ==========================================================================
+   Astronaut loader — Installments empty state
+   From Uiverse.io by JkHuger - https://uiverse.io/JkHuger/new-deer-97
+   MIT License, Copyright (c) JkHuger (JkHuger)
+
+   Scoped to `astro-*`: the source shipped .body, .head, .arm, .leg and
+   .panel, which would collide with half the page. Adaptations, all of them
+   layout-only — the drawing, colours, timing and easing are the source's:
+     · star coordinates are percentages of the source's 1500 × 700 canvas,
+       so the field fits a card instead of a full page;
+     · the snow fall distance is the field height (100%) instead of 650px;
+     · the figure is scaled through --astro-scale so it never clips;
+     · the source's prefixed gradient syntax is written unprefixed (same
+       stops, same render).
+   The palette below is illustration artwork, not UI colour — see
+   decisions/006-installments-empty-state.md. Every UI colour, size and
+   duration around it still resolves to a token.
+   ========================================================================== */
+
+@keyframes astro-snow {
+  0% {
+    opacity: 0;
+    transform: translateY(0px);
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(100%);
+  }
+}
+
+@keyframes astro-tumble {
+  0% {
+    transform: scale(var(--astro-scale, 0.6)) rotate(0deg);
+  }
+
+  100% {
+    transform: scale(var(--astro-scale, 0.6)) rotate(360deg);
+  }
+}
+
+.astro-stars-1,
+.astro-stars-2,
+.astro-stars-3,
+.astro-stars-4 {
+  position: absolute;
+  z-index: 10;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  transform: translateY(0px);
+}
+
+.astro-stars-1 {
+  animation: astro-snow 5s linear infinite;
+}
+
+.astro-stars-2 {
+  animation: astro-snow 5s -1.64s linear infinite;
+}
+
+.astro-stars-3 {
+  animation: astro-snow 5s -2.30s linear infinite;
+}
+
+.astro-stars-4 {
+  animation: astro-snow 5s -3.30s linear infinite;
+}
+
+.astro-star {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background-color: #fff;
+  position: absolute;
+  z-index: 10;
+  opacity: 0.7;
+}
+
+.astro-star::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #fff;
+  position: absolute;
+  z-index: 10;
+  top: 80px;
+  left: 70px;
+  opacity: 0.7;
+}
+
+.astro-star::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #fff;
+  position: absolute;
+  z-index: 10;
+  top: 8px;
+  left: 170px;
+  opacity: 0.9;
+}
+
+.astro-star-1 {
+  top: 4.29%;
+  left: 1.33%;
+}
+
+.astro-star-2 {
+  top: 15.71%;
+  left: 16.67%;
+}
+
+.astro-star-3 {
+  top: 8.57%;
+  left: 38%;
+}
+
+.astro-star-4 {
+  top: 17.14%;
+  left: 60%;
+}
+
+.astro-star-5 {
+  top: 2.86%;
+  left: 74.67%;
+}
+
+.astro-star-6 {
+  top: 12.86%;
+  left: 85.33%;
+}
+
+.astro-star-7 {
+  top: 4.29%;
+  left: 98.67%;
+}
+
+.astro-astronaut {
+  --astro-scale: 0.6;
+  width: 250px;
+  height: 300px;
+  position: absolute;
+  z-index: 11;
+  top: calc(50% - 150px);
+  left: calc(50% - 125px);
+  animation: astro-tumble 5s linear infinite;
+}
+
+.astro-schoolbag {
+  width: 100px;
+  height: 150px;
+  position: absolute;
+  z-index: 1;
+  top: calc(50% - 75px);
+  left: calc(50% - 50px);
+  background-color: #94b7ca;
+  border-radius: 50px 50px 0 0 / 30px 30px 0 0;
+}
+
+.astro-head {
+  width: 97px;
+  height: 80px;
+  position: absolute;
+  z-index: 3;
+  background: linear-gradient(90deg, #e3e8eb 0%, #e3e8eb 50%, #fbfdfa 50%, #fbfdfa 100%);
+  border-radius: 50%;
+  top: 34px;
+  left: calc(50% - 47.5px);
+}
+
+.astro-head::after {
+  content: "";
+  width: 60px;
+  height: 50px;
+  position: absolute;
+  top: calc(50% - 25px);
+  left: calc(50% - 30px);
+  background: linear-gradient(180deg, #15aece 0%, #15aece 50%, #0391bf 50%, #0391bf 100%);
+  border-radius: 15px;
+}
+
+.astro-head::before {
+  content: "";
+  width: 12px;
+  height: 25px;
+  position: absolute;
+  top: calc(50% - 12.5px);
+  left: -4px;
+  background-color: #618095;
+  border-radius: 5px;
+  box-shadow: 92px 0px 0px #618095;
+}
+
+.astro-body {
+  width: 85px;
+  height: 100px;
+  position: absolute;
+  z-index: 2;
+  background-color: #fffbff;
+  border-radius: 40px / 20px;
+  top: 105px;
+  left: calc(50% - 41px);
+  background: linear-gradient(90deg, #e3e8eb 0%, #e3e8eb 50%, #fbfdfa 50%, #fbfdfa 100%);
+}
+
+.astro-panel {
+  width: 60px;
+  height: 40px;
+  position: absolute;
+  top: 20px;
+  left: calc(50% - 30px);
+  background-color: #b7cceb;
+}
+
+.astro-panel::before {
+  content: "";
+  width: 30px;
+  height: 5px;
+  position: absolute;
+  top: 9px;
+  left: 7px;
+  background-color: #fbfdfa;
+  box-shadow: 0px 9px 0px #fbfdfa, 0px 18px 0px #fbfdfa;
+}
+
+.astro-panel::after {
+  content: "";
+  width: 8px;
+  height: 8px;
+  position: absolute;
+  top: 9px;
+  right: 7px;
+  background-color: #fbfdfa;
+  border-radius: 50%;
+  box-shadow: 0px 14px 0px 2px #fbfdfa;
+}
+
+.astro-arm {
+  width: 80px;
+  height: 30px;
+  position: absolute;
+  top: 121px;
+  z-index: 2;
+}
+
+.astro-arm-left {
+  left: 30px;
+  background-color: #e3e8eb;
+  border-radius: 0 0 0 39px;
+}
+
+.astro-arm-right {
+  right: 30px;
+  background-color: #fbfdfa;
+  border-radius: 0 0 39px 0;
+}
+
+.astro-arm-left::before,
+.astro-arm-right::before {
+  content: "";
+  width: 30px;
+  height: 70px;
+  position: absolute;
+  top: -40px;
+}
+
+.astro-arm-left::before {
+  border-radius: 50px 50px 0px 120px / 50px 50px 0 110px;
+  left: 0;
+  background-color: #e3e8eb;
+}
+
+.astro-arm-right::before {
+  border-radius: 50px 50px 120px 0 / 50px 50px 110px 0;
+  right: 0;
+  background-color: #fbfdfa;
+}
+
+.astro-arm-left::after,
+.astro-arm-right::after {
+  content: "";
+  width: 30px;
+  height: 10px;
+  position: absolute;
+  top: -24px;
+}
+
+.astro-arm-left::after {
+  background-color: #6e91a4;
+  left: 0;
+}
+
+.astro-arm-right::after {
+  right: 0;
+  background-color: #b6d2e0;
+}
+
+.astro-leg {
+  width: 30px;
+  height: 40px;
+  position: absolute;
+  z-index: 2;
+  bottom: 70px;
+}
+
+.astro-leg-left {
+  left: 76px;
+  background-color: #e3e8eb;
+  transform: rotate(20deg);
+}
+
+.astro-leg-right {
+  right: 73px;
+  background-color: #fbfdfa;
+  transform: rotate(-20deg);
+}
+
+.astro-leg-left::before,
+.astro-leg-right::before {
+  content: "";
+  width: 50px;
+  height: 25px;
+  position: absolute;
+  bottom: -26px;
+}
+
+.astro-leg-left::before {
+  left: -20px;
+  background-color: #e3e8eb;
+  border-radius: 30px 0 0 0;
+  border-bottom: 10px solid #6d96ac;
+}
+
+.astro-leg-right::before {
+  right: -20px;
+  background-color: #fbfdfa;
+  border-radius: 0 30px 0 0;
+  border-bottom: 10px solid #b0cfe4;
+}
+
 /* Req 49: Print styles for weekly schedule */
 @media print {
   /* Hide navigation, sidebar, and action buttons */

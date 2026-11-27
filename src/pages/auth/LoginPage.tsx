@@ -8,6 +8,7 @@ import AlertBanner from '../../components/ui/AlertBanner';
 import Card from '../../components/ui/Card';
 import CustomButton from '../../components/ui/CustomButton';
 import CustomInput from '../../components/ui/CustomInput';
+import IntroOverlay from '../../components/IntroOverlay';
 import { usePageTitle } from '../../hooks/usePageTitle';
 import { consumeSessionNotice } from '../../hooks/useSession';
 
@@ -68,6 +69,8 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="bg-surface relative flex min-h-dvh items-center justify-center px-4 py-10">
+      {/* Opening beat on every load/refresh: spells GUC, then gets out of the way. */}
+      <IntroOverlay />
       <img
         src={gucLogo}
         alt="German University in Cairo"
