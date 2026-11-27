@@ -3,13 +3,10 @@
    --------------------------------------------------------------------------
    Palette and typeface for the University Schedule Management System.
 
-   Source color: indigo #4F46E5. Roles follow the Material 3 role names from
-   ui-system/brand.example.css. This file is the only place a project changes
-   colour or font; ui-system/tokens.css aliases these as --color-*.
-
-   The app is dark-only while the brand file still defines every role in both
-   schemes, as required by ui-system/check.sh and docs/using-the-system.md.
-   See decisions/002-indigo-dark-only.md.
+   Admin panel design system: Yellow accent (#fbbf24) on light backgrounds
+   with black sidebar. Professional, high-contrast, data-focused aesthetic.
+   
+   See decisions/010-admin-panel-design-system.md.
    ========================================================================== */
 
 :root {
@@ -19,123 +16,133 @@
   --brand-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
 
-  /* ---------- Light roles --------------------------------------------- */
-  --brand-primary: #4f46e5;
-  --brand-on-primary: #ffffff;
-  --brand-primary-container: #e0e0ff;
-  --brand-on-primary-container: #13006b;
+  /* ---------- Yellow accent primitives -------------------- */
+  --yellow-50: #fefce8;
+  --yellow-100: #fef9c3;
+  --yellow-200: #fef08a;
+  --yellow-300: #fde047;
+  --yellow-400: #facc15;
+  --yellow-500: #eab308;
+  --yellow-600: #ca8a04;
+  --yellow-700: #a16207;
+  --yellow-800: #854d0e;
+  --yellow-900: #713f12;
 
-  --brand-secondary: #5b5d72;
+  /* ---------- Light roles (default) ----------------------------------- */
+  --brand-primary: #fbbf24;
+  --brand-on-primary: #000000;
+  --brand-primary-container: #fef3c7;
+  --brand-on-primary-container: #713f12;
+
+  --brand-secondary: #64748b;
   --brand-on-secondary: #ffffff;
-  --brand-secondary-container: #e0e1f9;
-  --brand-on-secondary-container: #181a2c;
+  --brand-secondary-container: #e2e8f0;
+  --brand-on-secondary-container: #1e293b;
 
-  --brand-tertiary: #77536d;
+  --brand-tertiary: #6366f1;
   --brand-on-tertiary: #ffffff;
-  --brand-tertiary-container: #ffd8ee;
-  --brand-on-tertiary-container: #2d1228;
+  --brand-tertiary-container: #e0e7ff;
+  --brand-on-tertiary-container: #312e81;
 
-  --brand-error: #ba1a1a;
+  --brand-error: #ef4444;
   --brand-on-error: #ffffff;
-  --brand-error-container: #ffdad6;
-  --brand-on-error-container: #410002;
+  --brand-error-container: #fee2e2;
+  --brand-on-error-container: #7f1d1d;
 
-  --brand-success: #2f6b3a;
+  --brand-success: #10b981;
   --brand-on-success: #ffffff;
-  --brand-success-container: #b7f0c0;
-  --brand-on-success-container: #00210a;
+  --brand-success-container: #d1fae5;
+  --brand-on-success-container: #064e3b;
 
-  --brand-warning: #7a5900;
-  --brand-on-warning: #ffffff;
-  --brand-warning-container: #ffe08a;
-  --brand-on-warning-container: #261a00;
+  --brand-warning: #f59e0b;
+  --brand-on-warning: #000000;
+  --brand-warning-container: #fef3c7;
+  --brand-on-warning-container: #78350f;
 
-  --brand-info: #005b8c;
+  --brand-info: #3b82f6;
   --brand-on-info: #ffffff;
-  --brand-info-container: #c9e6ff;
-  --brand-on-info-container: #001e30;
+  --brand-info-container: #dbeafe;
+  --brand-on-info-container: #1e3a8a;
 
-  --brand-surface: #faf8ff;
-  --brand-on-surface: #1b1b21;
-  --brand-surface-variant: #e3e1ec;
-  --brand-on-surface-variant: #46464f;
+  --brand-surface: #ffffff;
+  --brand-on-surface: #111827;
+  --brand-surface-variant: #f3f4f6;
+  --brand-on-surface-variant: #6b7280;
 
   --brand-surface-container-lowest: #ffffff;
-  --brand-surface-container-low: #f4f3fa;
-  --brand-surface-container: #eeedf4;
-  --brand-surface-container-high: #e8e7ee;
-  --brand-surface-container-highest: #e3e2e9;
+  --brand-surface-container-low: #f9fafb;
+  --brand-surface-container: #f3f4f6;
+  --brand-surface-container-high: #e5e7eb;
+  --brand-surface-container-highest: #d1d5db;
 
-  --brand-outline: #767680;
-  --brand-outline-variant: #c7c5d0;
+  --brand-outline: #9ca3af;
+  --brand-outline-variant: #e5e7eb;
 
-  --brand-inverse-surface: #303038;
-  --brand-inverse-on-surface: #f2eff7;
-  --brand-inverse-primary: #bac3ff;
+  --brand-inverse-surface: #1f2937;
+  --brand-inverse-on-surface: #f9fafb;
+  --brand-inverse-primary: #fde047;
 
   --brand-scrim: #000000;
   --brand-shadow: #000000;
 }
 
-/* ---------- Dark roles ------------------------------------------------
-   Both blocks are required. The app forces [data-theme="dark"] on <html>,
-   so the attribute block is the one that renders; the media query stays in
-   sync for completeness.
+/* ---------- Dark roles (black sidebar theme) --------------------------
+   Black sidebar with yellow accents. High contrast for admin interfaces.
    -------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --brand-primary: #a5b4fc;
-    --brand-on-primary: #1e1b4b;
-    --brand-primary-container: #312e81;
-    --brand-on-primary-container: #e0e7ff;
+    --brand-primary: #fbbf24;
+    --brand-on-primary: #000000;
+    --brand-primary-container: #854d0e;
+    --brand-on-primary-container: #fef3c7;
 
-    --brand-secondary: #bfc2dd;
-    --brand-on-secondary: #2d2f42;
-    --brand-secondary-container: #434659;
-    --brand-on-secondary-container: #dadcf5;
+    --brand-secondary: #94a3b8;
+    --brand-on-secondary: #0f172a;
+    --brand-secondary-container: #334155;
+    --brand-on-secondary-container: #e2e8f0;
 
-    --brand-tertiary: #c9a5bf;
-    --brand-on-tertiary: #45263d;
-    --brand-tertiary-container: #5e3c55;
-    --brand-on-tertiary-container: #f7d8ec;
+    --brand-tertiary: #818cf8;
+    --brand-on-tertiary: #1e1b4b;
+    --brand-tertiary-container: #3730a3;
+    --brand-on-tertiary-container: #e0e7ff;
 
-    --brand-error: #ffb4ab;
-    --brand-on-error: #690005;
-    --brand-error-container: #93000a;
-    --brand-on-error-container: #ffdad6;
+    --brand-error: #f87171;
+    --brand-on-error: #7f1d1d;
+    --brand-error-container: #991b1b;
+    --brand-on-error-container: #fee2e2;
 
-    --brand-success: #7bd88f;
-    --brand-on-success: #003912;
-    --brand-success-container: #14522a;
-    --brand-on-success-container: #b7f0c0;
+    --brand-success: #34d399;
+    --brand-on-success: #064e3b;
+    --brand-success-container: #065f46;
+    --brand-on-success-container: #d1fae5;
 
-    --brand-warning: #f5c84c;
-    --brand-on-warning: #3f2e00;
-    --brand-warning-container: #5c4500;
-    --brand-on-warning-container: #ffe08a;
+    --brand-warning: #fbbf24;
+    --brand-on-warning: #78350f;
+    --brand-warning-container: #92400e;
+    --brand-on-warning-container: #fef3c7;
 
-    --brand-info: #9ccbff;
-    --brand-on-info: #00344f;
-    --brand-info-container: #004c73;
-    --brand-on-info-container: #c9e6ff;
+    --brand-info: #60a5fa;
+    --brand-on-info: #1e3a8a;
+    --brand-info-container: #1e40af;
+    --brand-on-info-container: #dbeafe;
 
-    --brand-surface: #0b0f19;
-    --brand-on-surface: #e6e8f0;
-    --brand-surface-variant: #2a2e3d;
-    --brand-on-surface-variant: #a9aec2;
+    --brand-surface: #1a1a1a;
+    --brand-on-surface: #f9fafb;
+    --brand-surface-variant: #2d2d2d;
+    --brand-on-surface-variant: #d1d5db;
 
-    --brand-surface-container-lowest: #070a12;
-    --brand-surface-container-low: #10141f;
-    --brand-surface-container: #151a26;
-    --brand-surface-container-high: #1b2130;
-    --brand-surface-container-highest: #222939;
+    --brand-surface-container-lowest: #0a0a0a;
+    --brand-surface-container-low: #1a1a1a;
+    --brand-surface-container: #262626;
+    --brand-surface-container-high: #333333;
+    --brand-surface-container-highest: #404040;
 
-    --brand-outline: #6b7285;
-    --brand-outline-variant: #343b4d;
+    --brand-outline: #525252;
+    --brand-outline-variant: #404040;
 
-    --brand-inverse-surface: #e6e8f0;
-    --brand-inverse-on-surface: #1b1b21;
-    --brand-inverse-primary: #4f46e5;
+    --brand-inverse-surface: #f9fafb;
+    --brand-inverse-on-surface: #111827;
+    --brand-inverse-primary: #ca8a04;
 
     --brand-scrim: #000000;
     --brand-shadow: #000000;
@@ -143,58 +150,58 @@
 }
 
 [data-theme="dark"] {
-  --brand-primary: #a5b4fc;
-  --brand-on-primary: #1e1b4b;
-  --brand-primary-container: #312e81;
-  --brand-on-primary-container: #e0e7ff;
+  --brand-primary: #fbbf24;
+  --brand-on-primary: #000000;
+  --brand-primary-container: #854d0e;
+  --brand-on-primary-container: #fef3c7;
 
-  --brand-secondary: #bfc2dd;
-  --brand-on-secondary: #2d2f42;
-  --brand-secondary-container: #434659;
-  --brand-on-secondary-container: #dadcf5;
+  --brand-secondary: #94a3b8;
+  --brand-on-secondary: #0f172a;
+  --brand-secondary-container: #334155;
+  --brand-on-secondary-container: #e2e8f0;
 
-  --brand-tertiary: #c9a5bf;
-  --brand-on-tertiary: #45263d;
-  --brand-tertiary-container: #5e3c55;
-  --brand-on-tertiary-container: #f7d8ec;
+  --brand-tertiary: #818cf8;
+  --brand-on-tertiary: #1e1b4b;
+  --brand-tertiary-container: #3730a3;
+  --brand-on-tertiary-container: #e0e7ff;
 
-  --brand-error: #ffb4ab;
-  --brand-on-error: #690005;
-  --brand-error-container: #93000a;
-  --brand-on-error-container: #ffdad6;
+  --brand-error: #f87171;
+  --brand-on-error: #7f1d1d;
+  --brand-error-container: #991b1b;
+  --brand-on-error-container: #fee2e2;
 
-  --brand-success: #7bd88f;
-  --brand-on-success: #003912;
-  --brand-success-container: #14522a;
-  --brand-on-success-container: #b7f0c0;
+  --brand-success: #34d399;
+  --brand-on-success: #064e3b;
+  --brand-success-container: #065f46;
+  --brand-on-success-container: #d1fae5;
 
-  --brand-warning: #f5c84c;
-  --brand-on-warning: #3f2e00;
-  --brand-warning-container: #5c4500;
-  --brand-on-warning-container: #ffe08a;
+  --brand-warning: #fbbf24;
+  --brand-on-warning: #78350f;
+  --brand-warning-container: #92400e;
+  --brand-on-warning-container: #fef3c7;
 
-  --brand-info: #9ccbff;
-  --brand-on-info: #00344f;
-  --brand-info-container: #004c73;
-  --brand-on-info-container: #c9e6ff;
+  --brand-info: #60a5fa;
+  --brand-on-info: #1e3a8a;
+  --brand-info-container: #1e40af;
+  --brand-on-info-container: #dbeafe;
 
-  --brand-surface: #0b0f19;
-  --brand-on-surface: #e6e8f0;
-  --brand-surface-variant: #2a2e3d;
-  --brand-on-surface-variant: #a9aec2;
+  --brand-surface: #1a1a1a;
+  --brand-on-surface: #f9fafb;
+  --brand-surface-variant: #2d2d2d;
+  --brand-on-surface-variant: #d1d5db;
 
-  --brand-surface-container-lowest: #070a12;
-  --brand-surface-container-low: #10141f;
-  --brand-surface-container: #151a26;
-  --brand-surface-container-high: #1b2130;
-  --brand-surface-container-highest: #222939;
+  --brand-surface-container-lowest: #0a0a0a;
+  --brand-surface-container-low: #1a1a1a;
+  --brand-surface-container: #262626;
+  --brand-surface-container-high: #333333;
+  --brand-surface-container-highest: #404040;
 
-  --brand-outline: #6b7285;
-  --brand-outline-variant: #343b4d;
+  --brand-outline: #525252;
+  --brand-outline-variant: #404040;
 
-  --brand-inverse-surface: #e6e8f0;
-  --brand-inverse-on-surface: #1b1b21;
-  --brand-inverse-primary: #4f46e5;
+  --brand-inverse-surface: #f9fafb;
+  --brand-inverse-on-surface: #111827;
+  --brand-inverse-primary: #ca8a04;
 
   --brand-scrim: #000000;
   --brand-shadow: #000000;

@@ -4,6 +4,7 @@ import { useSession } from '../hooks/useSession';
 import { usePageTitle } from '../hooks/usePageTitle';
 import HistoryButtons from './HistoryButtons';
 import Sidebar from './Sidebar';
+import TopNavBar from './TopNavBar';
 
 const AppLayout: React.FC = () => {
   const { user } = useSession();
@@ -32,7 +33,7 @@ const AppLayout: React.FC = () => {
   }, [pathname]);
 
   return (
-    <div className="flex h-dvh overflow-hidden bg-surface font-sans text-on-surface">
+    <div className="flex h-dvh overflow-hidden bg-gray-50 font-sans text-on-surface">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -44,26 +45,30 @@ const AppLayout: React.FC = () => {
         onClose={() => setNavOpen(false)}
       />
 
-      <main
-        ref={mainRef}
-        id="main-content"
-        tabIndex={-1}
-        className="h-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 focus-visible:outline-none md:p-6 lg:p-8"
-      >
-        {/* Same spot on every page, the way a browser keeps its own controls. */}
-        <div className="-ml-1.5 mb-3">
-          <HistoryButtons />
-        </div>
-        <React.Suspense
-          fallback={
-            <div className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant" role="status">
-              Loading page...
-            </div>
-          }
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <TopNavBar />
+
+        <main
+          ref={mainRef}
+          id="main-content"
+          tabIndex={-1}
+          className="h-full min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto p-4 focus-visible:outline-none md:p-6 lg:p-8"
         >
-          <Outlet />
-        </React.Suspense>
-      </main>
+          {/* Same spot on every page, the way a browser keeps its own controls. */}
+          <div className="-ml-1.5 mb-3">
+            <HistoryButtons />
+          </div>
+          <React.Suspense
+            fallback={
+              <div className="flex items-center justify-center gap-2 p-16 text-body text-on-surface-variant" role="status">
+                Loading page...
+              </div>
+            }
+          >
+            <Outlet />
+          </React.Suspense>
+        </main>
+      </div>
     </div>
   );
 };
