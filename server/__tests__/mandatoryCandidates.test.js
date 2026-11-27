@@ -104,6 +104,15 @@ describe('deriveCandidates', () => {
     ]);
   });
 
+  it('uses the student major when checking a course with a major-specific semester', () => {
+    const dmet502 = { ...course('DMET 502', 5), recommendedSemesterByMajor: [{ major: 'Computer Science', semester: 7 }] };
+    const student = makeStudent({ currentSemester: 6 });
+    const result = deriveCandidates({ student, records: [], catalogue: [dmet502] });
+    expect(result).not.toContainEqual(expect.objectContaining({ course: expect.objectContaining({ code: 'DMET 502' }) }));
+    expect(deriveCandidates({ student: makeStudent({ major: 'DMET', currentSemester: 6 }), records: [], catalogue: [dmet502] }))
+      .toContainEqual(expect.objectContaining({ course: expect.objectContaining({ code: 'DMET 502' }), semester: 5 }));
+  });
+
   it('does not call current or future-semester courses unattended', () => {
     // CSEN 401 (semester 4, the current one) and CSEN 501 (semester 5) have no record.
     const records = cleanRecords().filter((row) => row.course !== CSEN401);

@@ -1,6 +1,7 @@
 const CourseOffering = require('../models/CourseOffering');
 const CourseRecord = require('../models/CourseRecord');
 const { buildMandatoryCandidates } = require('./mandatoryCourseService');
+const { recommendedSemesterFor } = require('./courseSemester');
 
 const courseSummary = (course) => ({
   id: String(course._id),
@@ -90,7 +91,7 @@ const eligibleNonMandatoryCourses = async ({ student, term, currentTerm = term, 
         progressionSemester < 1 ||
         progressionSemester > 10 ||
         !course.majors?.includes(student.major) ||
-        course.recommendedSemester > progressionSemester
+        recommendedSemesterFor(course, student.major) > progressionSemester
       ) {
         return false;
       }

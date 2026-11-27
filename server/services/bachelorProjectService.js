@@ -11,9 +11,9 @@ const { deriveBachelorEligibility } = require('./advisingOverviewService');
 const loadBachelorEligibility = async (student) => {
   const [records, catalogue] = await Promise.all([
     CourseRecord.find({ student: student._id }).populate('course', 'code name creditHours').lean(),
-    Course.find(requiredCourseFilter(student)).select('code name creditHours recommendedSemester').lean(),
+    Course.find(requiredCourseFilter(student)).select('code name creditHours recommendedSemester recommendedSemesterByMajor').lean(),
   ]);
-  return deriveBachelorEligibility({ records, catalogue });
+  return deriveBachelorEligibility({ records, catalogue, major: student.major });
 };
 
 module.exports = { loadBachelorEligibility };

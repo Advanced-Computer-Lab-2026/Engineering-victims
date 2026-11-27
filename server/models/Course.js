@@ -26,6 +26,24 @@ const hours = (label) => ({
   validate: { validator: Number.isInteger, message: `${label} must be a whole number.` },
 });
 
+const recommendedSemesterByMajorSchema = new mongoose.Schema(
+  {
+    major: {
+      type: String,
+      enum: { values: MAJORS, message: 'Major must be Computer Science or DMET.' },
+      required: true,
+    },
+    semester: {
+      type: Number,
+      required: true,
+      min: [1, 'Recommended semester must be between 1 and 10.'],
+      max: [10, 'Recommended semester must be between 1 and 10.'],
+      validate: { validator: Number.isInteger, message: 'Recommended semester must be a whole number.' },
+    },
+  },
+  { _id: false }
+);
+
 const courseSchema = new mongoose.Schema(
   {
     code: {
@@ -63,6 +81,9 @@ const courseSchema = new mongoose.Schema(
       max: [10, 'Recommended semester must be between 1 and 10.'],
       validate: { validator: Number.isInteger, message: 'Recommended semester must be a whole number.' },
     },
+    // A few curriculum rows are shared by both majors but placed in different
+    // semesters per the workbook. Entries here override the fallback above.
+    recommendedSemesterByMajor: { type: [recommendedSemesterByMajorSchema], default: [] },
     offeringSeasons: {
       type: [{ type: String, enum: { values: SEASONS, message: 'Season must be Winter, Spring or Summer.' } }],
       validate: { validator: (value) => value.length > 0, message: 'Choose at least one offering season.' },
@@ -74,6 +95,20 @@ const courseSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+courseSchema.pre('validate', function validateMajorSemesterOverrides(next) {
+  const seen = new Set();
+  for (const entry of this.recommendedSemesterByMajor ?? []) {
+    if (!this.majors.includes(entry.major)) {
+      this.invalidate('recommendedSemesterByMajor', `${entry.major} is not selected for this course.`);
+    }
+    if (seen.has(entry.major)) {
+      this.invalidate('recommendedSemesterByMajor', `Only one semester override is allowed for ${entry.major}.`);
+    }
+    seen.add(entry.major);
+  }
+  next();
+});
 
 // Case-insensitive, so "csen 501" cannot sit next to "CSEN 501".
 courseSchema.index({ code: 1 }, { unique: true, collation: { locale: 'en', strength: 2 } });
@@ -89,6 +124,7 @@ const FIELD_LABELS = {
   faculty: 'Faculty',
   majors: 'Major',
   recommendedSemester: 'Recommended semester',
+  recommendedSemesterByMajor: 'Major-specific recommended semesters',
   offeringSeasons: 'Offering season',
   prerequisites: 'Prerequisites',
 };
@@ -99,3 +135,4 @@ module.exports.COURSE_TYPES = COURSE_TYPES;
 module.exports.MAJORS = MAJORS;
 module.exports.SEASONS = SEASONS;
 module.exports.normalizeCode = normalizeCode;
+module.exports.recommendedSemesterByMajorSchema = recommendedSemesterByMajorSchema;

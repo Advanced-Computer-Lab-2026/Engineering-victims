@@ -12,6 +12,10 @@ const toPayload = (draft: CourseDraft) => {
     tutorialHours: number(draft.tutorialHours),
     labHours: number(draft.labHours),
     recommendedSemester: number(draft.recommendedSemester),
+    recommendedSemesterByMajor: draft.recommendedSemesterByMajor.map((entry) => ({
+      major: entry.major,
+      semester: number(entry.semester),
+    })),
   };
 };
 

@@ -29,8 +29,8 @@ const fixture = () => {
   const coordinator = { _id: 'coordinator-id', email: 'coordinator@guc.edu.eg' };
   const students = [
     { _id: 'student-accepted', studentId: '64-50034', studentType: 'Advising Student', assignedAdvisor: advisor._id },
-    { _id: 'student-submitted', studentId: '64-40077', studentType: 'Advising Student', assignedAdvisor: advisor._id },
-    { _id: 'student-rejected', studentId: '64-40078', studentType: 'Advising Student', assignedAdvisor: advisor._id },
+    { _id: 'student-submitted', studentId: '65-60016', studentType: 'Advising Student', assignedAdvisor: advisor._id },
+    { _id: 'student-curriculum-draft', studentId: '64-40077', studentType: 'Advising Student', assignedAdvisor: advisor._id },
     { _id: 'student-draft', studentId: '64-20046', studentType: 'Advising Student', assignedAdvisor: advisor._id },
     { _id: 'student-exam', studentId: '64-30011', studentType: 'Advising Student', assignedAdvisor: advisor._id },
   ];
@@ -146,9 +146,9 @@ describe('seedGraduationPlans', () => {
     expect(plans[0].submittedAt).toEqual(new Date('2026-11-08T12:00:00.000Z'));
     expect(plans[0].decidedAt).toEqual(new Date('2026-11-10T12:00:00.000Z'));
     expect(plans[1].decidedBy).toBeNull();
-    expect(plans[2].responseNote).toMatch(/revise the term sequence/i);
+    expect(plans[2].responseNote).toBe('');
     expect(plans[2].submittedAt).toBeNull();
-    expect(plans[2].decidedBy).toBe(coordinator._id);
+    expect(plans[2].decidedBy).toBeNull();
     expect(plans[3].placements).toEqual([]);
     expect(plans[3].responseNote).toBe('');
     expect(validatePlan).toHaveBeenCalledTimes(2);

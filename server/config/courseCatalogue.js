@@ -110,6 +110,13 @@ const ELECTIVES = [
   ['DMET 911', 'Deep Learning for Media', ['DMET 901']],
 ];
 
+// The workbook lists DMET 502 in semester 5 for DMET and semester 7 for CS.
+// Keep its shared course code and prerequisite chain, with the CS placement as
+// an explicit override to the semester-5 fallback.
+const RECOMMENDED_SEMESTER_OVERRIDES = {
+  'DMET 502': [{ major: 'Computer Science', semester: 7 }],
+};
+
 const seasonFor = (semester) => (semester % 2 === 1 ? ['Winter'] : ['Spring']);
 
 const COURSES = [
@@ -124,6 +131,7 @@ const COURSES = [
     faculty: 'MET',
     majors,
     recommendedSemester: semester,
+    recommendedSemesterByMajor: RECOMMENDED_SEMESTER_OVERRIDES[code] ?? [],
     offeringSeasons: seasonFor(semester),
     prerequisites,
   })),
@@ -138,6 +146,7 @@ const COURSES = [
     faculty: 'MET',
     majors: BOTH,
     recommendedSemester: 9,
+    recommendedSemesterByMajor: [],
     offeringSeasons: ['Winter', 'Spring'],
     prerequisites,
   })),

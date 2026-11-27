@@ -21,8 +21,10 @@ import {
   COURSE_TYPES,
   type Course,
   type CourseDraft,
+  type CourseMajor,
   type CourseType,
 } from '../lib/types';
+import { recommendedSemesterLabel } from '../lib/courseSemester';
 import AlertBanner from './ui/AlertBanner';
 import Badge, { type BadgeTone } from './ui/Badge';
 import CheckboxGroup from './ui/CheckboxGroup';
@@ -60,6 +62,7 @@ const emptyDraft = (): CourseDraft => ({
   faculty: 'MET',
   majors: [...COURSE_MAJORS],
   recommendedSemester: '1',
+  recommendedSemesterByMajor: [],
   offeringSeasons: ['Winter'],
   prerequisites: [],
 });
@@ -75,6 +78,10 @@ const draftFrom = (course: Course): CourseDraft => ({
   faculty: course.faculty,
   majors: [...course.majors],
   recommendedSemester: String(course.recommendedSemester),
+  recommendedSemesterByMajor: (course.recommendedSemesterByMajor ?? []).map((entry) => ({
+    major: entry.major,
+    semester: String(entry.semester),
+  })),
   offeringSeasons: [...course.offeringSeasons],
   prerequisites: course.prerequisites.map((prerequisite) => prerequisite.id),
 });
@@ -235,7 +242,7 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                     {course.majors.join(', ')}
                   </DetailRow>
                   <DetailRow icon={<Layers className="h-4 w-4" />} label="Recommended semester">
-                    Semester {course.recommendedSemester}
+                    {recommendedSemesterLabel(course)}
                   </DetailRow>
                   <DetailRow icon={<CalendarDays className="h-4 w-4" />} label="Offering season">
                     {course.offeringSeasons.join(', ')}
@@ -347,8 +354,41 @@ const CourseDrawer: React.FC<CourseDrawerProps> = ({ mode, course, courses, onCl
                 legend="Majors"
                 options={COURSE_MAJORS}
                 value={draft.majors}
-                onChange={(value) => set('majors', value)}
+                onChange={(value) => {
+                  setDraft((current) => ({
+                    ...current,
+                    majors: value,
+                    recommendedSemesterByMajor: current.recommendedSemesterByMajor.filter((entry) => value.includes(entry.major)),
+                  }));
+                }}
               />
+
+              {draft.majors.length > 1 && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {draft.majors.map((major) => (
+                    <Select
+                      key={major}
+                      label={`Semester for ${major}`}
+                      placeholder={`Use default (Semester ${draft.recommendedSemester})`}
+                      value={draft.recommendedSemesterByMajor.find((entry) => entry.major === major)?.semester ?? ''}
+                      onChange={(event) => {
+                        const semester = event.target.value;
+                        setDraft((current) => ({
+                          ...current,
+                          recommendedSemesterByMajor: [
+                            ...current.recommendedSemesterByMajor.filter((entry) => entry.major !== major),
+                            ...(semester ? [{ major: major as CourseMajor, semester }] : []),
+                          ],
+                        }));
+                      }}
+                      options={Array.from({ length: 10 }, (_, index) => ({
+                        value: String(index + 1),
+                        label: `Semester ${index + 1}`,
+                      }))}
+                    />
+                  ))}
+                </div>
+              )}
 
               <CheckboxGroup
                 legend="Offering season"

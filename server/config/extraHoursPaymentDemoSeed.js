@@ -32,7 +32,13 @@ const { EVENTS } = require('../services/notificationEvents');
  * requests are built from the students' real drafts and then settled through
  * the real services — decideRequest, payWallet, confirmDeferral, reverseRecord —
  * so the rows are exactly what the application writes: activated schedules,
- * wallet debits, seat counters and history included.
+ * wallet debits, seat counters and history included. Three more are built the
+ * same way and deliberately stopped early, so the states *before* a settlement
+ * are on screen too:
+ *
+ *   EHR-DEMO-008  Submitted, Pending               Coordinator queue
+ *   EHR-DEMO-009  Approved, Awaiting Payment       wallet covers the cost
+ *   EHR-DEMO-010  Approved, Awaiting Payment       wallet cannot cover it
  *
  * What the demo ends up with, one row per screen state that matters:
  *
@@ -80,15 +86,30 @@ const DEMO_SETTLEMENTS = [
     topUpCourses: ['CSEN 102', 'CSEN 501'], itemCourse: 'CSEN 701',
     settlement: 'wallet', paymentReference: 'PAY-DEMO-004' },
   { reference: 'EHR-DEMO-005', studentEmail: 'hana.mahmoud@student.guc.edu.eg',
-    topUpCourses: ['CSEN 301', 'CSEN 501'], itemCourse: 'CSEN 701',
+    topUpCourses: ['CSEN 503', 'CSEN 605'], itemCourse: 'CSEN 701',
     settlement: 'deferred', chargeReference: 'DEF-DEMO-005', installmentReference: 'INST-DEMO-005' },
   { reference: 'EHR-DEMO-006', studentEmail: 'rana.adel@student.guc.edu.eg',
-    topUpCourses: ['CSEN 301'], itemCourse: 'CSEN 501',
+    topUpCourses: ['CSEN 301', 'CSEN 701', 'CSEN 703'], itemCourse: 'CSEN 701',
     settlement: 'wallet', paymentReference: 'PAY-DEMO-006', refundReference: 'REF-DEMO-006',
     reversalNote: 'Demo refund: the payment was returned to the wallet and the extra hours revoked again.' },
   { reference: 'EHR-DEMO-007', studentEmail: 'omar.nabil@student.guc.edu.eg',
     topUpCourses: ['CSEN 301', 'CSEN 501', 'CSEN 605'], itemCourse: 'CSEN 701',
     settlement: 'gateway-failed', paymentReference: 'PAY-DEMO-007' },
+
+  // The three request states that exist before any money moves, so the
+  // coordinator's queue, the student's settlement choice and both wallet
+  // outcomes are on screen too. Their drafts already sit in the billable
+  // window, so none of them needs a top-up:
+  //
+  //   EHR-DEMO-008  Pending                      decided by the Coordinator
+  //   EHR-DEMO-009  Approved, Awaiting Payment   wallet EGP 10000 >= 2400
+  //   EHR-DEMO-010  Approved, Awaiting Payment   wallet EGP 0 < 800
+  { reference: 'EHR-DEMO-008', studentEmail: 'rana.adel@student.guc.edu.eg',
+    topUpCourses: [], itemCourse: 'CSEN 701', settlement: 'pending' },
+  { reference: 'EHR-DEMO-009', studentEmail: 'hana.mahmoud@student.guc.edu.eg',
+    topUpCourses: [], itemCourse: 'CSEN 701', settlement: 'awaiting' },
+  { reference: 'EHR-DEMO-010', studentEmail: 'omar.nabil@student.guc.edu.eg',
+    topUpCourses: [], itemCourse: 'CSEN 701', settlement: 'awaiting' },
 ];
 
 // The demo timeline, so the screens read like a settled week rather than "now".
@@ -174,9 +195,11 @@ const topUpDraft = async ({ student, term, codes, offeringsByCode, records }) =>
     }
   }
 
-  await StudentSchedule.insertMany(
-    additions.map((slot) => ({ studentId: student._id, termId: term._id, slotId: slot._id, status: statuses[0] }))
-  );
+  if (additions.length) {
+    await StudentSchedule.insertMany(
+      additions.map((slot) => ({ studentId: student._id, termId: term._id, slotId: slot._id, status: statuses[0] }))
+    );
+  }
   return additions.length;
 };
 
@@ -185,6 +208,11 @@ const topUpDraft = async ({ student, term, codes, offeringsByCode, records }) =>
  * loadContext() + evaluateSelection() — the exact check decideRequest and
  * prepareActivation re-run — with requested hours derived from the excess the
  * draft plus the item course creates over the standard allowance.
+ *
+ * A `pending` spec stops after saving the submission: the coordinator's queue
+ * needs a request nobody has decided yet. Every other spec is approved through
+ * decideRequest(), which also moves settlementStatus to 'Awaiting Payment
+ * Choice'; the settlement steps below then either settle it or leave it there.
  */
 const buildSettledRequest = async ({ spec, student, coordinator, term }) => {
   const context = await loadContext(String(student._id), String(term._id));
@@ -200,7 +228,8 @@ const buildSettledRequest = async ({ spec, student, coordinator, term }) => {
   if (!Number.isInteger(requestedHours) || requestedHours < 1 || requestedHours > baseline.maximumTotalHours - baseline.standardHours) {
     throw new Error(
       `The extra-hours payment demo window for ${student.email} is out of range ` +
-      `(draft ${draftHours}h, item ${item.code} ${item.creditHours}h, standard ${baseline.standardHours}h).`
+      `(draft ${draftHours}h, item ${item.code} ${item.creditHours}h, standard ${baseline.standardHours}h, ` +
+      `requested ${requestedHours}h, maximum ${baseline.maximumTotalHours}h).`
     );
   }
 
@@ -213,6 +242,10 @@ const buildSettledRequest = async ({ spec, student, coordinator, term }) => {
   request.reference = spec.reference;
   request.history.push({ action: 'Submitted', actor: student.assignedAdvisor, at: submittedAt });
   await request.save();
+
+  // The submitted-only demo request: the Coordinator's queue reads it as
+  // Pending, and nothing here approves it.
+  if (spec.settlement === 'pending') return ExtraHoursRequest.findById(request._id).lean();
 
   // The coordinator approves through the real decision service, so the request
   // passes its eligibility and price re-check exactly as on screen.
@@ -380,17 +413,28 @@ const seedExtraHoursPayments = async ({ students, users, terms, reconcileAssigne
   }
   await reconcileAssignedCounts();
 
-  let settled = 0;
+  const outcomes = { settled: 0, pending: 0, awaiting: 0 };
   for (const { spec, student, actor } of targets) {
     const request = await buildSettledRequest({ spec, student, coordinator, term });
+    // These requests deliberately stop before any money moves: one waits on
+    // the Coordinator's decision, the others wait for the student to choose a
+    // payment method. Both states are where the demo leaves them on screen.
+    if (spec.settlement === 'pending') {
+      outcomes.pending += 1;
+      continue;
+    }
+    if (spec.settlement === 'awaiting') {
+      outcomes.awaiting += 1;
+      continue;
+    }
     const context = { spec, request, student, actor, coordinator, term };
     if (spec.settlement === 'wallet') await settleFromWallet(context);
     else if (spec.settlement === 'deferred') await settleByDeferral(context);
     else if (spec.settlement === 'gateway-failed') await settleFailedGateway(context);
     else throw new Error(`Unknown extra-hours demo settlement: ${spec.settlement}`);
-    settled += 1;
+    outcomes.settled += 1;
   }
-  return { settled, addedRows };
+  return { ...outcomes, addedRows };
 };
 
 module.exports = { seedExtraHoursPayments, DEMO_SETTLEMENTS };

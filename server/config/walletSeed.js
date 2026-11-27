@@ -52,6 +52,9 @@ const WALLET_HISTORY = {
   ],
   'omar.nabil@student.guc.edu.eg': [
     { type: 'Refund', amount: hours(2), requestReference: 'EHR-2026-0006', paymentReference: 'PAY-6B3D02', description: 'Refund for cancelled extra-hours request (2 hours)', occurredAt: '2026-03-09T12:00:00Z' },
+    // Spent down to zero afterwards, so he is also the student whose approved
+    // extra-hours request (EHR-DEMO-010) cannot be paid from the wallet.
+    { type: 'Payment', amount: hours(2), requestReference: 'EHR-2026-0025', paymentReference: 'PAY-7B4C11', description: 'Wallet payment for approved extra hours (2 hours)', occurredAt: '2026-10-15T09:00:00Z' },
   ],
   'laila.hassan@student.guc.edu.eg': [
     { type: 'Refund', amount: hours(2), requestReference: 'EHR-2026-0017', paymentReference: 'PAY-17A4D2', description: 'Refund for cancelled extra-hours request (2 hours)', occurredAt: '2026-10-04T10:20:00Z' },

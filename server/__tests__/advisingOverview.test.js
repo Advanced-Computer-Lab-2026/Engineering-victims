@@ -128,6 +128,14 @@ describe('bachelor-project eligibility', () => {
     expect(result.outstandingCourses.map((entry) => entry.course.code)).not.toContain('CSEN 701');
   });
 
+  it('uses the selected major semester when applying the semester-6 bachelor-project cutoff', () => {
+    const dmet502 = { ...course('DMET 502', 5), recommendedSemesterByMajor: [{ major: 'Computer Science', semester: 7 }] };
+    const cs = deriveBachelorEligibility({ records: [], catalogue: [dmet502], major: 'Computer Science' });
+    const dmet = deriveBachelorEligibility({ records: [], catalogue: [dmet502], major: 'DMET' });
+    expect(cs.outstandingCourses).toHaveLength(0);
+    expect(dmet.outstandingCourses).toMatchObject([{ course: { code: 'DMET 502' }, semester: 5 }]);
+  });
+
   it('stays eligible with one or two failed semester 1-6 courses', () => {
     const records = [passed(AS102), passed(RPW401), passed(CSEN102), passed(MATH203), failed(CSEN301), failed(CSEN601)];
     const result = deriveBachelorEligibility({ records, catalogue: CATALOGUE });

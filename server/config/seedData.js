@@ -43,6 +43,11 @@ const { seedExtraHoursRequests } = require('./extraHoursDemoSeed');
 const { seedExtraHoursPayments } = require('./extraHoursPaymentDemoSeed');
 const { seedMandatoryRemovalRequests } = require('./mandatoryRemovalDemoSeed');
 const {
+  seedFullSlots,
+  seedAdvisingDrafts,
+  seedScheduleActivityHistory,
+} = require('./evaluationDemoSeed');
+const {
   seedSlotChangeRequests,
   seedExitExamRequests,
   seedSemesterStandingHistory,
@@ -105,9 +110,15 @@ const STAFF = [
  *
  * Passwords follow FirstnameLastname2006.
  */
+const semesterStudyGroup = (semester) => {
+  const number = Number(semester);
+  const suffix = number % 100 >= 11 && number % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[number % 10] ?? 'th');
+  return `${number}${suffix} Semester`;
+};
+
 const STUDENTS = [
   // ---- Normal Student: one row per status in NORMAL_STATUSES ----
-  { fullName: 'Samy Elgedaily', email: 'samy.elgedaily@student.guc.edu.eg', password: 'SamyElgedaily2006', studentId: '64-12345', studentType: 'Normal Student', major: 'Computer Science', currentSemester: 5, academicStanding: 'Good Standing', workflowStatus: 'Schedule Assigned', isActive: true, advisorEmail: null },
+  { fullName: 'Samy Elgedaily', email: 'samy.elgedaily@student.guc.edu.eg', password: 'SamyElgedaily2006', studentId: '64-12345', studentType: 'Normal Student', major: 'Computer Science', currentSemester: 5, academicStanding: 'Good Standing', workflowStatus: 'Swap Request Open', isActive: true, advisorEmail: null },
   { fullName: 'Mariam Fouad', email: 'mariam.fouad@student.guc.edu.eg', password: 'MariamFouad2006', studentId: '64-12346', studentType: 'Normal Student', major: 'Computer Science', currentSemester: 5, academicStanding: 'Good Standing', workflowStatus: 'Swap Request Open', isActive: true, advisorEmail: null },
   { fullName: 'Zeyad Tarek', email: 'zeyad.tarek@student.guc.edu.eg', password: 'ZeyadTarek2006', studentId: '65-60012', studentType: 'Normal Student', major: 'DMET', currentSemester: 2, academicStanding: 'Good Standing', workflowStatus: 'Swap Completed', isActive: true, advisorEmail: null },
   { fullName: 'Farida Wagdy', email: 'farida.wagdy@student.guc.edu.eg', password: 'FaridaWagdy2006', studentId: '65-60013', studentType: 'Normal Student', major: 'Computer Science', currentSemester: 3, academicStanding: 'Good Standing', workflowStatus: 'Swap Withdrawn', isActive: true, advisorEmail: null },
@@ -136,7 +147,11 @@ const STUDENTS = [
   // req-52 filter is not a dead choice either.
   { fullName: 'Hassan Rifaat', email: 'hassan.rifaat@student.guc.edu.eg', password: 'HassanRifaat2006', studentId: '65-60015', studentType: 'Advising Student', major: 'Computer Science', currentSemester: 2, academicStanding: 'Good Standing', advisingReason: null, workflowStatus: 'Ready for Student Review', isActive: true, advisorEmail: 'mona.adel@guc.edu.eg' },
   { fullName: 'Yasmin Adly', email: 'yasmin.adly@student.guc.edu.eg', password: 'YasminAdly2006', studentId: '65-60016', studentType: 'Advising Student', major: 'DMET', currentSemester: 8, academicStanding: 'Good Standing', advisingReason: 'More than 2 failed courses in a season', workflowStatus: 'Processed', isActive: true, advisorEmail: 'karim.fahmy@guc.edu.eg' },
-];
+].map((student) =>
+  student.studentType === 'Advising Student'
+    ? { ...student, studyGroup: student.studyGroup ?? semesterStudyGroup(student.currentSemester) }
+    : student
+);
 
 /**
  * Three terms: the one the demo currently sits in, one closed term behind it so
@@ -171,7 +186,10 @@ const TERMS = [
     teachingStartDate: '2026-09-22',
     teachingEndDate: '2026-12-18',
     advisingDeadline: '2027-01-15',
-    swapDeadline: '2026-10-10',
+    // Keep swaps open for the whole advising window. expirePastDeadlineRequests()
+    // closes every Open request the first time the swaps screen is opened once
+    // this passes, so an earlier date would wipe the seeded Open requests.
+    swapDeadline: '2027-01-15',
   },
   {
     academicYear: '2026/2027',
@@ -803,7 +821,7 @@ const seed = async () => {
   );
 
   const courses = await seedCourses(administrator?._id ?? null);
-  const { offerings, slots } = await seedOfferings({ terms, courses, instructors: advisors });
+  const { offerings } = await seedOfferings({ terms, courses, instructors: advisors });
   // Standard schedule groups built on those slots, and the processed schedules
   // of the Normal Students that sit in them.
   const { groups, schedules, grouped } = await seedScheduleGroups({
@@ -834,7 +852,7 @@ const seed = async () => {
     reconcileAssignedCounts,
   });
   const graduationPlans = await seedGraduationPlans({ students, users: created });
-  const slotChangeRequests = await seedSlotChangeRequests({ students, terms, courses });
+  const slotChangeRequests = await seedSlotChangeRequests({ students, terms, courses, users: created });
   const exitExamRequests = await seedExitExamRequests({ students, users: created });
   const semesterStandings = await seedSemesterStandingHistory({ students, terms, users: created });
 
@@ -846,6 +864,18 @@ const seed = async () => {
   // The lazy path stays: it is what repairs databases seeded before Req 35.
   const { ensureSeededSwapRequests } = require('../controllers/swapRequestController');
   await ensureSeededSwapRequests();
+
+  // Demo coverage no other seeder builds: a few groups filled to their exact
+  // seat count, and the saved advising drafts the draft editor would otherwise
+  // create (and write to the database) on first read. Both read the rows every
+  // seeder above has finished writing, and run before the reconcile pass below.
+  const fullSlots = await seedFullSlots({ terms });
+  const advisingDrafts = await seedAdvisingDrafts({ students, terms, users: created });
+  const scheduleActivityLogs = await seedScheduleActivityHistory({
+    students,
+    users: created,
+    terms,
+  });
 
   const currentTerm =
     terms.find((term) => term.season === 'Winter') ?? terms[terms.length - 1] ?? null;
@@ -902,7 +932,9 @@ const seed = async () => {
     terms: terms.length,
     courses: courses.length,
     offerings: offerings.length,
-    slots,
+    // Counted at the end: the slot-change demo publishes one extra course slot
+    // while deciding a request, after seedOfferings has built the base grid.
+    slots: await CourseSlot.countDocuments(),
     groups,
     schedules,
     grouped,
@@ -916,6 +948,9 @@ const seed = async () => {
     graduationPlans: graduationPlans.length,
     slotChangeRequests,
     exitExamRequests,
+    fullSlots,
+    advisingDrafts,
+    scheduleActivityLogs,
     semesterStandings,
     notifications: notifications.length,
   };

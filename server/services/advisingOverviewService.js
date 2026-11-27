@@ -1,6 +1,7 @@
 const Course = require('../models/Course');
 const CourseRecord = require('../models/CourseRecord');
 const { buildAcademicHistory, requiredCourseFilter, FAIL } = require('./academicHistoryService');
+const { recommendedSemesterFor } = require('./courseSemester');
 
 /**
  * Req 59: what an Advisor, Coordinator or Administrator needs to know about an
@@ -89,7 +90,7 @@ const courseSummary = (course) => ({
  * A course never attempted, or still in progress with no failed attempt, is
  * not a "failed course", so it is not covered by that exception.
  */
-const deriveBachelorEligibility = ({ records, catalogue }) => {
+const deriveBachelorEligibility = ({ records, catalogue, major }) => {
   const passed = new Set();
   const failed = new Set();
   const inProgress = new Set();
@@ -109,10 +110,10 @@ const deriveBachelorEligibility = ({ records, catalogue }) => {
 
   const outstanding = catalogue
     .filter((course) => !passed.has(String(course._id)))
-    .filter((course) => isEnglish(course) || course.recommendedSemester <= BACHELOR_LAST_SEMESTER)
+    .filter((course) => isEnglish(course) || recommendedSemesterFor(course, major) <= BACHELOR_LAST_SEMESTER)
     .map((course) => ({
       course: courseSummary(course),
-      semester: course.recommendedSemester,
+      semester: recommendedSemesterFor(course, major),
       state: stateOf(String(course._id)),
       english: isEnglish(course),
     }))
@@ -157,7 +158,7 @@ const buildAdvisingOverview = async (student) => {
   const [history, records, catalogue] = await Promise.all([
     buildAcademicHistory(student),
     CourseRecord.find({ student: student._id }).populate('course', 'code name creditHours').lean(),
-    Course.find(requiredCourseFilter(student)).select('code name creditHours recommendedSemester').lean(),
+    Course.find(requiredCourseFilter(student)).select('code name creditHours recommendedSemester recommendedSemesterByMajor').lean(),
   ]);
 
   return {
@@ -170,7 +171,7 @@ const buildAdvisingOverview = async (student) => {
       lastUpdateAt: student.lastUpdateAt,
     },
     completedHours: history.summary.completedHours,
-    bachelorProject: deriveBachelorEligibility({ records, catalogue }),
+    bachelorProject: deriveBachelorEligibility({ records, catalogue, major: student.major }),
   };
 };
 

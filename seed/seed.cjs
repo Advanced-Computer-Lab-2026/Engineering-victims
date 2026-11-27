@@ -22,6 +22,16 @@ const { seed } = require('../server/config/seedData');
 
 dotenv.config({ path: path.join(__dirname, '..', 'server', '.env') });
 
+/** "12 (9 Pending, 1 Approved, 1 Rejected, 1 Withdrawn)" — the request mix at a glance. */
+const formatSlotChanges = (result) => {
+  if (typeof result === 'number') return String(result);
+  const mix = ['Approved', 'Rejected', 'Withdrawn']
+    .filter((status) => result[status] > 0)
+    .map((status) => `${result[status]} ${status}`)
+    .join(', ');
+  return `${result.created} (${result.Pending} Pending${mix ? `, ${mix}` : ''})`;
+};
+
 async function run() {
   if (!process.env.MONGODB_URI) {
     throw new Error('MONGODB_URI not found in server/.env');
@@ -39,11 +49,14 @@ async function run() {
     `   Offerings: ${result.offerings}, slots: ${result.slots}, schedule groups: ${result.groups}, student schedule rows: ${result.schedules + result.advisingSchedules} (normal: ${result.schedules}, advising: ${result.advisingSchedules}; ${result.grouped} normal students grouped)`,
   );
   console.log(
-    `   Slot-change requests: ${result.slotChangeRequests}, exit-exam requests: ${result.exitExamRequests}, semester standings: ${result.semesterStandings}`,
+    `   Slot-change requests: ${formatSlotChanges(result.slotChangeRequests)}, exit-exam requests: ${result.exitExamRequests}, semester standings: ${result.semesterStandings}`,
   );
   console.log(`   Mandatory-course removal requests: ${result.mandatoryRemovalRequests}`);
   console.log(
-    `   Extra-hours requests: ${result.extraHoursRequests} (display-only) and ${result.extraHoursPayments.settled} settled with payment or deferred-charge records (${result.extraHoursPayments.addedRows} draft rows added).`,
+    `   Full course slots: ${result.fullSlots}, saved advising drafts: ${result.advisingDrafts}, history records: ${result.scheduleActivityLogs}, swap requests: the lazy seeder's`,
+  );
+  console.log(
+    `   Extra-hours requests: ${result.extraHoursRequests} (display-only), ${result.extraHoursPayments.settled} settled with payment or deferred-charge records, ${result.extraHoursPayments.awaiting} awaiting a payment choice and ${result.extraHoursPayments.pending} still Pending (${result.extraHoursPayments.addedRows} draft rows added).`,
   );
 
   await mongoose.disconnect();

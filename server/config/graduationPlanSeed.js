@@ -9,13 +9,8 @@ const {
 
 const DEMO_PLANS = [
   { studentId: '64-50034', status: 'Accepted' },
-  { studentId: '64-40077', status: 'Submitted' },
-  {
-    studentId: '64-40078',
-    status: 'Draft',
-    responseNote: 'Please revise the term sequence before resubmitting this plan.',
-    wasRejected: true,
-  },
+  { studentId: '65-60016', status: 'Submitted' },
+  { studentId: '64-40077', status: 'Draft' },
   { studentId: '64-20046', status: 'Draft' },
   { studentId: '64-30011', status: 'Draft' },
 ];

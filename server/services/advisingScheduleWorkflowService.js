@@ -95,7 +95,7 @@ const loadDraftValidation = async ({ student, term, session }) => {
   const draft = await withSession(
     AdvisingScheduleDraft.findOne({ student: student._id, term: term._id }).populate(
       'courses.course',
-      'code name courseType creditHours lectureHours tutorialHours labHours prerequisites majors recommendedSemester offeringSeasons isActive'
+      'code name courseType creditHours lectureHours tutorialHours labHours prerequisites majors recommendedSemester recommendedSemesterByMajor offeringSeasons isActive'
     ),
     session
   );

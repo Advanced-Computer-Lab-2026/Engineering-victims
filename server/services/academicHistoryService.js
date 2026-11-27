@@ -1,5 +1,6 @@
 const Course = require('../models/Course');
 const CourseRecord = require('../models/CourseRecord');
+const { recommendedSemesterFor } = require('./courseSemester');
 
 const { GRADE_POINTS } = CourseRecord;
 const FAIL = 'F';
@@ -75,7 +76,7 @@ const buildAcademicHistory = async (student) => {
     .map((course) => ({
       ...courseSummary(course),
       courseType: course.courseType,
-      recommendedSemester: course.recommendedSemester,
+      recommendedSemester: recommendedSemesterFor(course, student.major),
       offeringSeasons: course.offeringSeasons,
       prerequisites: (course.prerequisites ?? []).map((prerequisite) => ({
         id: prerequisite._id,
@@ -85,7 +86,8 @@ const buildAcademicHistory = async (student) => {
         passed: passedIds.has(String(prerequisite._id)),
       })),
       isRetake: failedIds.has(String(course._id)),
-    }));
+    }))
+    .sort((a, b) => a.recommendedSemester - b.recommendedSemester || a.code.localeCompare(b.code));
 
   return {
     summary: {

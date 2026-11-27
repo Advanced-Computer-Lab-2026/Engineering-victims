@@ -294,6 +294,7 @@ export interface Course extends CourseSummary {
   faculty: string;
   majors: CourseMajor[];
   recommendedSemester: number;
+  recommendedSemesterByMajor?: Array<{ major: CourseMajor; semester: number }>;
   offeringSeasons: AcademicTermSeason[];
   prerequisites: CourseSummary[];
   createdAt?: string;
@@ -312,6 +313,7 @@ export interface CourseDraft {
   faculty: string;
   majors: CourseMajor[];
   recommendedSemester: string;
+  recommendedSemesterByMajor: Array<{ major: CourseMajor; semester: string }>;
   offeringSeasons: AcademicTermSeason[];
   prerequisites: string[];
 }
