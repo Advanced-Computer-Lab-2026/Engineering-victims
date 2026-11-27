@@ -3,13 +3,13 @@
    --------------------------------------------------------------------------
    Palette and typeface for the University Schedule Management System.
 
-   Source color: indigo #4F46E5. Roles follow the Material 3 role names from
+   Source color: emerald #059669. Roles follow the Material 3 role names from
    ui-system/brand.example.css. This file is the only place a project changes
    colour or font; ui-system/tokens.css aliases these as --color-*.
 
-   The app is dark-only while the brand file still defines every role in both
-   schemes, as required by ui-system/check.sh and docs/using-the-system.md.
-   See decisions/002-indigo-dark-only.md.
+   Light mode is now the default for academic daylight readability. Dark mode
+   still available via system preference.
+   See decisions/008-emerald-academic-palette.md and decisions/009-top-navigation-bar.md.
    ========================================================================== */
 
 :root {
@@ -19,21 +19,34 @@
   --brand-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas,
     "Liberation Mono", monospace;
 
-  /* ---------- Light roles --------------------------------------------- */
-  --brand-primary: #4f46e5;
+  /* ---------- Emerald primitives (academic green) -------------------- */
+  --emerald-10: #002114;
+  --emerald-20: #003823;
+  --emerald-30: #005234;
+  --emerald-40: #006d47;
+  --emerald-50: #00885a;
+  --emerald-60: #00a56e;
+  --emerald-70: #0bc184;
+  --emerald-80: #5dddaa;
+  --emerald-90: #7ffcc3;
+  --emerald-95: #c4ffe0;
+  --emerald-99: #f1fff5;
+
+  /* ---------- Light roles (default) ----------------------------------- */
+  --brand-primary: #059669;
   --brand-on-primary: #ffffff;
-  --brand-primary-container: #e0e0ff;
-  --brand-on-primary-container: #13006b;
+  --brand-primary-container: #c4ffe0;
+  --brand-on-primary-container: #002114;
 
-  --brand-secondary: #5b5d72;
+  --brand-secondary: #4d6357;
   --brand-on-secondary: #ffffff;
-  --brand-secondary-container: #e0e1f9;
-  --brand-on-secondary-container: #181a2c;
+  --brand-secondary-container: #cfe9d9;
+  --brand-on-secondary-container: #0a1f16;
 
-  --brand-tertiary: #77536d;
+  --brand-tertiary: #3d6373;
   --brand-on-tertiary: #ffffff;
-  --brand-tertiary-container: #ffd8ee;
-  --brand-on-tertiary-container: #2d1228;
+  --brand-tertiary-container: #c0e8fb;
+  --brand-on-tertiary-container: #001f29;
 
   --brand-error: #ba1a1a;
   --brand-on-error: #ffffff;
@@ -55,49 +68,48 @@
   --brand-info-container: #c9e6ff;
   --brand-on-info-container: #001e30;
 
-  --brand-surface: #faf8ff;
-  --brand-on-surface: #1b1b21;
-  --brand-surface-variant: #e3e1ec;
-  --brand-on-surface-variant: #46464f;
+  --brand-surface: #f6fef9;
+  --brand-on-surface: #181d1a;
+  --brand-surface-variant: #dce5df;
+  --brand-on-surface-variant: #404943;
 
   --brand-surface-container-lowest: #ffffff;
-  --brand-surface-container-low: #f4f3fa;
-  --brand-surface-container: #eeedf4;
-  --brand-surface-container-high: #e8e7ee;
-  --brand-surface-container-highest: #e3e2e9;
+  --brand-surface-container-low: #f0f8f3;
+  --brand-surface-container: #eaf2ed;
+  --brand-surface-container-high: #e5ece7;
+  --brand-surface-container-highest: #dfe7e1;
 
-  --brand-outline: #767680;
-  --brand-outline-variant: #c7c5d0;
+  --brand-outline: #707973;
+  --brand-outline-variant: #c0c9c3;
 
-  --brand-inverse-surface: #303038;
-  --brand-inverse-on-surface: #f2eff7;
-  --brand-inverse-primary: #bac3ff;
+  --brand-inverse-surface: #2d322f;
+  --brand-inverse-on-surface: #eff1ee;
+  --brand-inverse-primary: #7ffcc3;
 
   --brand-scrim: #000000;
   --brand-shadow: #000000;
 }
 
-/* ---------- Dark roles ------------------------------------------------
-   Both blocks are required. The app forces [data-theme="dark"] on <html>,
-   so the attribute block is the one that renders; the media query stays in
-   sync for completeness.
+/* ---------- Dark roles (system preference) --------------------------
+   Activated via @media (prefers-color-scheme: dark) or [data-theme="dark"].
+   Light is now the default.
    -------------------------------------------------------------------- */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --brand-primary: #a5b4fc;
-    --brand-on-primary: #1e1b4b;
-    --brand-primary-container: #312e81;
-    --brand-on-primary-container: #e0e7ff;
+    --brand-primary: #7ffcc3;
+    --brand-on-primary: #00382a;
+    --brand-primary-container: #00513c;
+    --brand-on-primary-container: #c4ffe0;
 
-    --brand-secondary: #bfc2dd;
-    --brand-on-secondary: #2d2f42;
-    --brand-secondary-container: #434659;
-    --brand-on-secondary-container: #dadcf5;
+    --brand-secondary: #b3ccc0;
+    --brand-on-secondary: #1f352a;
+    --brand-secondary-container: #354c40;
+    --brand-on-secondary-container: #cfe9d9;
 
-    --brand-tertiary: #c9a5bf;
-    --brand-on-tertiary: #45263d;
-    --brand-tertiary-container: #5e3c55;
-    --brand-on-tertiary-container: #f7d8ec;
+    --brand-tertiary: #a4cce0;
+    --brand-on-tertiary: #053542;
+    --brand-tertiary-container: #224c5a;
+    --brand-on-tertiary-container: #c0e8fb;
 
     --brand-error: #ffb4ab;
     --brand-on-error: #690005;
@@ -119,23 +131,23 @@
     --brand-info-container: #004c73;
     --brand-on-info-container: #c9e6ff;
 
-    --brand-surface: #0b0f19;
-    --brand-on-surface: #e6e8f0;
-    --brand-surface-variant: #2a2e3d;
-    --brand-on-surface-variant: #a9aec2;
+    --brand-surface: #0f1512;
+    --brand-on-surface: #dfe7e1;
+    --brand-surface-variant: #404943;
+    --brand-on-surface-variant: #c0c9c3;
 
-    --brand-surface-container-lowest: #070a12;
-    --brand-surface-container-low: #10141f;
-    --brand-surface-container: #151a26;
-    --brand-surface-container-high: #1b2130;
-    --brand-surface-container-highest: #222939;
+    --brand-surface-container-lowest: #0a0f0d;
+    --brand-surface-container-low: #181d1a;
+    --brand-surface-container: #1c211e;
+    --brand-surface-container-high: #262b28;
+    --brand-surface-container-highest: #313633;
 
-    --brand-outline: #6b7285;
-    --brand-outline-variant: #343b4d;
+    --brand-outline: #8a938c;
+    --brand-outline-variant: #404943;
 
-    --brand-inverse-surface: #e6e8f0;
-    --brand-inverse-on-surface: #1b1b21;
-    --brand-inverse-primary: #4f46e5;
+    --brand-inverse-surface: #dfe7e1;
+    --brand-inverse-on-surface: #2d322f;
+    --brand-inverse-primary: #059669;
 
     --brand-scrim: #000000;
     --brand-shadow: #000000;
@@ -143,20 +155,20 @@
 }
 
 [data-theme="dark"] {
-  --brand-primary: #a5b4fc;
-  --brand-on-primary: #1e1b4b;
-  --brand-primary-container: #312e81;
-  --brand-on-primary-container: #e0e7ff;
+  --brand-primary: #7ffcc3;
+  --brand-on-primary: #00382a;
+  --brand-primary-container: #00513c;
+  --brand-on-primary-container: #c4ffe0;
 
-  --brand-secondary: #bfc2dd;
-  --brand-on-secondary: #2d2f42;
-  --brand-secondary-container: #434659;
-  --brand-on-secondary-container: #dadcf5;
+  --brand-secondary: #b3ccc0;
+  --brand-on-secondary: #1f352a;
+  --brand-secondary-container: #354c40;
+  --brand-on-secondary-container: #cfe9d9;
 
-  --brand-tertiary: #c9a5bf;
-  --brand-on-tertiary: #45263d;
-  --brand-tertiary-container: #5e3c55;
-  --brand-on-tertiary-container: #f7d8ec;
+  --brand-tertiary: #a4cce0;
+  --brand-on-tertiary: #053542;
+  --brand-tertiary-container: #224c5a;
+  --brand-on-tertiary-container: #c0e8fb;
 
   --brand-error: #ffb4ab;
   --brand-on-error: #690005;
@@ -178,23 +190,23 @@
   --brand-info-container: #004c73;
   --brand-on-info-container: #c9e6ff;
 
-  --brand-surface: #0b0f19;
-  --brand-on-surface: #e6e8f0;
-  --brand-surface-variant: #2a2e3d;
-  --brand-on-surface-variant: #a9aec2;
+  --brand-surface: #0f1512;
+  --brand-on-surface: #dfe7e1;
+  --brand-surface-variant: #404943;
+  --brand-on-surface-variant: #c0c9c3;
 
-  --brand-surface-container-lowest: #070a12;
-  --brand-surface-container-low: #10141f;
-  --brand-surface-container: #151a26;
-  --brand-surface-container-high: #1b2130;
-  --brand-surface-container-highest: #222939;
+  --brand-surface-container-lowest: #0a0f0d;
+  --brand-surface-container-low: #181d1a;
+  --brand-surface-container: #1c211e;
+  --brand-surface-container-high: #262b28;
+  --brand-surface-container-highest: #313633;
 
-  --brand-outline: #6b7285;
-  --brand-outline-variant: #343b4d;
+  --brand-outline: #8a938c;
+  --brand-outline-variant: #404943;
 
-  --brand-inverse-surface: #e6e8f0;
-  --brand-inverse-on-surface: #1b1b21;
-  --brand-inverse-primary: #4f46e5;
+  --brand-inverse-surface: #dfe7e1;
+  --brand-inverse-on-surface: #2d322f;
+  --brand-inverse-primary: #059669;
 
   --brand-scrim: #000000;
   --brand-shadow: #000000;

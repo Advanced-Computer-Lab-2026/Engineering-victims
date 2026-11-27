@@ -1,10 +1,8 @@
 import React, { useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LogOut, X } from 'lucide-react';
-import { useSession } from '../hooks/useSession';
+import { NavLink } from 'react-router-dom';
+import { X } from 'lucide-react';
 import { useUnreadCount } from '../hooks/useUnreadCount';
 import { useFocusTrap } from '../hooks/useFocusTrap';
-import CustomButton from './ui/CustomButton';
 import { navLabel, visibleNavItems } from '../lib/navigation';
 import type { Role, StudentType } from '../lib/types';
 
@@ -17,8 +15,6 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClose }) => {
-  const navigate = useNavigate();
-  const { logout } = useSession();
   const { unreadCount } = useUnreadCount();
   const trapRef = useFocusTrap<HTMLElement>(open);
 
@@ -30,13 +26,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
-
-  const handleLogout = () => {
-    // Clearing the shared session also collapses the role-gated nav items, so
-    // signing out lands on login with no stale state behind it.
-    logout();
-    navigate('/', { replace: true });
-  };
 
   return (
     <>
@@ -74,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
           </button>
         </div>
 
-        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 pb-4">
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-4 pb-4 pt-2">
           {visibleNavItems(role, studentType).map((item) => {
             const Icon = item.icon;
             const label = navLabel(item, role);
@@ -128,19 +117,6 @@ const Sidebar: React.FC<SidebarProps> = ({ role, studentType = null, open, onClo
             );
           })}
         </nav>
-
-        <div className="border-t border-outline-variant p-4">
-          <CustomButton
-            variant="danger-ghost"
-            size="sm"
-            fullWidth
-            onClick={handleLogout}
-            icon={<LogOut className="h-4 w-4" aria-hidden />}
-            className="justify-start"
-          >
-            Sign Out
-          </CustomButton>
-        </div>
       </aside>
     </>
   );
