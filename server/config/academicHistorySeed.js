@@ -1,4 +1,5 @@
 const CourseRecord = require('../models/CourseRecord');
+const { recommendedSemesterFor } = require('../services/courseSemester');
 
 /**
  * Req 54 demo academic histories.
@@ -68,7 +69,12 @@ const termsBackBySemester = (currentSemester) => {
 };
 
 const gradeFor = (student, course) => {
-  const pool = GRADE_POOLS[student.academicStanding] ?? GRADE_POOLS['Good Standing'];
+  // Hana is also the deferred-payment demo account. Keep her generated GPA
+  // below the 3.70 threshold used by the extra-hours eligibility rule so her
+  // stored Good Standing remains eligible for that live payment journey.
+  const pool = student.studentId === '64-40077'
+    ? ['C', 'B-', 'B', 'B', 'B+']
+    : GRADE_POOLS[student.academicStanding] ?? GRADE_POOLS['Good Standing'];
   return pool[hash(`${student.studentId}|${course.code}`) % pool.length];
 };
 
@@ -95,13 +101,13 @@ const seedAcademicHistory = async ({ students, courses, offerings = [] }) => {
         (course) =>
           course.courseType !== 'Elective' &&
           course.majors.includes(student.major) &&
-          course.recommendedSemester <= student.currentSemester
+          recommendedSemesterFor(course, student.major) <= student.currentSemester
       );
 
-      const completed = ownCourses.filter((course) => course.recommendedSemester < student.currentSemester);
+      const completed = ownCourses.filter((course) => recommendedSemesterFor(course, student.major) < student.currentSemester);
       const enrolled = ownCourses.filter(
         (course) =>
-          course.recommendedSemester === student.currentSemester &&
+          recommendedSemesterFor(course, student.major) === student.currentSemester &&
           !publishedCourseIds.has(String(course._id))
       );
 
@@ -110,19 +116,20 @@ const seedAcademicHistory = async ({ students, courses, offerings = [] }) => {
         student.academicStanding === 'Probation'
           ? completed
               .filter((course) => course.courseType === 'Core')
-              .sort((a, b) => b.recommendedSemester - a.recommendedSemester || a.code.localeCompare(b.code))[0]
+              .sort((a, b) => recommendedSemesterFor(b, student.major) - recommendedSemesterFor(a, student.major) || a.code.localeCompare(b.code))[0]
           : null;
 
       const termsBack = termsBackBySemester(student.currentSemester);
 
       completed.forEach((course) => {
+        const semester = recommendedSemesterFor(course, student.major);
         rows.push({
           student: student._id,
           course: course._id,
           status: 'Completed',
           grade: failed && String(failed._id) === String(course._id) ? 'F' : gradeFor(student, course),
-          term: termLabel(termsBack.get(course.recommendedSemester)),
-          semester: course.recommendedSemester,
+          term: termLabel(termsBack.get(semester)),
+          semester,
         });
       });
 

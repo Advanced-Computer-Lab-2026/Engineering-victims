@@ -12,6 +12,7 @@ import EmptyState from '../components/ui/EmptyState';
 import Select from '../components/ui/Select';
 import { ApiError } from '../lib/api';
 import { fetchCourses, deleteCourse } from '../lib/coursesService';
+import { recommendedSemesterFor, recommendedSemesterLabel } from '../lib/courseSemester';
 import { COURSE_MAJORS, COURSE_SEASONS, COURSE_TYPES, type Course, type CourseImportResult } from '../lib/types';
 
 interface CourseFilters {
@@ -29,7 +30,9 @@ const EMPTY_COURSE_FILTERS: CourseFilters = {
 };
 
 const byCatalogueOrder = (a: Course, b: Course) =>
-  a.recommendedSemester - b.recommendedSemester || a.code.localeCompare(b.code, undefined, { numeric: true });
+  Math.min(...a.majors.map((major) => recommendedSemesterFor(a, major))) -
+    Math.min(...b.majors.map((major) => recommendedSemesterFor(b, major))) ||
+  a.code.localeCompare(b.code, undefined, { numeric: true });
 
 /**
  * Req 18-20: the Administrator's course catalogue. The whole catalogue is a
@@ -82,7 +85,14 @@ const CourseCataloguePage: React.FC = () => {
       }
       if (filters.courseType && course.courseType !== filters.courseType) return false;
       if (filters.major && !course.majors.includes(filters.major as Course['majors'][number])) return false;
-      if (filters.recommendedSemester && String(course.recommendedSemester) !== filters.recommendedSemester) {
+      if (
+        filters.recommendedSemester &&
+        !(filters.major
+          ? [filters.major as Course['majors'][number]].some(
+              (major) => String(recommendedSemesterFor(course, major)) === filters.recommendedSemester
+            )
+          : course.majors.some((major) => String(recommendedSemesterFor(course, major)) === filters.recommendedSemester))
+      ) {
         return false;
       }
       if (filters.offeringSeason && !course.offeringSeasons.includes(filters.offeringSeason as Course['offeringSeasons'][number])) {
@@ -93,7 +103,7 @@ const CourseCataloguePage: React.FC = () => {
   }, [courses, search, filters]);
 
   const semesters = useMemo(
-    () => [...new Set(courses.map((course) => course.recommendedSemester))].sort((a, b) => a - b),
+    () => [...new Set(courses.flatMap((course) => course.majors.map((major) => recommendedSemesterFor(course, major))))].sort((a, b) => a - b),
     [courses]
   );
 
@@ -339,7 +349,7 @@ const CourseCataloguePage: React.FC = () => {
                       <td className="px-4 py-3 text-on-surface">
                         {course.majors.length === COURSE_MAJORS.length ? 'Both' : course.majors.join(', ')}
                       </td>
-                      <td className="px-4 py-3 text-on-surface">{course.recommendedSemester}</td>
+                      <td className="px-4 py-3 text-on-surface">{recommendedSemesterLabel(course)}</td>
                       <td className="px-4 py-3 text-on-surface">{course.offeringSeasons.join(', ')}</td>
                       <td className="px-4 py-3 font-mono text-caption text-on-surface-variant">
                         {course.prerequisites.length === 0

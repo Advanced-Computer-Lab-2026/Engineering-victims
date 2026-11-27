@@ -212,8 +212,12 @@ The result is faster advising, fewer errors, and complete visibility for everyon
   only.
 
 ### Integrations
-- Google Calendar sync via OAuth
+- Google Calendar sync via OAuth (`configured` is read from the env; each
+  student connects their own Google account once, then syncs a processed
+  schedule)
 - Email notifications over Gmail SMTP (reset codes, password changes, advisor add/remove)
+- Extra-hours payments through Stripe hosted checkout, wallet balance or
+  deferral to the next installment, with refunds and a webhook for gateway results
 
 ---
 
@@ -372,30 +376,79 @@ The dataset is built so that no screen, filter or action is decorative:
 - **Every student has a login account** with the same email and the same
   `isActive` flag, so the profile join never falls back to "Not set" and a
   deactivated student really cannot sign in.
+- **All 13 Advising Students have a study group** named for their current
+  semester (`1st Semester` through `8th Semester`), so advisor grouping is
+  populated for the evaluation.
 - **Two advising students have no advisor**, so first-time assignment and the
   *Unassigned* filter have a target; the rest are spread over three advisors so
   reassignment and the advisor filter have options. One advisor deliberately has
   none, because *Remove advisor* refuses to run while students are assigned.
-- **3 terms** (one closed, the current one, one ahead), each with **course
-  offerings** — 25 in total, a mix of `Published` and `Draft` — and **54
-  lecture/tutorial/lab slots** laid out on a grid that cannot trip the
-  instructor or room conflict rules. No term is left empty: the catalogue only
-  offers Winter and Spring courses, so a Summer term could never hold an
-  offering and is deliberately not seeded.
+- **3 terms** (one closed, the current one, one ahead) with **33 course
+  offerings** — a mix of `Published` and `Draft` — and **87 lecture/tutorial/lab
+  slots** on a grid that cannot trip the instructor or room conflict rules.
+  Three current-term tutorial groups are filled to their exact seat count so the
+  seat meter, the *Full* badge and "no seats left" pickers all have content.
 - **75 courses** with prerequisites linked by id (no dangling codes, no cycles),
   so the prerequisite picker and the *Required by* panel both have content.
-- **4 graduation plans** exercise the review workflow: an accepted plan, a
-  submission awaiting Coordinator review, a rejected plan returned to its
-  Advisor as a private draft with the Coordinator's note, and an unfinished
-  private draft. Drafts are visible only to their creating Advisor; Coordinators
-  see submitted and accepted plans, and the Advising Student sees only their
-  accepted plan.
-- **81 notifications**, written *from* the state above rather than from a fixed
+  DMET 502 appears once in the catalogue with its DMET semester 5 placement and
+  a Computer Science semester 7 override, matching both curriculum entries.
+- **205 schedule rows** spanning no schedule, incomplete and complete drafts,
+  review-ready and processed schedules, plus **2 saved advising drafts** so the
+  draft editor opens on real courses instead of writing a migration row on first
+  read.
+- **5 graduation plans**: 3 Draft, 1 Submitted and 1 Accepted. Drafts are
+  visible only to their creating Advisor; Coordinators see submitted and
+  accepted plans, and the Advising
+  Student sees only their accepted plan.
+- **12 slot-change requests**: 9 Pending, 1 Approved (moved into a newly
+  published second lecture group), 1 Rejected (single-group course) and 1
+  Withdrawn — every review decision and every student-history status has a row.
+- **2 exit-exam requests**: 1 Pending and 1 Approved.
+- **10 extra-hours requests**: Rejected, Withdrawn, 2 Pending, Paid (wallet),
+  Deferred, Refunded, failed gateway, and 2 Approved but awaiting a payment
+  choice — one student has enough wallet balance, the other has none.
+- **5 swap requests**: Open, Completed, Withdrawn and Expired, including two
+  Open requests whose course sets match exactly.
+- **11 schedule-history records** across 8 students, 2 actions, 3 staff roles
+  and 5 staff members, with fixed staggered dates — enough for the search,
+  action/date filters and CSV export to be demonstrated.
+- **86 notifications**, written *from* the state above rather than from a fixed
   script: a student's notifications match their workflow status, an inactive
   student is not told they can sign in, an advisor's message names their actual
   students, and the Coordinator/Administrator counts are computed off the
   records. Every account has at least one unread and one read row, so both
   *mark as read* and *mark all as read* work everywhere.
+
+### Prepared demo cases
+
+All of these are in the shared database after `node seed/seed.cjs`. The exact
+same rows are produced by a fresh seed; `node scripts/verify-seed-state.cjs`
+proves it and `node scripts/audit-demo-rules.cjs` checks the app's own rules.
+
+| Login | Screen | What is ready to demonstrate |
+| --- | --- | --- |
+| `coordinator@guc.edu.eg` | Slot-change review | Approve one of 9 Pending requests; filter for the existing Approved, Rejected and Withdrawn rows |
+| `coordinator@guc.edu.eg` | Extra-hours review / finance | Rana Adel's Pending request to decide; 10 requests and 4 payment/deferred records across all states |
+| `mona.adel@guc.edu.eg` | Advising students | Laila Hassan — probation, Approved mandatory-course removal, Approved exit exam and an Approved slot change |
+| `advisor@guc.edu.eg` | Advising students | Ahmed Sherif — probation with a failed mandatory course, a Pending exit exam and a Draft graduation plan |
+| `karim.fahmy@guc.edu.eg` | Advising students | Hana Mahmoud — bachelor-project eligible, Draft graduation plan, Deferred extra-hours charge and an approved request awaiting payment from a well-funded wallet |
+| `omar.nabil@student.guc.edu.eg` | My extra hours | Approved request awaiting payment with **zero** wallet balance, so the insufficient-funds path is reachable |
+| `rana.adel@student.guc.edu.eg` | My extra hours | An approved request already refunded to her wallet (the Pending and Rejected requests are in the Coordinator's review queue) |
+| `yasmin.adly@student.guc.edu.eg` / `mariam.said@student.guc.edu.eg` | Graduation plans | Submitted and Accepted plans respectively; three Draft plans are visible to their Advisors |
+| `karim.emad@student.guc.edu.eg` / `yasmin.adly@student.guc.edu.eg` / `nour.elsayed@student.guc.edu.eg` | Schedule activity history | Processed and Reopened entries across 8 students, 3 staff roles and 11 dates — filter, search and export all return rows |
+| `samy.elgedaily@student.guc.edu.eg` / `mariam.fouad@student.guc.edu.eg` | Schedule swaps | Two Open requests with identical course sets, so accepting one completes a real swap; Zeyad, Farida and Youssef supply Completed, Withdrawn and Expired rows |
+| `dina.mostafa@student.guc.edu.eg` | Weekly schedule | No schedule at all (`Not Started`) |
+| `omar.nabil@student.guc.edu.eg` | Advising schedule draft | An incomplete saved draft backed by `Draft` schedule rows |
+| `nour.elsayed@student.guc.edu.eg` | Advising schedule draft | A `Reopened` draft with two saved courses and a history reason |
+| `karim.emad@student.guc.edu.eg` / `yasmin.adly@student.guc.edu.eg` | Weekly schedule | Processed schedules |
+| `laila.hassan@student.guc.edu.eg` / `salma.ibrahim@student.guc.edu.eg` / `hassan.rifaat@student.guc.edu.eg` | Weekly schedule | Review-ready schedules, with slot-change requests already attached |
+
+The Winter term's swap deadline is set to the advising deadline, so the seeded
+Open requests stay open while the demo runs. Visiting the extra-hours screen
+triggers the app's idempotent notification backfill (+6 rows); run
+`node seed/seed.cjs` before taking a fresh evaluation snapshot. Calendar sync,
+outbound email and Stripe are configured through `server/.env`; a real calendar
+connection still needs a one-off Google OAuth sign-in from the student account.
 
 ### Troubleshooting
 
@@ -439,6 +492,10 @@ the browser calls it directly instead of through the proxy.
 | `NODE_ENV` | `development` | Runtime mode |
 | `MAIL_USER` | `engineeringvictims1@gmail.com` | Gmail address that sends outbound email |
 | `MAIL_PASS` | — | 16-char Gmail **App Password** (not the account password). Blank disables email |
+| `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` | — | Stripe test keys for hosted extra-hours checkout and the webhook |
+| `PAYMENT_APP_ORIGIN` | `http://localhost:5173` | Client origin Stripe returns to after checkout |
+| `GOOGLE_CALENDAR_CLIENT_ID` / `GOOGLE_CALENDAR_CLIENT_SECRET` / `GOOGLE_CALENDAR_REDIRECT_URI` | — | Google OAuth client used by calendar sync |
+| `CALENDAR_TOKEN_KEY` | — | Key used to encrypt stored calendar refresh tokens |
 
 `.env` (client)
 

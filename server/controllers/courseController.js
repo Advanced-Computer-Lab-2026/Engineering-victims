@@ -22,6 +22,7 @@ const toCourseResponse = (course) => ({
   faculty: course.faculty,
   majors: course.majors ?? [],
   recommendedSemester: course.recommendedSemester,
+  recommendedSemesterByMajor: course.recommendedSemesterByMajor ?? [],
   offeringSeasons: course.offeringSeasons ?? [],
   prerequisites: (course.prerequisites ?? []).map((prerequisite) => ({
     id: String(prerequisite._id),

@@ -1,6 +1,7 @@
 const ScheduleTemplate = require('../models/ScheduleTemplate');
 const StudentSchedule = require('../models/StudentSchedule');
 const CourseSlot = require('../models/CourseSlot');
+const { recommendedSemesterFor } = require('../services/courseSemester');
 
 /**
  * Standard schedule groups ("Schedule Groups" on the Coordinator's screen) and
@@ -134,7 +135,7 @@ const seedScheduleGroups = async ({ terms, offerings, courses, students }) => {
       .map((entry, index) => ({
         entry,
         index,
-        distance: Math.abs((entry.course.recommendedSemester ?? 0) - semester),
+        distance: Math.abs((recommendedSemesterFor(entry.course, major) ?? 0) - semester),
       }))
       // Closest to the cohort's semester first; catalogue order breaks ties so
       // the same group comes out on every reseed.

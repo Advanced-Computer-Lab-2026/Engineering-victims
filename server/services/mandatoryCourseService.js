@@ -2,6 +2,7 @@ const Course = require('../models/Course');
 const CourseRecord = require('../models/CourseRecord');
 const MandatoryRemovalRequest = require('../models/MandatoryRemovalRequest');
 const { requiredCourseFilter, FAIL } = require('./academicHistoryService');
+const { recommendedSemesterFor } = require('./courseSemester');
 
 const FAILED = 'Failed';
 const UNATTENDED = 'Unattended';
@@ -85,14 +86,14 @@ const deriveCandidates = ({ student, records, catalogue, approvedRemovals = new 
     ? catalogue
         .filter(
           (course) =>
-            Number.isInteger(course.recommendedSemester) &&
-            course.recommendedSemester < student.currentSemester &&
+            Number.isInteger(recommendedSemesterFor(course, student.major)) &&
+            recommendedSemesterFor(course, student.major) < student.currentSemester &&
             !attempts.has(String(course._id))
         )
         .map((course) => ({
           course: courseSummary(course),
           reason: UNATTENDED,
-          semester: course.recommendedSemester,
+          semester: recommendedSemesterFor(course, student.major),
           // Never taken, so there is no term to show.
           term: null,
           inProgress: false,
@@ -109,7 +110,7 @@ const deriveCandidates = ({ student, records, catalogue, approvedRemovals = new 
 const buildMandatoryCandidates = async (student) => {
   const [records, catalogue, approvedRemovals] = await Promise.all([
     CourseRecord.find({ student: student._id }).populate('course', 'code name creditHours').lean(),
-    Course.find(requiredCourseFilter(student)).select('code name creditHours recommendedSemester').lean(),
+    Course.find(requiredCourseFilter(student)).select('code name creditHours recommendedSemester recommendedSemesterByMajor').lean(),
     approvedRemovalsFor(student),
   ]);
 

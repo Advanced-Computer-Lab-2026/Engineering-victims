@@ -1,6 +1,7 @@
 const CourseRecord = require('../models/CourseRecord');
 const ExtraHoursRequest = require('../models/ExtraHoursRequest');
 const { evaluateExtraHoursRequest, prepareExtraHoursRequest } = require('../services/extraHoursService');
+const { recommendedSemesterFor } = require('../services/courseSemester');
 
 const DEMO_REQUESTS = [
   { reference: 'EHR-DEMO-001', studentEmail: 'rana.adel@student.guc.edu.eg', decision: 'Rejected' },
@@ -54,11 +55,11 @@ const buildSpecRequest = ({ spec, student, term, courses, records }) => {
   const candidates = courses
     .filter((course) =>
       course.isActive === true &&
-      course.recommendedSemester >= student.currentSemester &&
+      recommendedSemesterFor(course, student.major) >= student.currentSemester &&
       course.majors.includes(student.major) &&
       !passedCourses.has(String(course._id))
     )
-    .sort((a, b) => a.recommendedSemester - b.recommendedSemester || a.code.localeCompare(b.code));
+    .sort((a, b) => recommendedSemesterFor(a, student.major) - recommendedSemesterFor(b, student.major) || a.code.localeCompare(b.code));
 
   for (let selectedHours = baseline.maximumTotalHours; selectedHours > baseline.standardHours; selectedHours -= 1) {
     const requestedHours = selectedHours - baseline.standardHours;

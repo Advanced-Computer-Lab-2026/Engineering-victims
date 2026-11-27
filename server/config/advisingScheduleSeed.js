@@ -1,6 +1,7 @@
 const CourseSlot = require('../models/CourseSlot');
 const StudentSchedule = require('../models/StudentSchedule');
 const { stageFor } = require('../services/weeklyScheduleService');
+const { recommendedSemesterFor } = require('../services/courseSemester');
 
 /**
  * Req 31 demo schedules for the Advising Students.
@@ -74,8 +75,8 @@ const seedAdvisingSchedules = async ({ terms, offerings, courses, students }) =>
         .filter(({ course }) => course && course.majors.includes(student.major))
         .sort(
           (a, b) =>
-            Math.abs(a.course.recommendedSemester - student.currentSemester) -
-              Math.abs(b.course.recommendedSemester - student.currentSemester) ||
+            Math.abs(recommendedSemesterFor(a.course, student.major) - student.currentSemester) -
+              Math.abs(recommendedSemesterFor(b.course, student.major) - student.currentSemester) ||
             a.course.code.localeCompare(b.course.code)
         );
 

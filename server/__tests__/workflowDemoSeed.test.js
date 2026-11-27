@@ -5,7 +5,10 @@ jest.mock('../models/ExitExamRequest', () => ({ create: jest.fn() }));
 jest.mock('../models/SemesterStanding', () => ({ insertMany: jest.fn() }));
 jest.mock('../models/GraduationPlan', () => ({ exists: jest.fn() }));
 jest.mock('../services/graduationPlanService', () => ({ remainingCoursesFor: jest.fn() }));
-jest.mock('../services/exitExamRequestService', () => ({ validateRequest: jest.fn() }));
+jest.mock('../services/exitExamRequestService', () => ({
+  validateRequest: jest.fn(),
+  applyDecision: jest.fn(),
+}));
 jest.mock('../services/probationService', () => ({ semesterOrdinal: jest.fn(() => 4051) }));
 
 const StudentSchedule = require('../models/StudentSchedule');
@@ -15,7 +18,7 @@ const ExitExamRequest = require('../models/ExitExamRequest');
 const SemesterStanding = require('../models/SemesterStanding');
 const GraduationPlan = require('../models/GraduationPlan');
 const { remainingCoursesFor } = require('../services/graduationPlanService');
-const { validateRequest } = require('../services/exitExamRequestService');
+const { validateRequest, applyDecision } = require('../services/exitExamRequestService');
 const {
   seedSlotChangeRequests,
   seedExitExamRequests,
@@ -44,9 +47,11 @@ describe('seedSlotChangeRequests', () => {
       termStartDate: new Date('2026-09-15T00:00:00Z'),
       advisingDeadline: new Date('2027-01-15T00:00:00Z'),
     };
+    // Not one of the three students with a seeded outcome, so every request
+    // this test checks stays Pending — the state the review queue opens on.
     const student = {
       _id: 'student',
-      studentId: '64-30010',
+      studentId: '64-30012',
       studentType: 'Advising Student',
       workflowStatus: 'Ready for Student Review',
     };
@@ -66,18 +71,37 @@ describe('seedSlotChangeRequests', () => {
     }));
     StudentSchedule.find.mockReturnValue(queryFor(scheduleRows));
     CourseSlot.find.mockReturnValue(queryFor(slots));
+    SlotChangeRequest.insertMany.mockResolvedValueOnce(
+      ['Lecture', 'Tutorial', 'Lab'].map((slotType, index) => ({
+        _id: `request-${slotType.toLowerCase()}`,
+        student: student._id,
+        slotType,
+        currentSlot: `slot-${slotType.toLowerCase()}`,
+        scheduleEntry: `entry-${slotType.toLowerCase()}`,
+        toObject() {
+          return this;
+        },
+      }))
+    );
 
     await expect(
       seedSlotChangeRequests({
         students: [student],
         terms: [term],
+        users: [],
         courses: slots.map((slot) => ({
           _id: slot.offeringId.courseId,
           code: `CSEN ${slot.slotType}`,
         })),
         now: new Date('2026-11-14T00:00:00Z'),
       })
-    ).resolves.toBe(3);
+    ).resolves.toEqual({
+      created: 3,
+      Pending: 3,
+      Approved: 0,
+      Rejected: 0,
+      Withdrawn: 0,
+    });
 
     const requests = SlotChangeRequest.insertMany.mock.calls[0][0];
     expect(requests.map((request) => request.status)).toEqual(['Pending', 'Pending', 'Pending']);
@@ -99,22 +123,41 @@ describe('seedSlotChangeRequests', () => {
 });
 
 describe('seedExitExamRequests', () => {
-  it('creates a pending request for the seeded advisor draft and sole failed course', async () => {
+  it('creates one pending and one decided request for the two eligible students', async () => {
     const student = {
       _id: 'student',
       studentId: '64-30011',
       studentType: 'Advising Student',
       assignedAdvisor: 'advisor',
     };
+    const decidedStudent = {
+      _id: 'decided-student',
+      studentId: '64-20045',
+      studentType: 'Advising Student',
+      assignedAdvisor: 'advisor',
+    };
     const advisor = { _id: 'advisor', role: 'Advisor' };
+    const coordinator = { _id: 'coordinator', role: 'Coordinator' };
+    const save = jest.fn();
+    ExitExamRequest.create.mockImplementation(() => ({ save }));
+    applyDecision.mockReturnValue(null);
 
-    await expect(seedExitExamRequests({ students: [student], users: [advisor] })).resolves.toBe(1);
+    await expect(
+      seedExitExamRequests({
+        students: [student, decidedStudent],
+        users: [advisor, coordinator],
+      })
+    ).resolves.toBe(2);
 
+    // Only the Pending case needs a draft plan; the decided one is validated
+    // and approved straight away.
+    expect(GraduationPlan.exists).toHaveBeenCalledTimes(1);
     expect(GraduationPlan.exists).toHaveBeenCalledWith({
       student: student._id,
       advisor: advisor._id,
       status: 'Draft',
     });
+    expect(validateRequest).toHaveBeenCalledTimes(2);
     expect(validateRequest).toHaveBeenCalledWith({
       student,
       remaining: [{ id: 'failed-course', isRetake: true }],
@@ -129,6 +172,11 @@ describe('seedExitExamRequests', () => {
         status: 'Pending',
       })
     );
+    expect(applyDecision).toHaveBeenCalledTimes(1);
+    expect(applyDecision).toHaveBeenCalledWith(
+      expect.objectContaining({ decision: 'approve', coordinatorId: coordinator._id })
+    );
+    expect(save).toHaveBeenCalledTimes(1);
   });
 });
 
